@@ -14,5 +14,16 @@ export default defineSchema({
 		// Ordered; a game's engine derives per-player role (e.g. tictactoe's X/O) from index.
 		playerIds: v.array(v.id("users")),
 		state: gameStateValidator
-	}).index("byCode", ["code"])
+	}).index("byCode", ["code"]),
+
+	cursors: defineTable({
+		roomId: v.id("rooms"),
+		userId: v.id("users"),
+		// Normalized to the tracked area (0-1), so it maps consistently across viewers regardless of viewport size.
+		x: v.number(),
+		y: v.number(),
+		updatedAt: v.number()
+	})
+		.index("byRoom", ["roomId"])
+		.index("byRoomAndUser", ["roomId", "userId"])
 });

@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as cursors from "../cursors.js";
 import type * as games_engine from "../games/engine.js";
 import type * as games_index from "../games/index.js";
 import type * as games_tictactoe_engine from "../games/tictactoe/engine.js";
@@ -22,6 +23,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  cursors: typeof cursors;
   "games/engine": typeof games_engine;
   "games/index": typeof games_index;
   "games/tictactoe/engine": typeof games_tictactoe_engine;

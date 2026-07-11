@@ -7,7 +7,7 @@ const CODE_LENGTH = 6;
 // No 0/O/1/I/L — avoids ambiguous shared-code typos.
 const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 
-async function requireUser(ctx: QueryCtx | MutationCtx) {
+export async function requireUser(ctx: QueryCtx | MutationCtx) {
 	const identity = await ctx.auth.getUserIdentity();
 	if (!identity) throw new Error("Sign in to play");
 
@@ -17,7 +17,7 @@ async function requireUser(ctx: QueryCtx | MutationCtx) {
 	return user;
 }
 
-async function getRoomByCode(ctx: QueryCtx | MutationCtx, code: string) {
+export async function getRoomByCode(ctx: QueryCtx | MutationCtx, code: string) {
 	return await ctx.db
 		.query("rooms")
 		.withIndex("byCode", (q) => q.eq("code", code))

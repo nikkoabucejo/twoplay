@@ -4,6 +4,7 @@
 	import { draw, fade } from "svelte/transition";
 	import { Board } from "$lib/components/layout";
 	import { Button } from "$lib/components/ui";
+	import { CursorLayer } from "$lib/features/presence";
 	import { getClerkAuth } from "$lib/services/auth";
 	import { cn } from "$lib/utils/style";
 	import { api } from "../../../../../convex/_generated/api.js";
@@ -161,26 +162,33 @@
 			<Button variant="outline" onclick={copyInviteLink}>Copy invite link</Button>
 		</div>
 	{:else if data}
-		<Board
-			players={[
-				{ label: room.playerX?.name ?? "Player 1", accent: "text-cyan-500", abilities },
-				{ label: room.playerO?.name ?? "Player 2", accent: "text-pink-500", abilities }
-			]}
+		<CursorLayer
+			{roomCode}
+			class="mx-auto w-fit"
+			colorFor={(index) =>
+				index === 0 ? "text-cyan-500" : index === 1 ? "text-pink-500" : "text-muted-foreground"}
 		>
-			<div class="grid size-full grid-cols-3 grid-rows-3 gap-3">
-				{#each room.boards as cells, boardIndex (boardIndex)}
-					{@render miniBoard(cells, boardIndex)}
-				{/each}
-			</div>
-
-			{#snippet controls()}
-				<div class="flex flex-col items-center gap-2">
-					<Button variant="outline" onclick={() => room.reset()}>Reset game</Button>
-					{#if room.error}
-						<p class="text-sm text-destructive">{room.error}</p>
-					{/if}
+			<Board
+				players={[
+					{ label: room.playerX?.name ?? "Player 1", accent: "text-cyan-500", abilities },
+					{ label: room.playerO?.name ?? "Player 2", accent: "text-pink-500", abilities }
+				]}
+			>
+				<div class="grid size-full grid-cols-3 grid-rows-3 gap-3">
+					{#each room.boards as cells, boardIndex (boardIndex)}
+						{@render miniBoard(cells, boardIndex)}
+					{/each}
 				</div>
-			{/snippet}
-		</Board>
+
+				{#snippet controls()}
+					<div class="flex flex-col items-center gap-2">
+						<Button variant="outline" onclick={() => room.reset()}>Reset game</Button>
+						{#if room.error}
+							<p class="text-sm text-destructive">{room.error}</p>
+						{/if}
+					</div>
+				{/snippet}
+			</Board>
+		</CursorLayer>
 	{/if}
 </div>
