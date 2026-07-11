@@ -1,11 +1,11 @@
 <script lang="ts">
-	import './layout.css';
-	import favicon from '$lib/assets/favicon.svg';
-	import { browser } from '$app/environment';
-	import { setupConvex, setupAuth } from 'convex-svelte';
-	import { PUBLIC_CONVEX_URL, PUBLIC_CLERK_PUBLISHABLE_KEY } from '$env/static/public';
-	import { setupClerkAuth } from '$lib/services/auth';
-	import type { LayoutProps } from './$types';
+	import "./layout.css";
+	import favicon from "$lib/assets/favicon.svg";
+	import { browser } from "$app/environment";
+	import { setupConvex, setupAuth } from "convex-svelte";
+	import { PUBLIC_CONVEX_URL, PUBLIC_CLERK_PUBLISHABLE_KEY } from "$env/static/public";
+	import { setupClerkAuth } from "$lib/services/auth";
+	import type { LayoutProps } from "./$types";
 
 	let { data, children }: LayoutProps = $props();
 

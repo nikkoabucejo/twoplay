@@ -9,8 +9,14 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 	if (!auth?.userId) return { user: null };
 
 	const user = await clerkClient.users.getUser(auth.userId);
-	const email = user.emailAddresses.find((address) => address.id === user.primaryEmailAddressId)?.emailAddress ?? null;
-	const name = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.username || email || "Anonymous";
+	const email =
+		user.emailAddresses.find((address) => address.id === user.primaryEmailAddressId)
+			?.emailAddress ?? null;
+	const name =
+		[user.firstName, user.lastName].filter(Boolean).join(" ") ||
+		user.username ||
+		email ||
+		"Anonymous";
 
 	// No named JWT template needed — Convex reads the `aud: "convex"` claim
 	// mapped onto the default session token (Clerk dashboard → Sessions →
@@ -23,6 +29,6 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 	}
 
 	return {
-		user: { id: user.id, email, name, imageUrl: user.hasImage ? user.imageUrl : null },
+		user: { id: user.id, email, name, imageUrl: user.hasImage ? user.imageUrl : null }
 	};
 };

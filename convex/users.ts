@@ -14,7 +14,7 @@ export const store = mutation({
 		} else if (user.name !== name) {
 			await ctx.db.patch(user._id, { name });
 		}
-	},
+	}
 });
 
 async function userByExternalId(ctx: QueryCtx, externalId: string) {

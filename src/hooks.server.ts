@@ -3,7 +3,7 @@ import { clerkClient } from "$lib/services/auth/clerk.server";
 
 export const handle: Handle = async ({ event, resolve }) => {
 	const requestState = await clerkClient.authenticateRequest(event.request, {
-		authorizedParties: [event.url.origin],
+		authorizedParties: [event.url.origin]
 	});
 
 	event.locals.auth = requestState.toAuth();

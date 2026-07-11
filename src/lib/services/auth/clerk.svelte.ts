@@ -43,7 +43,7 @@ function profileFromUser(user: ClerkUser): ClerkProfile {
 		id: user.id,
 		email: user.primaryEmailAddress?.emailAddress ?? null,
 		name: user.fullName ?? user.username ?? null,
-		imageUrl: user.hasImage ? user.imageUrl : null,
+		imageUrl: user.hasImage ? user.imageUrl : null
 	};
 }
 
@@ -81,7 +81,7 @@ export class ClerkAuth {
 
 		await clerk.load({
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			ui: { ClerkUI: window.__internal_ClerkUICtor as any },
+			ui: { ClerkUI: window.__internal_ClerkUICtor as any }
 		});
 		this.#sync();
 		this.#resolveReady();

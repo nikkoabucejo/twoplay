@@ -1,0 +1,8 @@
+.svelte-kit
+build
+convex/_generated
+pnpm-lock.yaml
+static
+.agents
+.claude
+skills-lock.json
