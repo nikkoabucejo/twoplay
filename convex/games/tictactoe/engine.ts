@@ -55,6 +55,18 @@ function status(state: TictactoeState): GameStatus {
 	return { turnIndex: totalFilled % 2 === 0 ? 0 : 1, winnerIndex: null, isOver: false };
 }
 
+/** Whoever has won more of the nine mini-boards; null on a tie (including 0-0). */
+function roundWinner(state: TictactoeState): number | null {
+	const wins = [0, 0];
+	for (const board of state.boards) {
+		const winner = winnerOf(board);
+		if (winner === "X") wins[0]++;
+		else if (winner === "O") wins[1]++;
+	}
+	if (wins[0] === wins[1]) return null;
+	return wins[0] > wins[1] ? 0 : 1;
+}
+
 function applyMove(
 	state: TictactoeState,
 	playerIndex: number,
@@ -91,5 +103,6 @@ export const tictactoeEngine: GameEngine<TictactoeState, TictactoeMove> = {
 	createInitialState,
 	applyMove,
 	status,
-	roleLabel
+	roleLabel,
+	roundWinner
 };

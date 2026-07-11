@@ -62,6 +62,10 @@
 		copiedTimeout = setTimeout(() => (copied = false), 1500);
 	}
 
+	function firstName(name: string) {
+		return name.split(" ")[0];
+	}
+
 	const destinations = $derived(
 		room.effectiveSelected !== null ? room.movesFrom(room.effectiveSelected).map((m) => m.to) : []
 	);
@@ -169,7 +173,9 @@
 				{#snippet header()}
 					<div class="flex items-center gap-2">
 						<span class="size-2.5 rounded-full bg-cyan-500"></span>
-						<span class="font-semibold text-cyan-500">{room.playerCyan?.name ?? "Player 1"}</span>
+						<span class="font-semibold text-cyan-500">
+							{room.playerCyan ? firstName(room.playerCyan.name) : "Player 1"}
+						</span>
 						<span class="tabular-nums text-muted-foreground">{room.scoreCyan}</span>
 					</div>
 
@@ -192,9 +198,11 @@
 						{/if}
 					</div>
 
-					<div class="flex items-center gap-2">
+					<div class="flex items-center justify-end gap-2">
 						<span class="tabular-nums text-muted-foreground">{room.scorePink}</span>
-						<span class="font-semibold text-pink-500">{room.playerPink?.name ?? "Player 2"}</span>
+						<span class="font-semibold text-pink-500">
+							{room.playerPink ? firstName(room.playerPink.name) : "Player 2"}
+						</span>
 						<span class="size-2.5 rounded-full bg-pink-500"></span>
 					</div>
 				{/snippet}

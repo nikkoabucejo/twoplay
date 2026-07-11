@@ -103,7 +103,7 @@
 		<div class="flex flex-col items-center gap-6">
 			{#if header}
 				<div
-					class="flex w-(--board-size) items-center justify-between gap-3 rounded-lg border bg-muted/40 px-4 py-2.5 text-sm backdrop-blur-sm"
+					class="grid w-(--board-size) grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-lg border bg-muted/40 px-4 py-2.5 text-sm backdrop-blur-sm"
 				>
 					{@render header()}
 				</div>

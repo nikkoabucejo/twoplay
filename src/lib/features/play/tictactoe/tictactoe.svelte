@@ -66,6 +66,10 @@
 		clearTimeout(copiedTimeout);
 		copiedTimeout = setTimeout(() => (copied = false), 1500);
 	}
+
+	function firstName(name: string) {
+		return name.split(" ")[0];
+	}
 </script>
 
 {#snippet mark(value: "X" | "O", size: string = "h-3/5 w-3/5")}
@@ -211,7 +215,9 @@
 				{#snippet header()}
 					<div class="flex items-center gap-2">
 						<span class="size-2.5 rounded-full bg-cyan-500"></span>
-						<span class="font-semibold text-cyan-500">{room.playerX?.name ?? "Player 1"}</span>
+						<span class="font-semibold text-cyan-500">
+							{room.playerX ? firstName(room.playerX.name) : "Player 1"}
+						</span>
 						<span class="tabular-nums text-muted-foreground">{room.scoreX}</span>
 					</div>
 
@@ -226,9 +232,11 @@
 						</span>
 					</div>
 
-					<div class="flex items-center gap-2">
+					<div class="flex items-center justify-end gap-2">
 						<span class="tabular-nums text-muted-foreground">{room.scoreO}</span>
-						<span class="font-semibold text-pink-500">{room.playerO?.name ?? "Player 2"}</span>
+						<span class="font-semibold text-pink-500">
+							{room.playerO ? firstName(room.playerO.name) : "Player 2"}
+						</span>
 						<span class="size-2.5 rounded-full bg-pink-500"></span>
 					</div>
 				{/snippet}

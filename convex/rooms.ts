@@ -5,6 +5,7 @@ import {
 	gameMoveValidator,
 	gameTypeValidator,
 	getEngine,
+	roundWinner,
 	type GameType
 } from "./games/index.js";
 import { userByExternalId } from "./users.js";
@@ -51,7 +52,8 @@ export const create = mutation({
 			code,
 			gameType,
 			playerIds: [user._id],
-			state: engine.createInitialState()
+			state: engine.createInitialState(),
+			scores: Array(engine.playerCount).fill(0)
 		});
 		return code;
 	}
@@ -96,7 +98,8 @@ export const get = query({
 			gameType: room.gameType,
 			players: players.map((p) => (p ? { name: p.name } : null)),
 			myIndex: myIndex >= 0 ? myIndex : null,
-			state: room.state
+			state: room.state,
+			scores: room.scores ?? Array(engine.playerCount).fill(0)
 		};
 	}
 });
@@ -130,6 +133,10 @@ export const reset = mutation({
 		}
 
 		const engine = getEngine(room.gameType as GameType);
-		await ctx.db.patch(room._id, { state: engine.createInitialState() });
+		const scores = room.scores ?? Array(engine.playerCount).fill(0);
+		const winnerIndex = roundWinner(room.gameType as GameType, room.state);
+		if (winnerIndex !== null) scores[winnerIndex] += 1;
+
+		await ctx.db.patch(room._id, { state: engine.createInitialState(), scores });
 	}
 });

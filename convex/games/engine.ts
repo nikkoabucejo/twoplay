@@ -11,4 +11,6 @@ export interface GameEngine<State, Move> {
 	applyMove(state: State, playerIndex: number, move: Move): State;
 	status(state: State): GameStatus;
 	roleLabel(index: number): string;
+	/** Index of the round's winner (for score-keeping when a room resets), or null if undecided/tied. */
+	roundWinner(state: State): number | null;
 }

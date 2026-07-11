@@ -142,9 +142,9 @@ export class CheckersRoom {
 	playerCyan = $derived(this.data?.players?.[0] ?? null);
 	playerPink = $derived(this.data?.players?.[1] ?? null);
 
-	/** Pieces remaining on the board, used as an at-a-glance material score. */
-	scoreCyan = $derived(this.board.filter((p) => p?.color === "cyan").length);
-	scorePink = $derived(this.board.filter((p) => p?.color === "pink").length);
+	/** Matches won by each side, persisted on the room and carried across resets. */
+	scoreCyan = $derived(this.data?.scores?.[0] ?? 0);
+	scorePink = $derived(this.data?.scores?.[1] ?? 0);
 
 	/** No legal moves for the side to move means that side is out of moves or pieces — the other color wins. */
 	winner = $derived<PieceColor | null>(

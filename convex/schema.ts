@@ -13,7 +13,9 @@ export default defineSchema({
 		gameType: gameTypeValidator,
 		// Ordered; a game's engine derives per-player role (e.g. tictactoe's X/O) from index.
 		playerIds: v.array(v.id("users")),
-		state: gameStateValidator
+		state: gameStateValidator,
+		// Rounds won per player index; persists across resets. Optional for rooms created before this field existed.
+		scores: v.optional(v.array(v.number()))
 	}).index("byCode", ["code"]),
 
 	cursors: defineTable({

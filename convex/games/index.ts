@@ -58,3 +58,17 @@ export function applyMove(
 		}
 	}
 }
+
+/** Dispatches to the matching engine's `roundWinner`, for the same reason `applyMove` above does. */
+export function roundWinner(gameType: GameType, state: GameState): number | null {
+	switch (gameType) {
+		case "tictactoe": {
+			if (state.kind !== "tictactoe") throw new Error("State does not match this room's game");
+			return tictactoeEngine.roundWinner(state);
+		}
+		case "checkers": {
+			if (state.kind !== "checkers") throw new Error("State does not match this room's game");
+			return checkersEngine.roundWinner(state);
+		}
+	}
+}

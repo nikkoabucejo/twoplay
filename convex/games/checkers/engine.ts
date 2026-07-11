@@ -130,6 +130,11 @@ function status(state: CheckersState): GameStatus {
 	return { turnIndex, winnerIndex: null, isOver: false };
 }
 
+/** The match's winner once the side to move has no legal moves left; null while still in progress. */
+function roundWinner(state: CheckersState): number | null {
+	return status(state).winnerIndex;
+}
+
 function applyMove(state: CheckersState, playerIndex: number, move: CheckersMove): CheckersState {
 	const color = colorOf(playerIndex);
 	if (color !== state.turn) throw new Error("Not your turn");
@@ -165,5 +170,6 @@ export const checkersEngine: GameEngine<CheckersState, CheckersMove> = {
 	createInitialState,
 	applyMove,
 	status,
-	roleLabel
+	roleLabel,
+	roundWinner
 };
