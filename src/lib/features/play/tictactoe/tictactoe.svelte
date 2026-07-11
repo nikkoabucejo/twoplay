@@ -1,12 +1,11 @@
 <script lang="ts">
-	import { Check, Link, RotateCcw, Trophy } from "@lucide/svelte";
 	import { useMutation } from "convex-svelte";
 	import { backOut } from "svelte/easing";
 	import { draw, fade } from "svelte/transition";
 	import { goto } from "$app/navigation";
-	import { Board } from "$lib/components/layout";
+	import { Board, type BoardStatus } from "$lib/components/layout";
 	import { Button, Spinner } from "$lib/components/ui";
-	import { CursorLayer } from "$lib/features/presence";
+	import { Cursor } from "$lib/features/presence";
 	import { getClerkAuth } from "$lib/services/auth";
 	import { cn } from "$lib/utils/style";
 	import { api } from "../../../../../convex/_generated/api.js";
@@ -70,6 +69,14 @@
 	function firstName(name: string) {
 		return name.split(" ")[0];
 	}
+
+	const status: BoardStatus = $derived(
+		room.winner
+			? { type: "winner", player: room.winner === "X" ? 0 : 1, label: room.winner }
+			: room.isOver
+				? { type: "draw" }
+				: { type: "turn", player: room.turn === "X" ? 0 : 1 }
+	);
 </script>
 
 {#snippet mark(value: "X" | "O", size: string = "h-3/5 w-3/5")}
@@ -194,107 +201,57 @@
 			<Button variant="outline" href="/tictactoe">Back to lobby</Button>
 		</div>
 	{:else if data}
-		<CursorLayer
-			{roomCode}
-			class="mx-auto w-fit"
-			colorFor={(index) =>
-				index === 0 ? "text-cyan-500" : index === 1 ? "text-pink-500" : "text-muted-foreground"}
+		<Board
+			players={[
+				{
+					label: room.playerX ? firstName(room.playerX.name) : "Player 1",
+					accent: "text-cyan-500",
+					score: room.scoreX,
+					abilities
+				},
+				{
+					label: room.playerO ? firstName(room.playerO.name) : "Player 2",
+					accent: "text-pink-500",
+					score: room.scoreO,
+					abilities
+				}
+			]}
+			{status}
+			footer={{ onReset: () => room.reset(), onCopyInvite: copyInviteLink, copied, error: room.error }}
 		>
-			<Board
-				players={[
-					{ label: room.playerX?.name ?? "Player 1", accent: "text-cyan-500", abilities },
-					{ label: room.playerO?.name ?? "Player 2", accent: "text-pink-500", abilities }
-				]}
+			<Cursor
+				{roomCode}
+				class="size-full"
+				colorFor={(index) =>
+					index === 0 ? "text-cyan-500" : index === 1 ? "text-pink-500" : "text-muted-foreground"}
 			>
-				<div class="relative size-full">
-					<div class="grid size-full grid-cols-3 grid-rows-3 gap-3">
-						{#each room.boards as cells, boardIndex (boardIndex)}
-							{@render miniBoard(cells, boardIndex)}
-						{/each}
-					</div>
-					{#if room.winningLine}
-						{@const [a, , c] = room.winningLine}
-						<svg
-							viewBox="0 0 3 3"
-							class={cn(
-								"pointer-events-none absolute inset-0 h-full w-full",
-								room.winner === "X" ? "text-cyan-500" : "text-pink-500"
-							)}
-						>
-							<line
-								x1={(a % 3) + 0.5}
-								y1={Math.floor(a / 3) + 0.5}
-								x2={(c % 3) + 0.5}
-								y2={Math.floor(c / 3) + 0.5}
-								stroke="currentColor"
-								stroke-width="0.08"
-								stroke-linecap="round"
-								in:draw={{ duration: 400 }}
-							/>
-						</svg>
-					{/if}
+				<div class="grid size-full grid-cols-3 grid-rows-3 gap-3">
+					{#each room.boards as cells, boardIndex (boardIndex)}
+						{@render miniBoard(cells, boardIndex)}
+					{/each}
 				</div>
-
-				{#snippet header()}
-					<div class="flex items-center gap-2">
-						<span class="size-2.5 rounded-full bg-cyan-500"></span>
-						<span class="font-semibold text-cyan-500">
-							{room.playerX ? firstName(room.playerX.name) : "Player 1"}
-						</span>
-						<span class="tabular-nums text-muted-foreground">{room.scoreX}</span>
-					</div>
-
-					<div class="flex items-center gap-1.5">
-						{#if room.winner}
-							{@const winnerColor = room.winner === "X" ? "text-cyan-500" : "text-pink-500"}
-							<Trophy class={cn("size-4", winnerColor)} />
-							<span class={cn("font-semibold", winnerColor)}>{room.winner} wins</span>
-						{:else if room.isOver}
-							<span class="font-semibold text-muted-foreground">Draw</span>
-						{:else}
-							<span
-								class={cn(
-									"animate-pulse text-base leading-none",
-									room.turn === "X" ? "text-cyan-500" : "text-pink-500"
-								)}
-							>
-								{room.turn === "X" ? "◀" : "▶"}
-							</span>
-						{/if}
-					</div>
-
-					<div class="flex items-center justify-end gap-2">
-						<span class="tabular-nums text-muted-foreground">{room.scoreO}</span>
-						<span class="font-semibold text-pink-500">
-							{room.playerO ? firstName(room.playerO.name) : "Player 2"}
-						</span>
-						<span class="size-2.5 rounded-full bg-pink-500"></span>
-					</div>
-				{/snippet}
-
-				{#snippet footer()}
-					<div class="flex w-(--board-size) flex-col items-center gap-3">
-						<div class="flex items-center gap-2">
-							<Button variant="outline" size="sm" onclick={() => room.reset()}>
-								<RotateCcw />
-								Reset game
-							</Button>
-							<Button variant="outline" size="sm" onclick={copyInviteLink}>
-								{#if copied}
-									<Check />
-								{:else}
-									<Link />
-								{/if}
-								Copy invite link
-							</Button>
-						</div>
-
-						{#if room.error}
-							<p class="text-sm text-destructive" transition:fade>{room.error}</p>
-						{/if}
-					</div>
-				{/snippet}
-			</Board>
-		</CursorLayer>
+				{#if room.winningLine}
+					{@const [a, , c] = room.winningLine}
+					<svg
+						viewBox="0 0 3 3"
+						class={cn(
+							"pointer-events-none absolute inset-0 h-full w-full",
+							room.winner === "X" ? "text-cyan-500" : "text-pink-500"
+						)}
+					>
+						<line
+							x1={(a % 3) + 0.5}
+							y1={Math.floor(a / 3) + 0.5}
+							x2={(c % 3) + 0.5}
+							y2={Math.floor(c / 3) + 0.5}
+							stroke="currentColor"
+							stroke-width="0.08"
+							stroke-linecap="round"
+							in:draw={{ duration: 400 }}
+						/>
+					</svg>
+				{/if}
+			</Cursor>
+		</Board>
 	{/if}
 </div>

@@ -1,1 +1,1 @@
-export { CursorLayer, CursorPresence, type PeerCursor } from "./cursor/index.js";
+export { Cursor, CursorPresence, type PeerCursor } from "./cursor/index.js";

@@ -1,9 +1,16 @@
-import Root, { type Ability, type BoardPlayer } from "./board.svelte";
+import Root, {
+	type Ability,
+	type BoardFooter,
+	type BoardPlayer,
+	type BoardStatus
+} from "./board.svelte";
 
 export {
 	Root,
 	//
 	Root as Board,
 	type Ability,
-	type BoardPlayer
+	type BoardFooter,
+	type BoardPlayer,
+	type BoardStatus
 };

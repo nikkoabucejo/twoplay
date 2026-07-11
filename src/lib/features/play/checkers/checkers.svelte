@@ -1,12 +1,11 @@
 <script lang="ts">
-	import { Check, Link, RotateCcw, Trophy } from "@lucide/svelte";
 	import { useMutation } from "convex-svelte";
 	import { backOut } from "svelte/easing";
 	import { fade } from "svelte/transition";
 	import { goto } from "$app/navigation";
-	import { Board } from "$lib/components/layout";
+	import { Board, type BoardStatus } from "$lib/components/layout";
 	import { Button, Spinner } from "$lib/components/ui";
-	import { CursorLayer } from "$lib/features/presence";
+	import { Cursor } from "$lib/features/presence";
 	import { getClerkAuth } from "$lib/services/auth";
 	import { cn } from "$lib/utils/style";
 	import { api } from "../../../../../convex/_generated/api.js";
@@ -74,6 +73,19 @@
 			? new Set(room.legalMoves.map((move) => move.from))
 			: new Set<number>()
 	);
+
+	const status: BoardStatus = $derived(
+		room.winner
+			? {
+					type: "winner",
+					player: room.winner === "cyan" ? 0 : 1,
+					label: room.winner === "cyan" ? "Cyan" : "Pink"
+				}
+			: { type: "turn", player: room.turn === "cyan" ? 0 : 1 }
+	);
+
+	/** Cyan starts at the bottom of the raw board; flip so pink's own pieces are always nearest them too. */
+	const flip = $derived(room.myColor === "pink");
 </script>
 
 {#snippet piece(p: Piece, isSelected: boolean)}
@@ -115,20 +127,32 @@
 			<Button variant="outline" href="/checkers">Back to lobby</Button>
 		</div>
 	{:else if data}
-		<CursorLayer
-			{roomCode}
-			class="mx-auto w-fit"
-			colorFor={(index) =>
-				index === 0 ? "text-cyan-500" : index === 1 ? "text-pink-500" : "text-muted-foreground"}
+		<Board
+			players={[
+				{
+					label: room.playerCyan ? firstName(room.playerCyan.name) : "Player 1",
+					accent: "text-cyan-500",
+					score: room.scoreCyan
+				},
+				{
+					label: room.playerPink ? firstName(room.playerPink.name) : "Player 2",
+					accent: "text-pink-500",
+					score: room.scorePink
+				}
+			]}
+			{status}
+			footer={{ onReset: () => room.reset(), onCopyInvite: copyInviteLink, copied, error: room.error }}
 		>
-			<Board
-				players={[
-					{ label: room.playerCyan?.name ?? "Player 1", accent: "text-cyan-500" },
-					{ label: room.playerPink?.name ?? "Player 2", accent: "text-pink-500" }
-				]}
+			<Cursor
+				{roomCode}
+				{flip}
+				class="size-full"
+				colorFor={(index) =>
+					index === 0 ? "text-cyan-500" : index === 1 ? "text-pink-500" : "text-muted-foreground"}
 			>
 				<div class="grid size-full grid-cols-8 grid-rows-8 overflow-hidden rounded-xl border">
-					{#each { length: 64 } as _, index (index)}
+					{#each { length: 64 } as _, slot (slot)}
+						{@const index = flip ? 63 - slot : slot}
 						{@const row = Math.floor(index / 8)}
 						{@const col = index % 8}
 						{@const dark = (row + col) % 2 === 1}
@@ -169,67 +193,7 @@
 						</button>
 					{/each}
 				</div>
-
-				{#snippet header()}
-					<div class="flex items-center gap-2">
-						<span class="size-2.5 rounded-full bg-cyan-500"></span>
-						<span class="font-semibold text-cyan-500">
-							{room.playerCyan ? firstName(room.playerCyan.name) : "Player 1"}
-						</span>
-						<span class="tabular-nums text-muted-foreground">{room.scoreCyan}</span>
-					</div>
-
-					<div class="flex items-center gap-1.5">
-						{#if room.winner}
-							{@const winnerColor = room.winner === "cyan" ? "text-cyan-500" : "text-pink-500"}
-							<Trophy class={cn("size-4", winnerColor)} />
-							<span class={cn("font-semibold", winnerColor)}>
-								{room.winner === "cyan" ? "Cyan" : "Pink"} wins
-							</span>
-						{:else}
-							<span
-								class={cn(
-									"animate-pulse text-base leading-none",
-									room.turn === "cyan" ? "text-cyan-500" : "text-pink-500"
-								)}
-							>
-								{room.turn === "cyan" ? "◀" : "▶"}
-							</span>
-						{/if}
-					</div>
-
-					<div class="flex items-center justify-end gap-2">
-						<span class="tabular-nums text-muted-foreground">{room.scorePink}</span>
-						<span class="font-semibold text-pink-500">
-							{room.playerPink ? firstName(room.playerPink.name) : "Player 2"}
-						</span>
-						<span class="size-2.5 rounded-full bg-pink-500"></span>
-					</div>
-				{/snippet}
-
-				{#snippet footer()}
-					<div class="flex w-(--board-size) flex-col items-center gap-3">
-						<div class="flex items-center gap-2">
-							<Button variant="outline" size="sm" onclick={() => room.reset()}>
-								<RotateCcw />
-								Reset game
-							</Button>
-							<Button variant="outline" size="sm" onclick={copyInviteLink}>
-								{#if copied}
-									<Check />
-								{:else}
-									<Link />
-								{/if}
-								Copy invite link
-							</Button>
-						</div>
-
-						{#if room.error}
-							<p class="text-sm text-destructive" transition:fade>{room.error}</p>
-						{/if}
-					</div>
-				{/snippet}
-			</Board>
-		</CursorLayer>
+			</Cursor>
+		</Board>
 	{/if}
 </div>

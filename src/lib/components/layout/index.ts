@@ -1,1 +1,7 @@
-export { Board, type Ability, type BoardPlayer } from "./board/index.js";
+export {
+	Board,
+	type Ability,
+	type BoardFooter,
+	type BoardPlayer,
+	type BoardStatus
+} from "./board/index.js";
