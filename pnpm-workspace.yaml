@@ -1,3 +1,13 @@
+allowBuilds:
+  browser-tabs-lock: true
+  bufferutil: true
+  core-js: true
+  esbuild: true
+  utf-8-validate: true
 onlyBuiltDependencies:
   - esbuild
   - '@tailwindcss/oxide'
+  - browser-tabs-lock
+  - bufferutil
+  - core-js
+  - utf-8-validate
