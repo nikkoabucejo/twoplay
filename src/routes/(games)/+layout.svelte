@@ -12,14 +12,37 @@
 
 {#snippet cloud(color: string, position: string, anim: string)}
 	<div class={cn("absolute", position, anim)}>
-		<div class={cn("absolute inset-[15%] rounded-full blur-3xl", color)}></div>
-		<div class={cn("absolute top-[-5%] left-[-5%] size-[55%] rounded-full blur-3xl", color)}></div>
-		<div class={cn("absolute top-[2%] right-[-8%] size-[50%] rounded-full blur-3xl", color)}></div>
 		<div
-			class={cn("absolute bottom-[-6%] left-[6%] size-[48%] rounded-full blur-3xl", color)}
+			class={cn("blob-float absolute inset-[15%] rounded-full blur-3xl", color)}
+			style="animation-delay: -2s"
 		></div>
 		<div
-			class={cn("absolute right-[-6%] bottom-[-8%] size-[42%] rounded-full blur-3xl", color)}
+			class={cn(
+				"blob-float absolute top-[-5%] left-[-5%] size-[55%] rounded-full blur-3xl",
+				color
+			)}
+			style="animation-delay: -9s"
+		></div>
+		<div
+			class={cn(
+				"blob-float absolute top-[2%] right-[-8%] size-[50%] rounded-full blur-3xl",
+				color
+			)}
+			style="animation-delay: -4s"
+		></div>
+		<div
+			class={cn(
+				"blob-float absolute bottom-[-6%] left-[6%] size-[48%] rounded-full blur-3xl",
+				color
+			)}
+			style="animation-delay: -12s"
+		></div>
+		<div
+			class={cn(
+				"blob-float absolute right-[-6%] bottom-[-8%] size-[42%] rounded-full blur-3xl",
+				color
+			)}
+			style="animation-delay: -6s"
 		></div>
 	</div>
 {/snippet}
@@ -105,6 +128,13 @@
 		animation-iteration-count: infinite;
 	}
 
+	.blob-float {
+		animation-name: blob-float;
+		animation-timing-function: ease-in-out;
+		animation-iteration-count: infinite;
+		animation-duration: 16s;
+	}
+
 	@keyframes drift-a {
 		0%,
 		100% {
@@ -113,14 +143,14 @@
 			scale: 1;
 		}
 		33% {
-			translate: 10% 8%;
-			rotate: 6deg;
-			scale: 1.08;
+			translate: 18% 14%;
+			rotate: 25deg;
+			scale: 1.14;
 		}
 		66% {
-			translate: -8% 10%;
-			rotate: -5deg;
-			scale: 0.94;
+			translate: -14% 16%;
+			rotate: -20deg;
+			scale: 0.88;
 		}
 	}
 
@@ -132,14 +162,14 @@
 			scale: 1;
 		}
 		33% {
-			translate: -9% 9%;
-			rotate: -7deg;
-			scale: 0.95;
+			translate: -16% 15%;
+			rotate: -28deg;
+			scale: 0.9;
 		}
 		66% {
-			translate: 9% -8%;
-			rotate: 5deg;
-			scale: 1.1;
+			translate: 15% -14%;
+			rotate: 22deg;
+			scale: 1.16;
 		}
 	}
 
@@ -151,9 +181,21 @@
 			scale: 1;
 		}
 		50% {
-			translate: 12% 12%;
-			rotate: 8deg;
-			scale: 1.06;
+			translate: 20% 20%;
+			rotate: 30deg;
+			scale: 1.1;
+		}
+	}
+
+	@keyframes blob-float {
+		0%,
+		100% {
+			translate: 0 0;
+			scale: 1;
+		}
+		50% {
+			translate: 8% -6%;
+			scale: 1.12;
 		}
 	}
 </style>
