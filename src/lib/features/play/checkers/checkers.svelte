@@ -91,13 +91,15 @@
 {#snippet piece(p: Piece, isSelected: boolean)}
 	<div
 		class={cn(
-			"relative flex h-4/5 w-4/5 items-center justify-center rounded-full shadow-md ring-2 ring-inset ring-white/30 transition-transform",
-			p.color === "cyan" ? "bg-cyan-500" : "bg-pink-500",
-			isSelected && "scale-90 ring-4 ring-offset-2 ring-offset-background"
+			"relative flex h-4/5 w-4/5 items-center justify-center rounded-full shadow-md",
+			p.color === "cyan" ? "bg-cyan-500" : "bg-pink-500"
 		)}
 		in:liquidIn
 		out:fade={{ duration: 150 }}
 	>
+		{#if isSelected}
+			<div class="absolute inset-1 rounded-full ring-2 ring-white" in:fade={{ duration: 150 }}></div>
+		{/if}
 		{#if p.king}
 			<svg viewBox="0 0 24 24" class="h-2/5 w-2/5 text-background/90" fill="currentColor">
 				<path d="M3 8 L7 12 L12 5 L17 12 L21 8 L19 18 H5 Z" />
