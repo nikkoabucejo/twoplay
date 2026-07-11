@@ -1,3 +1,5 @@
+import { useMutation, useQuery, type UseQueryReturn } from "convex-svelte";
+import { api } from "../../../../../convex/_generated/api.js";
 import type { Board, GameStatus, Player } from "./types.js";
 
 const WINNING_LINES: readonly (readonly [number, number, number])[] = [
@@ -11,10 +13,6 @@ const WINNING_LINES: readonly (readonly [number, number, number])[] = [
 	[2, 4, 6] // diagonals
 ];
 
-function emptyBoard(): Board {
-	return Array<null>(9).fill(null);
-}
-
 function findWinningLine(board: Board): readonly [number, number, number] | null {
 	for (const line of WINNING_LINES) {
 		const [a, b, c] = line;
@@ -25,35 +23,108 @@ function findWinningLine(board: Board): readonly [number, number, number] | null
 	return null;
 }
 
+type BoardStatus = {
+	winningLine: readonly [number, number, number] | null;
+	winner: Player | null;
+	status: GameStatus;
+};
+
+function statusOf(board: Board): BoardStatus {
+	const winningLine = findWinningLine(board);
+	const winner = winningLine ? (board[winningLine[0]] as Player) : null;
+	const isDraw = winner === null && board.every((cell) => cell !== null);
+
+	return {
+		winningLine,
+		winner,
+		status: winner ? "won" : isDraw ? "draw" : "playing"
+	};
+}
+
 /**
- * Rune-backed game state for a single game of tic-tac-toe.
- * Instantiate once per board; all derived values update automatically.
+ * Rune-backed multiplayer state for a room of nine synced tic-tac-toe boards.
+ * Wraps a live Convex subscription (convex/rooms.ts is the source of truth
+ * for legality — whose turn it is, who's a player in the room); this class
+ * mirrors that data for the UI and derives per-board status from it.
  */
-export class TictactoeGame {
-	board = $state<Board>(emptyBoard());
-	currentPlayer = $state<Player>("X");
+export class TictactoeRoom {
+	error = $state<string | null>(null);
 
-	winningLine = $derived(findWinningLine(this.board));
-	winner = $derived<Player | null>(
-		this.winningLine ? (this.board[this.winningLine[0]] as Player) : null
+	#getCode: () => string;
+	#room: UseQueryReturn<typeof api.rooms.get>;
+	#play = useMutation(api.rooms.play);
+	#reset = useMutation(api.rooms.reset);
+
+	constructor(getCode: () => string) {
+		this.#getCode = getCode;
+		this.#room = useQuery(api.rooms.get, () => ({ code: this.#getCode() }));
+	}
+
+	get isLoading() {
+		return this.#room.isLoading;
+	}
+
+	get data() {
+		return this.#room.data;
+	}
+
+	boards = $derived(this.data?.boards ?? []);
+	statuses = $derived(this.boards.map(statusOf));
+	mySymbol = $derived(this.data?.mySymbol ?? null);
+	myLastBoard = $derived(this.data?.myLastBoard ?? null);
+
+	/** Whose mark lands next across the whole room, derived from total filled cells — no state to fall out of sync. */
+	turn = $derived(
+		(this.boards.reduce((sum, board) => sum + board.filter((cell) => cell !== null).length, 0) %
+			2 ===
+		0
+			? "X"
+			: "O") as Player
 	);
-	isDraw = $derived(this.winner === null && this.board.every((cell) => cell !== null));
-	status = $derived<GameStatus>(this.winner ? "won" : this.isDraw ? "draw" : "playing");
 
-	/** Place the current player's mark, then hand the turn over. No-op on filled cells or a finished game. */
-	play(index: number): void {
-		if (this.board[index] !== null || this.status !== "playing") return;
-		this.board[index] = this.currentPlayer;
-		this.currentPlayer = this.currentPlayer === "X" ? "O" : "X";
+	/** Whether some board other than `boardIndex` is still open — the repeat-board rule lifts when it's the only option left. */
+	private hasOtherPlayableBoard(boardIndex: number): boolean {
+		return this.statuses.some((status, i) => i !== boardIndex && status.status === "playing");
 	}
 
-	/** True when the cell is part of the winning line, for highlighting. */
-	isWinningCell(index: number): boolean {
-		return this.winningLine?.includes(index) ?? false;
+	/** True when playing here would repeat this player's own last-turn board, and another board is still available. */
+	isForbidden(boardIndex: number): boolean {
+		return (
+			this.mySymbol === this.turn &&
+			boardIndex === this.myLastBoard &&
+			this.hasOtherPlayableBoard(boardIndex)
+		);
 	}
 
-	reset(): void {
-		this.board = emptyBoard();
-		this.currentPlayer = "X";
+	/** True when it's this browser's turn to place a mark on that board. */
+	canPlay(boardIndex: number): boolean {
+		const status = this.statuses[boardIndex];
+		return (
+			status?.status === "playing" && this.mySymbol === this.turn && !this.isForbidden(boardIndex)
+		);
+	}
+
+	isWinningCell(boardIndex: number, cellIndex: number): boolean {
+		return this.statuses[boardIndex]?.winningLine?.includes(cellIndex) ?? false;
+	}
+
+	async play(boardIndex: number, cellIndex: number): Promise<void> {
+		if (this.boards[boardIndex]?.[cellIndex] !== null || !this.canPlay(boardIndex)) return;
+
+		this.error = null;
+		try {
+			await this.#play({ code: this.#getCode(), boardIndex, cellIndex });
+		} catch (err) {
+			this.error = err instanceof Error ? err.message : "Something went wrong";
+		}
+	}
+
+	async reset(): Promise<void> {
+		this.error = null;
+		try {
+			await this.#reset({ code: this.#getCode() });
+		} catch (err) {
+			this.error = err instanceof Error ? err.message : "Something went wrong";
+		}
 	}
 }

@@ -17,7 +17,7 @@ export const store = mutation({
 	}
 });
 
-async function userByExternalId(ctx: QueryCtx, externalId: string) {
+export async function userByExternalId(ctx: QueryCtx, externalId: string) {
 	return await ctx.db
 		.query("users")
 		.withIndex("byExternalId", (q) => q.eq("externalId", externalId))
