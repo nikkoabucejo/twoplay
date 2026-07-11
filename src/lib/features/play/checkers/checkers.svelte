@@ -66,7 +66,9 @@
 		room.effectiveSelected !== null ? room.movesFrom(room.effectiveSelected).map((m) => m.to) : []
 	);
 	const forcedMovers = $derived(
-		room.effectiveSelected === null ? new Set(room.legalMoves.map((move) => move.from)) : new Set<number>()
+		room.effectiveSelected === null
+			? new Set(room.legalMoves.map((move) => move.from))
+			: new Set<number>()
 	);
 </script>
 
@@ -134,7 +136,9 @@
 							type="button"
 							class={cn(
 								"relative flex items-center justify-center",
-								dark ? "bg-foreground/10 hover:bg-foreground/15 dark:bg-foreground/15" : "bg-background",
+								dark
+									? "bg-foreground/10 hover:bg-foreground/15 dark:bg-foreground/15"
+									: "bg-background",
 								!dark && "cursor-default"
 							)}
 							disabled={!dark}
@@ -144,10 +148,15 @@
 							onclick={() => room.select(index)}
 						>
 							{#if isForcedMover}
-								<div class="absolute inset-[12%] rounded-full ring-2 ring-amber-400/70" out:fade></div>
+								<div
+									class="absolute inset-[12%] rounded-full ring-2 ring-amber-400/70"
+									out:fade
+								></div>
 							{/if}
 							{#if isDestination}
-								<span class="absolute size-1/4 rounded-full bg-emerald-400/70" in:fade={{ duration: 150 }}
+								<span
+									class="absolute size-1/4 rounded-full bg-emerald-400/70"
+									in:fade={{ duration: 150 }}
 								></span>
 							{/if}
 							{#if cell}

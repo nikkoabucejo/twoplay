@@ -75,7 +75,11 @@ function captureMovesFrom(board: Board, index: number): Move[] {
  * without waiting on a round trip — convex/rooms.ts (via the checkers engine) remains the source of truth
  * for legality when a move is actually submitted.
  */
-function computeLegalMoves(board: Board, color: PieceColor, mustContinueFrom: number | null): Move[] {
+function computeLegalMoves(
+	board: Board,
+	color: PieceColor,
+	mustContinueFrom: number | null
+): Move[] {
 	if (mustContinueFrom !== null) return captureMovesFrom(board, mustContinueFrom);
 
 	const indices: number[] = [];
@@ -144,7 +148,11 @@ export class CheckersRoom {
 
 	/** No legal moves for the side to move means that side is out of moves or pieces — the other color wins. */
 	winner = $derived<PieceColor | null>(
-		this.#state !== null && this.legalMoves.length === 0 ? (this.turn === "cyan" ? "pink" : "cyan") : null
+		this.#state !== null && this.legalMoves.length === 0
+			? this.turn === "cyan"
+				? "pink"
+				: "cyan"
+			: null
 	);
 
 	movesFrom(index: number): Move[] {

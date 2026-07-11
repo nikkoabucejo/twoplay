@@ -24,7 +24,10 @@
 	function handlePointerMove(event: PointerEvent) {
 		const rect = container?.getBoundingClientRect();
 		if (!rect || rect.width === 0 || rect.height === 0) return;
-		presence.move((event.clientX - rect.left) / rect.width, (event.clientY - rect.top) / rect.height);
+		presence.move(
+			(event.clientX - rect.left) / rect.width,
+			(event.clientY - rect.top) / rect.height
+		);
 	}
 
 	$effect(() => () => presence.dispose());

@@ -91,7 +91,11 @@ function captureMovesFrom(board: Square[], index: number): Move[] {
 }
 
 /** Mandatory-capture rule: if any of the color's pieces can capture, only capture moves are legal. */
-function computeLegalMoves(board: Square[], color: PieceColor, mustContinueFrom: number | null): Move[] {
+function computeLegalMoves(
+	board: Square[],
+	color: PieceColor,
+	mustContinueFrom: number | null
+): Move[] {
 	if (mustContinueFrom !== null) return captureMovesFrom(board, mustContinueFrom);
 
 	const indices: number[] = [];
@@ -144,7 +148,8 @@ function applyMove(state: CheckersState, playerIndex: number, move: CheckersMove
 
 	const [toRow] = rc(found.to);
 	const promotes =
-		!piece.king && ((piece.color === "cyan" && toRow === 0) || (piece.color === "pink" && toRow === 7));
+		!piece.king &&
+		((piece.color === "cyan" && toRow === 0) || (piece.color === "pink" && toRow === 7));
 	board[found.to] = promotes ? { ...piece, king: true } : { ...piece };
 
 	if (found.captured !== null && captureMovesFrom(board, found.to).length > 0) {

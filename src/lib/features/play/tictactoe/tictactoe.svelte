@@ -71,10 +71,34 @@
 {#snippet mark(value: "X" | "O", size: string = "h-3/5 w-3/5")}
 	<svg viewBox="0 0 24 24" class={size} in:liquidIn>
 		{#if value === "X"}
-			<line x1="7" y1="7" x2="17" y2="17" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" />
-			<line x1="17" y1="7" x2="7" y2="17" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" />
+			<line
+				x1="7"
+				y1="7"
+				x2="17"
+				y2="17"
+				stroke="currentColor"
+				stroke-width="3.5"
+				stroke-linecap="round"
+			/>
+			<line
+				x1="17"
+				y1="7"
+				x2="7"
+				y2="17"
+				stroke="currentColor"
+				stroke-width="3.5"
+				stroke-linecap="round"
+			/>
 		{:else}
-			<circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" />
+			<circle
+				cx="12"
+				cy="12"
+				r="7"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="3.5"
+				stroke-linecap="round"
+			/>
 		{/if}
 	</svg>
 {/snippet}

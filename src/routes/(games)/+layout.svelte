@@ -15,8 +15,12 @@
 		<div class={cn("absolute inset-[15%] rounded-full blur-3xl", color)}></div>
 		<div class={cn("absolute top-[-5%] left-[-5%] size-[55%] rounded-full blur-3xl", color)}></div>
 		<div class={cn("absolute top-[2%] right-[-8%] size-[50%] rounded-full blur-3xl", color)}></div>
-		<div class={cn("absolute bottom-[-6%] left-[6%] size-[48%] rounded-full blur-3xl", color)}></div>
-		<div class={cn("absolute right-[-6%] bottom-[-8%] size-[42%] rounded-full blur-3xl", color)}></div>
+		<div
+			class={cn("absolute bottom-[-6%] left-[6%] size-[48%] rounded-full blur-3xl", color)}
+		></div>
+		<div
+			class={cn("absolute right-[-6%] bottom-[-8%] size-[42%] rounded-full blur-3xl", color)}
+		></div>
 	</div>
 {/snippet}
 

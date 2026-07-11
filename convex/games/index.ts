@@ -37,7 +37,12 @@ export function getEngine(gameType: GameType) {
  * `state`/`move` with a union-typed engine, so it collapses the parameter type to `never`. Switching on
  * the literal `gameType` narrows `state` and `move` to the one engine that's actually being called.
  */
-export function applyMove(gameType: GameType, state: GameState, playerIndex: number, move: GameMove): GameState {
+export function applyMove(
+	gameType: GameType,
+	state: GameState,
+	playerIndex: number,
+	move: GameMove
+): GameState {
 	switch (gameType) {
 		case "tictactoe": {
 			if (state.kind !== "tictactoe" || move.kind !== "tictactoe") {

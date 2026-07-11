@@ -1,6 +1,12 @@
 import { v } from "convex/values";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
-import { applyMove, gameMoveValidator, gameTypeValidator, getEngine, type GameType } from "./games/index.js";
+import {
+	applyMove,
+	gameMoveValidator,
+	gameTypeValidator,
+	getEngine,
+	type GameType
+} from "./games/index.js";
 import { userByExternalId } from "./users.js";
 
 const CODE_LENGTH = 6;

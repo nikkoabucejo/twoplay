@@ -65,7 +65,9 @@
 			<Button onclick={() => auth.signIn()}>Sign in</Button>
 		</div>
 	{:else}
-		<div class="flex w-full max-w-xs flex-col items-center gap-6 rounded-2xl border bg-muted/40 p-6 backdrop-blur-sm">
+		<div
+			class="flex w-full max-w-xs flex-col items-center gap-6 rounded-2xl border bg-muted/40 p-6 backdrop-blur-sm"
+		>
 			<div class="flex w-full items-center gap-2">
 				{#if createdCode}
 					<p

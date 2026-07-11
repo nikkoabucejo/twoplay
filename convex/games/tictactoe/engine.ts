@@ -55,7 +55,11 @@ function status(state: TictactoeState): GameStatus {
 	return { turnIndex: totalFilled % 2 === 0 ? 0 : 1, winnerIndex: null, isOver: false };
 }
 
-function applyMove(state: TictactoeState, playerIndex: number, move: TictactoeMove): TictactoeState {
+function applyMove(
+	state: TictactoeState,
+	playerIndex: number,
+	move: TictactoeMove
+): TictactoeState {
 	const symbol = roleLabel(playerIndex);
 	const board = state.boards[move.boardIndex];
 	if (!board || isBoardFinished(board) || board[move.cellIndex] !== null) return state;
@@ -74,7 +78,11 @@ function applyMove(state: TictactoeState, playerIndex: number, move: TictactoeMo
 		i === move.boardIndex ? b.map((c, j) => (j === move.cellIndex ? symbol : c)) : b
 	);
 
-	return { ...state, boards, lastBoardBySymbol: { ...lastBoardBySymbol, [symbol]: move.boardIndex } };
+	return {
+		...state,
+		boards,
+		lastBoardBySymbol: { ...lastBoardBySymbol, [symbol]: move.boardIndex }
+	};
 }
 
 export const tictactoeEngine: GameEngine<TictactoeState, TictactoeMove> = {
