@@ -69,7 +69,7 @@ export class TictactoeRoom {
 	}
 
 	/** True once the room is found but belongs to a different game type — a room-code collision across games. */
-	wrongGameType = $derived(this.data != null && this.data.gameType !== "tictactoe");
+	wrongGameType = $derived(this.data != null && this.data.game !== "tictactoe");
 
 	#state = $derived(this.data && this.data.state.kind === "tictactoe" ? this.data.state : null);
 
@@ -88,6 +88,13 @@ export class TictactoeRoom {
 	/** Rounds won by each side, persisted on the room and carried across resets. */
 	scoreX = $derived(this.data?.scores?.[0] ?? 0);
 	scoreO = $derived(this.data?.scores?.[1] ?? 0);
+
+	/** Each board's own winner treated as a meta 3x3 grid — three boards in a line wins the room. */
+	metaBoard = $derived<Board>(this.statuses.map((s) => s.winner));
+	metaStatus = $derived(statusOf(this.metaBoard));
+	winner = $derived(this.metaStatus.winner);
+	winningLine = $derived(this.metaStatus.winningLine);
+	isOver = $derived(this.metaStatus.status !== "playing");
 
 	/** Whose mark lands next across the whole room, derived from total filled cells — no state to fall out of sync. */
 	turn = $derived(
@@ -116,7 +123,10 @@ export class TictactoeRoom {
 	canPlay(boardIndex: number): boolean {
 		const status = this.statuses[boardIndex];
 		return (
-			status?.status === "playing" && this.mySymbol === this.turn && !this.isForbidden(boardIndex)
+			!this.isOver &&
+			status?.status === "playing" &&
+			this.mySymbol === this.turn &&
+			!this.isForbidden(boardIndex)
 		);
 	}
 

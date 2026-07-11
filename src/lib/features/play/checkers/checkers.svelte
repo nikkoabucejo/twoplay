@@ -52,7 +52,7 @@
 	});
 
 	$effect(() => {
-		if (room.wrongGameType && data) goto(`/${data.gameType}/${roomCode}`, { replaceState: true });
+		if (room.wrongGameType && data) goto(`/${data.game}/${roomCode}`, { replaceState: true });
 	});
 
 	function copyInviteLink() {

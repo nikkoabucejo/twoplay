@@ -7,19 +7,19 @@ export const store = mutation({
 		const identity = await ctx.auth.getUserIdentity();
 		if (!identity) throw new Error("Called store without authentication present");
 
-		const user = await userByExternalId(ctx, identity.subject);
+		const user = await userByClerkUserId(ctx, identity.subject);
 
 		if (user === null) {
-			await ctx.db.insert("users", { name, externalId: identity.subject });
+			await ctx.db.insert("users", { name, clerk__userId: identity.subject });
 		} else if (user.name !== name) {
 			await ctx.db.patch(user._id, { name });
 		}
 	}
 });
 
-export async function userByExternalId(ctx: QueryCtx, externalId: string) {
+export async function userByClerkUserId(ctx: QueryCtx, clerkUserId: string) {
 	return await ctx.db
 		.query("users")
-		.withIndex("byExternalId", (q) => q.eq("externalId", externalId))
+		.withIndex("byClerkUserId", (q) => q.eq("clerk__userId", clerkUserId))
 		.unique();
 }

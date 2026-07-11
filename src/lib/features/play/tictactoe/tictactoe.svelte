@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Check, Link, RotateCcw } from "@lucide/svelte";
+	import { Check, Link, RotateCcw, Trophy } from "@lucide/svelte";
 	import { useMutation } from "convex-svelte";
 	import { backOut } from "svelte/easing";
 	import { draw, fade } from "svelte/transition";
@@ -57,7 +57,7 @@
 	});
 
 	$effect(() => {
-		if (room.wrongGameType && data) goto(`/${data.gameType}/${roomCode}`, { replaceState: true });
+		if (room.wrongGameType && data) goto(`/${data.game}/${roomCode}`, { replaceState: true });
 	});
 
 	function copyInviteLink() {
@@ -206,10 +206,33 @@
 					{ label: room.playerO?.name ?? "Player 2", accent: "text-pink-500", abilities }
 				]}
 			>
-				<div class="grid size-full grid-cols-3 grid-rows-3 gap-3">
-					{#each room.boards as cells, boardIndex (boardIndex)}
-						{@render miniBoard(cells, boardIndex)}
-					{/each}
+				<div class="relative size-full">
+					<div class="grid size-full grid-cols-3 grid-rows-3 gap-3">
+						{#each room.boards as cells, boardIndex (boardIndex)}
+							{@render miniBoard(cells, boardIndex)}
+						{/each}
+					</div>
+					{#if room.winningLine}
+						{@const [a, , c] = room.winningLine}
+						<svg
+							viewBox="0 0 3 3"
+							class={cn(
+								"pointer-events-none absolute inset-0 h-full w-full",
+								room.winner === "X" ? "text-cyan-500" : "text-pink-500"
+							)}
+						>
+							<line
+								x1={(a % 3) + 0.5}
+								y1={Math.floor(a / 3) + 0.5}
+								x2={(c % 3) + 0.5}
+								y2={Math.floor(c / 3) + 0.5}
+								stroke="currentColor"
+								stroke-width="0.08"
+								stroke-linecap="round"
+								in:draw={{ duration: 400 }}
+							/>
+						</svg>
+					{/if}
 				</div>
 
 				{#snippet header()}
@@ -222,14 +245,22 @@
 					</div>
 
 					<div class="flex items-center gap-1.5">
-						<span
-							class={cn(
-								"animate-pulse text-base leading-none",
-								room.turn === "X" ? "text-cyan-500" : "text-pink-500"
-							)}
-						>
-							{room.turn === "X" ? "◀" : "▶"}
-						</span>
+						{#if room.winner}
+							{@const winnerColor = room.winner === "X" ? "text-cyan-500" : "text-pink-500"}
+							<Trophy class={cn("size-4", winnerColor)} />
+							<span class={cn("font-semibold", winnerColor)}>{room.winner} wins</span>
+						{:else if room.isOver}
+							<span class="font-semibold text-muted-foreground">Draw</span>
+						{:else}
+							<span
+								class={cn(
+									"animate-pulse text-base leading-none",
+									room.turn === "X" ? "text-cyan-500" : "text-pink-500"
+								)}
+							>
+								{room.turn === "X" ? "◀" : "▶"}
+							</span>
+						{/if}
 					</div>
 
 					<div class="flex items-center justify-end gap-2">

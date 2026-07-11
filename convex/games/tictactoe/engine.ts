@@ -35,6 +35,15 @@ function hasOtherPlayableBoard(boards: Cell[][], excludeIndex: number): boolean 
 	return boards.some((b, i) => i !== excludeIndex && !isBoardFinished(b));
 }
 
+/**
+ * Treats the nine boards' individual winners as a meta 3x3 grid and checks it with the same
+ * line logic as a single board — winning three boards in a row/column/diagonal wins the room.
+ * A drawn board contributes null, same as an empty cell, so it can't complete a meta line.
+ */
+function metaWinnerOf(boards: Cell[][]): Cell {
+	return winnerOf(boards.map(winnerOf));
+}
+
 function roleLabel(index: number): "X" | "O" {
 	return index === 0 ? "X" : "O";
 }
@@ -51,20 +60,18 @@ function status(state: TictactoeState): GameStatus {
 		(sum, board) => sum + board.filter((cell) => cell !== null).length,
 		0
 	);
-	// This variant (nine independent boards, no meta-board) has no overall end condition today.
-	return { turnIndex: totalFilled % 2 === 0 ? 0 : 1, winnerIndex: null, isOver: false };
+	const turnIndex = totalFilled % 2 === 0 ? 0 : 1;
+
+	const metaWinner = metaWinnerOf(state.boards);
+	if (metaWinner) return { turnIndex, winnerIndex: metaWinner === "X" ? 0 : 1, isOver: true };
+
+	const allBoardsFinished = state.boards.every(isBoardFinished);
+	return { turnIndex, winnerIndex: null, isOver: allBoardsFinished };
 }
 
-/** Whoever has won more of the nine mini-boards; null on a tie (including 0-0). */
+/** The room's winner once three boards are won in a line; null while undecided or on a full-grid draw. */
 function roundWinner(state: TictactoeState): number | null {
-	const wins = [0, 0];
-	for (const board of state.boards) {
-		const winner = winnerOf(board);
-		if (winner === "X") wins[0]++;
-		else if (winner === "O") wins[1]++;
-	}
-	if (wins[0] === wins[1]) return null;
-	return wins[0] > wins[1] ? 0 : 1;
+	return status(state).winnerIndex;
 }
 
 function applyMove(
@@ -76,7 +83,9 @@ function applyMove(
 	const board = state.boards[move.boardIndex];
 	if (!board || isBoardFinished(board) || board[move.cellIndex] !== null) return state;
 
-	if (playerIndex !== status(state).turnIndex) throw new Error("Not your turn");
+	const currentStatus = status(state);
+	if (currentStatus.isOver) return state;
+	if (playerIndex !== currentStatus.turnIndex) throw new Error("Not your turn");
 
 	const lastBoardBySymbol = state.lastBoardBySymbol ?? { X: null, O: null };
 	if (

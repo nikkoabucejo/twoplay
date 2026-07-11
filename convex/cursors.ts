@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { getRoomByCode, requireUser } from "./rooms.js";
-import { userByExternalId } from "./users.js";
+import { userByClerkUserId } from "./users.js";
 
 export const update = mutation({
 	args: { code: v.string(), x: v.number(), y: v.number() },
@@ -9,7 +9,7 @@ export const update = mutation({
 		const user = await requireUser(ctx);
 		const room = await getRoomByCode(ctx, code);
 		if (!room) throw new Error("Room not found");
-		if (!room.playerIds.includes(user._id)) throw new Error("You are not a player in this room");
+		if (!room.players.includes(user._id)) throw new Error("You are not a player in this room");
 
 		const existing = await ctx.db
 			.query("cursors")
@@ -47,7 +47,7 @@ export const list = query({
 		if (!room) return [];
 
 		const identity = await ctx.auth.getUserIdentity();
-		const viewer = identity ? await userByExternalId(ctx, identity.subject) : null;
+		const viewer = identity ? await userByClerkUserId(ctx, identity.subject) : null;
 
 		const cursors = await ctx.db
 			.query("cursors")
@@ -62,7 +62,7 @@ export const list = query({
 					return {
 						userId: cursor.userId,
 						name: player?.name ?? "Player",
-						index: room.playerIds.indexOf(cursor.userId),
+						index: room.players.indexOf(cursor.userId),
 						x: cursor.x,
 						y: cursor.y,
 						updatedAt: cursor.updatedAt

@@ -5,14 +5,14 @@ import { gameStateValidator, gameTypeValidator } from "./games/index.js";
 export default defineSchema({
 	users: defineTable({
 		name: v.string(),
-		externalId: v.string()
-	}).index("byExternalId", ["externalId"]),
+		clerk__userId: v.string()
+	}).index("byClerkUserId", ["clerk__userId"]),
 
 	rooms: defineTable({
 		code: v.string(),
-		gameType: gameTypeValidator,
+		game: gameTypeValidator,
 		// Ordered; a game's engine derives per-player role (e.g. tictactoe's X/O) from index.
-		playerIds: v.array(v.id("users")),
+		players: v.array(v.id("users")),
 		state: gameStateValidator,
 		// Rounds won per player index; persists across resets. Optional for rooms created before this field existed.
 		scores: v.optional(v.array(v.number()))

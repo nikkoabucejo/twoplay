@@ -121,7 +121,7 @@ export class CheckersRoom {
 	}
 
 	/** True once the room is found but belongs to a different game type — a room-code collision across games. */
-	wrongGameType = $derived(this.data != null && this.data.gameType !== "checkers");
+	wrongGameType = $derived(this.data != null && this.data.game !== "checkers");
 
 	#state = $derived(this.data && this.data.state.kind === "checkers" ? this.data.state : null);
 
