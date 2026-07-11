@@ -17,7 +17,7 @@
 		error = null;
 		creating = true;
 		try {
-			const code = await createRoom({});
+			const code = await createRoom({ gameType: "tictactoe" });
 			await goto(`/tictactoe/${code}`);
 		} catch (err) {
 			error = err instanceof Error ? err.message : "Could not create a room";

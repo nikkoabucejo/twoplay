@@ -68,10 +68,25 @@ export class TictactoeRoom {
 		return this.#room.data;
 	}
 
-	boards = $derived(this.data?.boards ?? []);
+	/** True once the room is found but belongs to a different game type — a room-code collision across games. */
+	wrongGameType = $derived(this.data != null && this.data.gameType !== "tictactoe");
+
+	#state = $derived(
+		this.data && this.data.gameType === "tictactoe" ? this.data.state : null
+	);
+
+	boards = $derived(this.#state?.boards ?? []);
 	statuses = $derived(this.boards.map(statusOf));
-	mySymbol = $derived(this.data?.mySymbol ?? null);
-	myLastBoard = $derived(this.data?.myLastBoard ?? null);
+	mySymbol = $derived<Player | null>(
+		this.data?.myIndex === 0 ? "X" : this.data?.myIndex === 1 ? "O" : null
+	);
+	myLastBoard = $derived(
+		this.mySymbol ? (this.#state?.lastBoardBySymbol?.[this.mySymbol] ?? null) : null
+	);
+
+	playerX = $derived(this.data?.players?.[0] ?? null);
+	playerO = $derived(this.data?.players?.[1] ?? null);
+	isWaitingForOpponent = $derived(this.data != null && !this.playerO);
 
 	/** Whose mark lands next across the whole room, derived from total filled cells — no state to fall out of sync. */
 	turn = $derived(
@@ -113,7 +128,10 @@ export class TictactoeRoom {
 
 		this.error = null;
 		try {
-			await this.#play({ code: this.#getCode(), boardIndex, cellIndex });
+			await this.#play({
+				code: this.#getCode(),
+				move: { kind: "tictactoe", boardIndex, cellIndex }
+			});
 		} catch (err) {
 			this.error = err instanceof Error ? err.message : "Something went wrong";
 		}

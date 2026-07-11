@@ -1,7 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-
-const cell = v.union(v.literal("X"), v.literal("O"), v.null());
+import { gameStateValidator, gameTypeValidator } from "./games/index.js";
 
 export default defineSchema({
 	users: defineTable({
@@ -11,16 +10,9 @@ export default defineSchema({
 
 	rooms: defineTable({
 		code: v.string(),
-		playerXId: v.id("users"),
-		playerOId: v.optional(v.id("users")),
-		// Nine independent 3x3 boards (twoplay's tictactoe layout), each a flat 9-cell array.
-		boards: v.array(v.array(cell)),
-		// Board each symbol played on last, so a player can be blocked from repeating their previous board.
-		lastBoardBySymbol: v.optional(
-			v.object({
-				X: v.union(v.number(), v.null()),
-				O: v.union(v.number(), v.null())
-			})
-		)
+		gameType: gameTypeValidator,
+		// Ordered; a game's engine derives per-player role (e.g. tictactoe's X/O) from index.
+		playerIds: v.array(v.id("users")),
+		state: gameStateValidator
 	}).index("byCode", ["code"])
 });

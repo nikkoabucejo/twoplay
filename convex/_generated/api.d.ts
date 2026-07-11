@@ -8,6 +8,10 @@
  * @module
  */
 
+import type * as games_engine from "../games/engine.js";
+import type * as games_index from "../games/index.js";
+import type * as games_tictactoe_engine from "../games/tictactoe/engine.js";
+import type * as games_tictactoe_index from "../games/tictactoe/index.js";
 import type * as rooms from "../rooms.js";
 import type * as users from "../users.js";
 
@@ -18,6 +22,10 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  "games/engine": typeof games_engine;
+  "games/index": typeof games_index;
+  "games/tictactoe/engine": typeof games_tictactoe_engine;
+  "games/tictactoe/index": typeof games_tictactoe_index;
   rooms: typeof rooms;
   users: typeof users;
 }>;

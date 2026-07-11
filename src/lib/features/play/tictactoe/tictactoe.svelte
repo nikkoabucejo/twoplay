@@ -69,16 +69,9 @@
 
 {#snippet miniBoard(cells: CellBoard, boardIndex: number)}
 	{@const status = room.statuses[boardIndex]}
-	{@const forbidden = room.isForbidden(boardIndex)}
 	<div class="relative h-full w-full">
 		<div
-			class={cn(
-				"grid h-full w-full grid-cols-3 grid-rows-3 gap-1.5 rounded-xl bg-muted/40 p-1.5 ring-2 ring-transparent transition-colors",
-				status.status === "playing" &&
-					!forbidden &&
-					(room.turn === "X" ? "ring-cyan-500/40" : "ring-pink-500/40"),
-				forbidden && "opacity-40"
-			)}
+			class="grid h-full w-full grid-cols-3 grid-rows-3 gap-1.5 rounded-xl bg-muted/50 p-1.5 backdrop-blur-2xl backdrop-saturate-150 transition-colors dark:bg-muted/40"
 			role="grid"
 			aria-label="Tic-tac-toe board"
 		>
@@ -86,8 +79,8 @@
 				<button
 					type="button"
 					class={cn(
-						"flex items-center justify-center rounded-md border bg-background transition-colors",
-						"hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60",
+						"flex items-center justify-center rounded-md bg-background/90 shadow-sm backdrop-blur-md transition-colors",
+						"hover:bg-background/95 disabled:cursor-not-allowed",
 						cell === "X" && "text-cyan-500",
 						cell === "O" && "text-pink-500"
 					)}
@@ -149,12 +142,17 @@
 			<p class="text-muted-foreground">Room "{roomCode}" doesn't exist.</p>
 			<Button variant="outline" href="/tictactoe">Back to lobby</Button>
 		</div>
+	{:else if room.wrongGameType}
+		<div class="flex flex-col items-center gap-3">
+			<p class="text-muted-foreground">Room "{roomCode}" is a different game.</p>
+			<Button variant="outline" href="/tictactoe">Back to lobby</Button>
+		</div>
 	{:else if joinError}
 		<div class="flex flex-col items-center gap-3">
 			<p class="text-muted-foreground">{joinError}</p>
 			<Button variant="outline" href="/tictactoe">Back to lobby</Button>
 		</div>
-	{:else if data && !data.playerO}
+	{:else if room.isWaitingForOpponent}
 		<div class="flex flex-col items-center gap-3 text-center">
 			<p class="text-muted-foreground">Waiting for a second player to join…</p>
 			<p class="rounded-md border bg-muted/40 px-4 py-2 font-mono text-lg tracking-widest">
@@ -165,8 +163,8 @@
 	{:else if data}
 		<Board
 			players={[
-				{ label: data.playerX?.name ?? "Player 1", accent: "text-cyan-500", abilities },
-				{ label: data.playerO?.name ?? "Player 2", accent: "text-pink-500", abilities }
+				{ label: room.playerX?.name ?? "Player 1", accent: "text-cyan-500", abilities },
+				{ label: room.playerO?.name ?? "Player 2", accent: "text-pink-500", abilities }
 			]}
 		>
 			<div class="grid size-full grid-cols-3 grid-rows-3 gap-3">
