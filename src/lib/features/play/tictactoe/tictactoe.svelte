@@ -1,9 +1,11 @@
 <script lang="ts">
+	import { Check, Link, RotateCcw } from "@lucide/svelte";
 	import { useMutation } from "convex-svelte";
 	import { backOut } from "svelte/easing";
 	import { draw, fade } from "svelte/transition";
+	import { goto } from "$app/navigation";
 	import { Board } from "$lib/components/layout";
-	import { Button } from "$lib/components/ui";
+	import { Button, Spinner } from "$lib/components/ui";
 	import { CursorLayer } from "$lib/features/presence";
 	import { getClerkAuth } from "$lib/services/auth";
 	import { cn } from "$lib/utils/style";
@@ -41,6 +43,8 @@
 	const data = $derived(room.data);
 
 	let joinError = $state<string | null>(null);
+	let copied = $state(false);
+	let copiedTimeout: ReturnType<typeof setTimeout> | undefined;
 
 	$effect(() => {
 		const code = roomCode;
@@ -52,8 +56,15 @@
 		});
 	});
 
+	$effect(() => {
+		if (room.wrongGameType && data) goto(`/${data.gameType}/${roomCode}`, { replaceState: true });
+	});
+
 	function copyInviteLink() {
 		navigator.clipboard.writeText(`${location.origin}/tictactoe/${roomCode}`);
+		copied = true;
+		clearTimeout(copiedTimeout);
+		copiedTimeout = setTimeout(() => (copied = false), 1500);
 	}
 </script>
 
@@ -70,9 +81,13 @@
 
 {#snippet miniBoard(cells: CellBoard, boardIndex: number)}
 	{@const status = room.statuses[boardIndex]}
+	{@const forbidden = room.isForbidden(boardIndex)}
 	<div class="relative h-full w-full">
 		<div
-			class="grid h-full w-full grid-cols-3 grid-rows-3 gap-1.5 rounded-xl bg-muted/50 p-1.5 backdrop-blur-2xl backdrop-saturate-150 transition-colors dark:bg-muted/40"
+			class={cn(
+				"grid h-full w-full grid-cols-3 grid-rows-3 gap-1.5 rounded-xl bg-muted/50 p-1.5 backdrop-blur-2xl backdrop-saturate-150 transition-colors dark:bg-muted/40",
+				forbidden && "grayscale"
+			)}
 			role="grid"
 			aria-label="Tic-tac-toe board"
 		>
@@ -137,29 +152,18 @@
 			<Button onclick={() => auth.signIn()}>Sign in</Button>
 		</div>
 	{:else if room.isLoading}
-		<p class="text-muted-foreground">Loading room…</p>
+		<Spinner size="lg" />
 	{:else if data === null}
 		<div class="flex flex-col items-center gap-3">
 			<p class="text-muted-foreground">Room "{roomCode}" doesn't exist.</p>
 			<Button variant="outline" href="/tictactoe">Back to lobby</Button>
 		</div>
 	{:else if room.wrongGameType}
-		<div class="flex flex-col items-center gap-3">
-			<p class="text-muted-foreground">Room "{roomCode}" is a different game.</p>
-			<Button variant="outline" href="/tictactoe">Back to lobby</Button>
-		</div>
+		<Spinner size="lg" />
 	{:else if joinError}
 		<div class="flex flex-col items-center gap-3">
 			<p class="text-muted-foreground">{joinError}</p>
 			<Button variant="outline" href="/tictactoe">Back to lobby</Button>
-		</div>
-	{:else if room.isWaitingForOpponent}
-		<div class="flex flex-col items-center gap-3 text-center">
-			<p class="text-muted-foreground">Waiting for a second player to join…</p>
-			<p class="rounded-md border bg-muted/40 px-4 py-2 font-mono text-lg tracking-widest">
-				{roomCode}
-			</p>
-			<Button variant="outline" onclick={copyInviteLink}>Copy invite link</Button>
 		</div>
 	{:else if data}
 		<CursorLayer
@@ -180,11 +184,50 @@
 					{/each}
 				</div>
 
-				{#snippet controls()}
-					<div class="flex flex-col items-center gap-2">
-						<Button variant="outline" onclick={() => room.reset()}>Reset game</Button>
+				{#snippet header()}
+					<div class="flex items-center gap-2">
+						<span class="size-2.5 rounded-full bg-cyan-500"></span>
+						<span class="font-semibold text-cyan-500">{room.playerX?.name ?? "Player 1"}</span>
+						<span class="tabular-nums text-muted-foreground">{room.scoreX}</span>
+					</div>
+
+					<div class="flex items-center gap-1.5">
+						<span
+							class={cn(
+								"animate-pulse text-base leading-none",
+								room.turn === "X" ? "text-cyan-500" : "text-pink-500"
+							)}
+						>
+							{room.turn === "X" ? "◀" : "▶"}
+						</span>
+					</div>
+
+					<div class="flex items-center gap-2">
+						<span class="tabular-nums text-muted-foreground">{room.scoreO}</span>
+						<span class="font-semibold text-pink-500">{room.playerO?.name ?? "Player 2"}</span>
+						<span class="size-2.5 rounded-full bg-pink-500"></span>
+					</div>
+				{/snippet}
+
+				{#snippet footer()}
+					<div class="flex w-(--board-size) flex-col items-center gap-3">
+						<div class="flex items-center gap-2">
+							<Button variant="outline" size="sm" onclick={() => room.reset()}>
+								<RotateCcw />
+								Reset game
+							</Button>
+							<Button variant="outline" size="sm" onclick={copyInviteLink}>
+								{#if copied}
+									<Check />
+								{:else}
+									<Link />
+								{/if}
+								Copy invite link
+							</Button>
+						</div>
+
 						{#if room.error}
-							<p class="text-sm text-destructive">{room.error}</p>
+							<p class="text-sm text-destructive" transition:fade>{room.error}</p>
 						{/if}
 					</div>
 				{/snippet}

@@ -31,7 +31,8 @@
 		size = "34rem",
 		class: className,
 		children,
-		controls
+		header,
+		footer
 	}: {
 		/** The two players, rendered left and right of the board. */
 		players: [BoardPlayer, BoardPlayer];
@@ -42,14 +43,15 @@
 		class?: string;
 		/** The game itself. Fills the square board area — use `size-full`. */
 		children: Snippet;
-		/** Optional controls rendered beneath the board (e.g. a reset button). */
-		controls?: Snippet;
+		/** Optional status bar above the board (e.g. whose turn, score). Rendered in a bordered bar spanning the board's width. */
+		header?: Snippet;
+		/** Optional actions beneath the board (e.g. reset, invite link). */
+		footer?: Snippet;
 	} = $props();
 </script>
 
 {#snippet abilityBar(player: BoardPlayer)}
 	<div class="flex flex-col items-center gap-2">
-		<p class={cn("text-sm font-semibold", player.accent)}>{player.label}</p>
 		<div class="flex flex-col gap-2">
 			{#each { length: abilitySlots } as _, slot (slot)}
 				{@const ability = player.abilities?.[slot]}
@@ -99,12 +101,20 @@
 		{@render abilityBar(players[0])}
 
 		<div class="flex flex-col items-center gap-6">
+			{#if header}
+				<div
+					class="flex w-(--board-size) items-center justify-between gap-3 rounded-lg border bg-muted/40 px-4 py-2.5 text-sm backdrop-blur-sm"
+				>
+					{@render header()}
+				</div>
+			{/if}
+
 			<div class="aspect-square w-(--board-size)">
 				{@render children()}
 			</div>
 
-			{#if controls}
-				{@render controls()}
+			{#if footer}
+				{@render footer()}
 			{/if}
 		</div>
 

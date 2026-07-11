@@ -1,10 +1,13 @@
 <script lang="ts">
-	import { Header } from "$lib/components/layout";
-	import { Tictactoe } from "$lib/features/play";
+	import { LogOut } from "@lucide/svelte";
+	import { Button } from "$lib/components/ui";
+	import { getClerkAuth } from "$lib/services/auth";
 	import { cn } from "$lib/utils/style";
-	import type { PageProps } from "./$types.js";
+	import type { LayoutProps } from "./$types.js";
 
-	let { params }: PageProps = $props();
+	let { children }: LayoutProps = $props();
+
+	const auth = getClerkAuth();
 </script>
 
 {#snippet cloud(color: string, position: string, anim: string)}
@@ -17,7 +20,7 @@
 	</div>
 {/snippet}
 
-<div class="relative flex min-h-svh flex-col items-center justify-center gap-8 overflow-hidden px-4 py-8 text-center">
+<div class="relative flex min-h-svh flex-col overflow-hidden">
 	<div class="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
 		{@render cloud(
 			"bg-cyan-500/20",
@@ -45,8 +48,38 @@
 			"drift-b animation-delay-[-16s] animation-duration-[32s]"
 		)}
 	</div>
-	<Header />
-	<Tictactoe roomCode={params.code} />
+
+	<nav class="absolute inset-x-4 top-4 z-10 flex items-center justify-between">
+		<a href="/" class="text-sm text-muted-foreground transition-colors hover:text-foreground">
+			Home
+		</a>
+
+		{#if auth.isSignedIn}
+			<div class="flex items-center gap-1">
+				<button
+					type="button"
+					class="flex items-center gap-2 rounded-full py-1 pr-3 pl-1 text-sm transition-colors hover:bg-muted"
+					onclick={() => auth.openUserProfile()}
+				>
+					{#if auth.profile?.imageUrl}
+						<img src={auth.profile.imageUrl} alt="" class="size-6 rounded-full" />
+					{:else}
+						<span
+							class="flex size-6 items-center justify-center rounded-full bg-muted text-xs font-semibold"
+						>
+							{(auth.profile?.name ?? "?").charAt(0).toUpperCase()}
+						</span>
+					{/if}
+					<span class="font-medium">{auth.profile?.name}</span>
+				</button>
+				<Button variant="ghost" size="icon-sm" aria-label="Sign out" onclick={() => auth.signOut()}>
+					<LogOut />
+				</Button>
+			</div>
+		{/if}
+	</nav>
+
+	{@render children()}
 </div>
 
 <style>

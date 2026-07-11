@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
-import { gameMoveValidator, gameTypeValidator, getEngine, type GameType } from "./games/index.js";
+import { applyMove, gameMoveValidator, gameTypeValidator, getEngine, type GameType } from "./games/index.js";
 import { userByExternalId } from "./users.js";
 
 const CODE_LENGTH = 6;
@@ -106,8 +106,7 @@ export const play = mutation({
 		if (playerIndex === -1) throw new Error("You are not a player in this room");
 		if (move.kind !== room.gameType) throw new Error("Move does not match this room's game");
 
-		const engine = getEngine(room.gameType as GameType);
-		const nextState = engine.applyMove(room.state, playerIndex, move);
+		const nextState = applyMove(room.gameType as GameType, room.state, playerIndex, move);
 		if (nextState === room.state) return;
 
 		await ctx.db.patch(room._id, { state: nextState });

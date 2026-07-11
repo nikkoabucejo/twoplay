@@ -111,6 +111,10 @@ export class ClerkAuth {
 		this.#clerk?.openSignIn();
 	}
 
+	async signOut() {
+		await this.#clerk?.signOut();
+	}
+
 	/** Opens Clerk's prebuilt account management UI (profile, security, …). */
 	openUserProfile() {
 		this.#clerk?.openUserProfile();

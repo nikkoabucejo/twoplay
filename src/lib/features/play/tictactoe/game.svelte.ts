@@ -71,9 +71,7 @@ export class TictactoeRoom {
 	/** True once the room is found but belongs to a different game type — a room-code collision across games. */
 	wrongGameType = $derived(this.data != null && this.data.gameType !== "tictactoe");
 
-	#state = $derived(
-		this.data && this.data.gameType === "tictactoe" ? this.data.state : null
-	);
+	#state = $derived(this.data && this.data.state.kind === "tictactoe" ? this.data.state : null);
 
 	boards = $derived(this.#state?.boards ?? []);
 	statuses = $derived(this.boards.map(statusOf));
@@ -86,7 +84,10 @@ export class TictactoeRoom {
 
 	playerX = $derived(this.data?.players?.[0] ?? null);
 	playerO = $derived(this.data?.players?.[1] ?? null);
-	isWaitingForOpponent = $derived(this.data != null && !this.playerO);
+
+	/** Mini-boards won by each side, used as an at-a-glance score. */
+	scoreX = $derived(this.statuses.filter((s) => s.winner === "X").length);
+	scoreO = $derived(this.statuses.filter((s) => s.winner === "O").length);
 
 	/** Whose mark lands next across the whole room, derived from total filled cells — no state to fall out of sync. */
 	turn = $derived(

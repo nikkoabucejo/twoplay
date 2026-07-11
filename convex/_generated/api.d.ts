@@ -9,6 +9,8 @@
  */
 
 import type * as cursors from "../cursors.js";
+import type * as games_checkers_engine from "../games/checkers/engine.js";
+import type * as games_checkers_index from "../games/checkers/index.js";
 import type * as games_engine from "../games/engine.js";
 import type * as games_index from "../games/index.js";
 import type * as games_tictactoe_engine from "../games/tictactoe/engine.js";
@@ -24,6 +26,8 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   cursors: typeof cursors;
+  "games/checkers/engine": typeof games_checkers_engine;
+  "games/checkers/index": typeof games_checkers_index;
   "games/engine": typeof games_engine;
   "games/index": typeof games_index;
   "games/tictactoe/engine": typeof games_tictactoe_engine;
