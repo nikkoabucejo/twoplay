@@ -77,9 +77,24 @@
 	</div>
 
 	<nav class="absolute inset-x-4 top-4 z-10 flex items-center justify-between">
-		<a href="/" class="text-sm text-muted-foreground transition-colors hover:text-foreground">
-			Home
-		</a>
+		<div class="flex items-center gap-4">
+			<a
+				href="https://www.buymeacoffee.com/nikkoabucejo"
+				target="_blank"
+				rel="noopener noreferrer"
+				class="flex items-center gap-1.5 text-sm text-[#ffdd00] transition-colors hover:text-[#ffe74c]"
+			>
+				<span
+					aria-hidden="true"
+					class="h-4 w-4 bg-[#ffdd00]"
+					style="mask: url('https://cdn.buymeacoffee.com/widget/assets/coffee%20cup.svg') center / contain no-repeat; -webkit-mask: url('https://cdn.buymeacoffee.com/widget/assets/coffee%20cup.svg') center / contain no-repeat;"
+				></span>
+				Buy me a coffee
+			</a>
+			<a href="/" class="text-sm text-muted-foreground transition-colors hover:text-foreground">
+				Home
+			</a>
+		</div>
 
 		{#if auth.isSignedIn}
 			<div class="flex items-center gap-1">
