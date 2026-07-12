@@ -29,16 +29,21 @@
 		};
 	}
 
-	let { roomCode, class: className }: { roomCode: string; class?: string } = $props();
+	let {
+		roomCode,
+		round,
+		class: className
+	}: { roomCode: string; round?: number; class?: string } = $props();
 
 	const auth = getClerkAuth();
 	const joinRoom = useMutation(api.rooms.join);
-	const room = new CheckersRoom(() => roomCode);
+	const room = new CheckersRoom(
+		() => roomCode,
+		() => round
+	);
 	const data = $derived(room.data);
 
 	let joinError = $state<string | null>(null);
-	let copied = $state(false);
-	let copiedTimeout: ReturnType<typeof setTimeout> | undefined;
 
 	$effect(() => {
 		const code = roomCode;
@@ -51,14 +56,15 @@
 	});
 
 	$effect(() => {
-		if (room.wrongGameType && data) goto(`/${data.game}/${roomCode}`, { replaceState: true });
+		if (room.wrongGameType && data) goto(`/${data.name}/${roomCode}`, { replaceState: true });
 	});
 
-	function copyInviteLink() {
-		navigator.clipboard.writeText(`${location.origin}/checkers/${roomCode}`);
-		copied = true;
-		clearTimeout(copiedTimeout);
-		copiedTimeout = setTimeout(() => (copied = false), 1500);
+	function goLive() {
+		goto(`/checkers/${roomCode}`);
+	}
+
+	function goToRound(round: number) {
+		goto(`/checkers/${roomCode}/${round}`);
 	}
 
 	function firstName(name: string) {
@@ -76,11 +82,7 @@
 
 	const status: BoardStatus = $derived(
 		room.winner
-			? {
-					type: "winner",
-					player: room.winner === "cyan" ? 0 : 1,
-					label: room.winner === "cyan" ? "Cyan" : "Pink"
-				}
+			? { type: "winner", player: room.winner === "cyan" ? 0 : 1 }
 			: { type: "turn", player: room.turn === "cyan" ? 0 : 1 }
 	);
 
@@ -98,7 +100,10 @@
 		out:fade={{ duration: 150 }}
 	>
 		{#if isSelected}
-			<div class="absolute inset-1 rounded-full ring-2 ring-white" in:fade={{ duration: 150 }}></div>
+			<div
+				class="absolute inset-1 rounded-full ring-2 ring-white"
+				in:fade={{ duration: 150 }}
+			></div>
 		{/if}
 		{#if p.king}
 			<svg viewBox="0 0 24 24" class="h-2/5 w-2/5 text-background/90" fill="currentColor">
@@ -143,7 +148,15 @@
 				}
 			]}
 			{status}
-			footer={{ onReset: () => room.reset(), onCopyInvite: copyInviteLink, copied, error: room.error }}
+			footer={{
+				isLive: room.isLive,
+				game: room.game,
+				round: room.round,
+				onReset: () => room.reset(),
+				onGoLive: goLive,
+				onGoToRound: goToRound,
+				error: room.error
+			}}
 		>
 			<Cursor
 				{roomCode}

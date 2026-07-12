@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import {
 	applyMove,
@@ -31,6 +32,42 @@ export async function getRoomByCode(ctx: QueryCtx | MutationCtx, code: string) {
 		.unique();
 }
 
+/** The room's live game — the one with the highest `round`. */
+async function getCurrentGame(ctx: QueryCtx | MutationCtx, roomId: Id<"rooms">) {
+	return await ctx.db
+		.query("games")
+		.withIndex("byRoom", (q) => q.eq("roomId", roomId))
+		.order("desc")
+		.first();
+}
+
+/** A specific past or present round, or the live game when `round` is omitted. */
+async function getGame(ctx: QueryCtx | MutationCtx, roomId: Id<"rooms">, round?: number) {
+	if (round === undefined) return await getCurrentGame(ctx, roomId);
+	return await ctx.db
+		.query("games")
+		.withIndex("byRoom", (q) => q.eq("roomId", roomId).eq("round", round))
+		.unique();
+}
+
+async function createGame(ctx: MutationCtx, roomId: Id<"rooms">, name: GameType) {
+	const previous = await getCurrentGame(ctx, roomId);
+	return await ctx.db.insert("games", {
+		roomId,
+		round: previous ? previous.round + 1 : 1,
+		state: getEngine(name).createInitialState()
+	});
+}
+
+/** How many moves have been played in a game — also next move's `moves.index`. */
+async function countMoves(ctx: QueryCtx | MutationCtx, gameId: Id<"games">): Promise<number> {
+	const moves = await ctx.db
+		.query("moves")
+		.withIndex("byGame", (q) => q.eq("gameId", gameId))
+		.collect();
+	return moves.length;
+}
+
 async function generateRoomCode(ctx: MutationCtx): Promise<string> {
 	for (let attempt = 0; attempt < 10; attempt++) {
 		let code = "";
@@ -43,18 +80,18 @@ async function generateRoomCode(ctx: MutationCtx): Promise<string> {
 }
 
 export const create = mutation({
-	args: { game: gameTypeValidator },
-	async handler(ctx, { game }) {
+	args: { name: gameTypeValidator },
+	async handler(ctx, { name }) {
 		const user = await requireUser(ctx);
 		const code = await generateRoomCode(ctx);
-		const engine = getEngine(game as GameType);
-		await ctx.db.insert("rooms", {
+		const engine = getEngine(name as GameType);
+		const roomId = await ctx.db.insert("rooms", {
 			code,
-			game,
+			name,
 			players: [user._id],
-			state: engine.createInitialState(),
 			scores: Array(engine.playerCount).fill(0)
 		});
+		await createGame(ctx, roomId, name as GameType);
 		return code;
 	}
 });
@@ -68,7 +105,7 @@ export const join = mutation({
 
 		if (room.players.includes(user._id)) return;
 
-		const engine = getEngine(room.game as GameType);
+		const engine = getEngine(room.name as GameType);
 		if (room.players.length >= engine.playerCount) throw new Error("Room is full");
 
 		await ctx.db.patch(room._id, { players: [...room.players, user._id] });
@@ -76,15 +113,15 @@ export const join = mutation({
 });
 
 export const get = query({
-	args: { code: v.string() },
-	async handler(ctx, { code }) {
+	args: { code: v.string(), round: v.optional(v.number()) },
+	async handler(ctx, { code, round }) {
 		const room = await getRoomByCode(ctx, code);
 		if (!room) return null;
 
 		const identity = await ctx.auth.getUserIdentity();
 		const viewer = identity ? await userByClerkUserId(ctx, identity.subject) : null;
 
-		const engine = getEngine(room.game as GameType);
+		const engine = getEngine(room.name as GameType);
 		const playerInfos = await Promise.all(
 			Array.from({ length: engine.playerCount }, (_, i) => room.players[i] ?? null).map((id) =>
 				id ? ctx.db.get(id) : null
@@ -92,13 +129,26 @@ export const get = query({
 		);
 
 		const myIndex = viewer ? room.players.indexOf(viewer._id) : -1;
+		const game = await getGame(ctx, room._id, round);
+		if (!game) return null;
+
+		// Whether `game` is the live round — false when `round` pins an older one, so the client
+		// can tell a manually-browsed past round apart from the one still being played.
+		const currentGame = round === undefined ? game : await getCurrentGame(ctx, room._id);
+		const isLive = currentGame !== null && currentGame._id === game._id;
 
 		return {
 			code: room.code,
-			game: room.game,
+			name: room.name,
 			players: playerInfos.map((p) => (p ? { name: p.name } : null)),
 			myIndex: myIndex >= 0 ? myIndex : null,
-			state: room.state,
+			state: game.state,
+			// The specific round/game instance currently displayed.
+			game: game.round,
+			// The room's most recent round, so the client can offer round-by-round navigation
+			// (e.g. disabling "next" past the latest one) without a separate query.
+			round: currentGame?.round ?? game.round,
+			isLive,
 			scores: room.scores ?? Array(engine.playerCount).fill(0)
 		};
 	}
@@ -113,12 +163,35 @@ export const play = mutation({
 
 		const playerIndex = room.players.indexOf(user._id);
 		if (playerIndex === -1) throw new Error("You are not a player in this room");
-		if (move.kind !== room.game) throw new Error("Move does not match this room's game");
+		if (move.kind !== room.name) throw new Error("Move does not match this room's game");
 
-		const nextState = applyMove(room.game as GameType, room.state, playerIndex, move);
-		if (nextState === room.state) return;
+		const game = await getCurrentGame(ctx, room._id);
+		if (!game) throw new Error("Game not found");
 
-		await ctx.db.patch(room._id, { state: nextState });
+		const nextState = applyMove(room.name as GameType, game.state, playerIndex, move);
+		if (nextState === game.state) return;
+
+		const index = await countMoves(ctx, game._id);
+		await ctx.db.patch(game._id, { state: nextState });
+		await ctx.db.insert("moves", { gameId: game._id, index, player: user._id, state: nextState });
+	}
+});
+
+/** Ordered history of moves played in a room's game — the current one when `round` is omitted. */
+export const history = query({
+	args: { code: v.string(), round: v.optional(v.number()) },
+	async handler(ctx, { code, round }) {
+		const room = await getRoomByCode(ctx, code);
+		if (!room) return [];
+
+		const game = await getGame(ctx, room._id, round);
+		if (!game) return [];
+
+		return await ctx.db
+			.query("moves")
+			.withIndex("byGame", (q) => q.eq("gameId", game._id))
+			.order("asc")
+			.collect();
 	}
 });
 
@@ -132,11 +205,15 @@ export const reset = mutation({
 			throw new Error("You are not a player in this room");
 		}
 
-		const engine = getEngine(room.game as GameType);
+		const engine = getEngine(room.name as GameType);
 		const scores = room.scores ?? Array(engine.playerCount).fill(0);
-		const winnerIndex = roundWinner(room.game as GameType, room.state);
-		if (winnerIndex !== null) scores[winnerIndex] += 1;
+		const game = await getCurrentGame(ctx, room._id);
+		if (game) {
+			const winnerIndex = roundWinner(room.name as GameType, game.state);
+			if (winnerIndex !== null) scores[winnerIndex] += 1;
+		}
 
-		await ctx.db.patch(room._id, { state: engine.createInitialState(), scores });
+		await ctx.db.patch(room._id, { scores });
+		await createGame(ctx, room._id, room.name as GameType);
 	}
 });

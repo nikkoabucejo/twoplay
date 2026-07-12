@@ -34,16 +34,21 @@
 		};
 	}
 
-	let { roomCode, class: className }: { roomCode: string; class?: string } = $props();
+	let {
+		roomCode,
+		round,
+		class: className
+	}: { roomCode: string; round?: number; class?: string } = $props();
 
 	const auth = getClerkAuth();
 	const joinRoom = useMutation(api.rooms.join);
-	const room = new TictactoeRoom(() => roomCode);
+	const room = new TictactoeRoom(
+		() => roomCode,
+		() => round
+	);
 	const data = $derived(room.data);
 
 	let joinError = $state<string | null>(null);
-	let copied = $state(false);
-	let copiedTimeout: ReturnType<typeof setTimeout> | undefined;
 
 	$effect(() => {
 		const code = roomCode;
@@ -56,23 +61,51 @@
 	});
 
 	$effect(() => {
-		if (room.wrongGameType && data) goto(`/${data.game}/${roomCode}`, { replaceState: true });
+		if (room.wrongGameType && data) goto(`/${data.name}/${roomCode}`, { replaceState: true });
 	});
 
-	function copyInviteLink() {
-		navigator.clipboard.writeText(`${location.origin}/tictactoe/${roomCode}`);
-		copied = true;
-		clearTimeout(copiedTimeout);
-		copiedTimeout = setTimeout(() => (copied = false), 1500);
+	function goLive() {
+		goto(`/tictactoe/${roomCode}`);
+	}
+
+	function goToRound(round: number) {
+		goto(`/tictactoe/${roomCode}/${round}`);
 	}
 
 	function firstName(name: string) {
 		return name.split(" ")[0];
 	}
 
+	/** Arrow keys scrub this browser's personal view of the current round's move history — local only,
+	 *  never touches the real game state or other players' views. */
+	function handleKeydown(event: KeyboardEvent) {
+		if (!data) return;
+		const target = event.target as HTMLElement | null;
+		if (target && ["INPUT", "TEXTAREA"].includes(target.tagName)) return;
+
+		switch (event.key) {
+			case "ArrowLeft":
+				event.preventDefault();
+				room.stepBack();
+				break;
+			case "ArrowRight":
+				event.preventDefault();
+				room.stepForward();
+				break;
+			case "ArrowUp":
+				event.preventDefault();
+				room.jumpToLatest();
+				break;
+			case "ArrowDown":
+				event.preventDefault();
+				room.jumpToFirst();
+				break;
+		}
+	}
+
 	const status: BoardStatus = $derived(
 		room.winner
-			? { type: "winner", player: room.winner === "X" ? 0 : 1, label: room.winner }
+			? { type: "winner", player: room.winner === "X" ? 0 : 1 }
 			: room.isOver
 				? { type: "draw" }
 				: { type: "turn", player: room.turn === "X" ? 0 : 1 }
@@ -180,6 +213,8 @@
 	</div>
 {/snippet}
 
+<svelte:window onkeydown={handleKeydown} />
+
 <div class={cn("flex flex-col items-center gap-6", className)}>
 	{#if !auth.isSignedIn}
 		<div class="flex flex-col items-center gap-3">
@@ -201,58 +236,88 @@
 			<Button variant="outline" href="/tictactoe">Back to lobby</Button>
 		</div>
 	{:else if data}
-		<Board
-			abilitySlots={5}
-			players={[
-				{
-					label: room.playerX ? firstName(room.playerX.name) : "Player 1",
-					accent: "text-cyan-500",
-					score: room.scoreX,
-					abilities
-				},
-				{
-					label: room.playerO ? firstName(room.playerO.name) : "Player 2",
-					accent: "text-pink-500",
-					score: room.scoreO,
-					abilities
-				}
-			]}
-			{status}
-			footer={{ onReset: () => room.reset(), onCopyInvite: copyInviteLink, copied, error: room.error }}
-		>
-			<Cursor
-				{roomCode}
-				class="size-full"
-				colorFor={(index) =>
-					index === 0 ? "text-cyan-500" : index === 1 ? "text-pink-500" : "text-muted-foreground"}
-			>
-				<div class="grid size-full grid-cols-3 grid-rows-3 gap-3">
-					{#each room.boards as cells, boardIndex (boardIndex)}
-						{@render miniBoard(cells, boardIndex)}
-					{/each}
-				</div>
-				{#if room.winningLine}
-					{@const [a, , c] = room.winningLine}
-					<svg
-						viewBox="0 0 3 3"
-						class={cn(
-							"pointer-events-none absolute inset-0 h-full w-full",
-							room.winner === "X" ? "text-cyan-500" : "text-pink-500"
-						)}
+		<div class="relative">
+			{#if room.isViewingHistory}
+				<div
+					class="pointer-events-none absolute inset-x-0 top-0 z-20 flex -translate-y-[calc(100%+0.5rem)] justify-center"
+					transition:fade={{ duration: 150 }}
+				>
+					<div
+						class="pointer-events-auto flex items-center gap-2 rounded-full border bg-background/90 px-3 py-1 text-xs shadow-sm backdrop-blur-sm"
 					>
-						<line
-							x1={(a % 3) + 0.5}
-							y1={Math.floor(a / 3) + 0.5}
-							x2={(c % 3) + 0.5}
-							y2={Math.floor(c / 3) + 0.5}
-							stroke="currentColor"
-							stroke-width="0.08"
-							stroke-linecap="round"
-							in:draw={{ duration: 400 }}
-						/>
-					</svg>
-				{/if}
-			</Cursor>
-		</Board>
+						<span class="text-muted-foreground">
+							Move {room.viewedMoveNumber} of {room.historyLength}
+						</span>
+						<button
+							type="button"
+							class="font-semibold text-primary hover:underline"
+							onclick={() => room.jumpToLatest()}
+						>
+							Return to live
+						</button>
+					</div>
+				</div>
+			{/if}
+			<Board
+				players={[
+					{
+						label: room.playerX ? firstName(room.playerX.name) : "Player 1",
+						accent: "text-cyan-500",
+						score: room.scoreX,
+						abilities
+					},
+					{
+						label: room.playerO ? firstName(room.playerO.name) : "Player 2",
+						accent: "text-pink-500",
+						score: room.scoreO,
+						abilities
+					}
+				]}
+				{status}
+				footer={{
+					isLive: room.isLive,
+					game: room.game,
+					round: room.round,
+					onReset: () => room.reset(),
+					onGoLive: goLive,
+					onGoToRound: goToRound,
+					error: room.error
+				}}
+			>
+				<Cursor
+					{roomCode}
+					class="size-full"
+					colorFor={(index) =>
+						index === 0 ? "text-cyan-500" : index === 1 ? "text-pink-500" : "text-muted-foreground"}
+				>
+					<div class="grid size-full grid-cols-3 grid-rows-3 gap-3">
+						{#each room.boards as cells, boardIndex (boardIndex)}
+							{@render miniBoard(cells, boardIndex)}
+						{/each}
+					</div>
+					{#if room.winningLine}
+						{@const [a, , c] = room.winningLine}
+						<svg
+							viewBox="0 0 3 3"
+							class={cn(
+								"pointer-events-none absolute inset-0 h-full w-full",
+								room.winner === "X" ? "text-cyan-500" : "text-pink-500"
+							)}
+						>
+							<line
+								x1={(a % 3) + 0.5}
+								y1={Math.floor(a / 3) + 0.5}
+								x2={(c % 3) + 0.5}
+								y2={Math.floor(c / 3) + 0.5}
+								stroke="currentColor"
+								stroke-width="0.08"
+								stroke-linecap="round"
+								in:draw={{ duration: 400 }}
+							/>
+						</svg>
+					{/if}
+				</Cursor>
+			</Board>
+		</div>
 	{/if}
 </div>

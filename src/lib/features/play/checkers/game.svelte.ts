@@ -103,13 +103,20 @@ export class CheckersRoom {
 	selected = $state<number | null>(null);
 
 	#getCode: () => string;
+	#getRound: () => number | undefined;
 	#room: UseQueryReturn<typeof api.rooms.get>;
 	#play = useMutation(api.rooms.play);
 	#reset = useMutation(api.rooms.reset);
 
-	constructor(getCode: () => string) {
+	/** `getRound` pins the room to a specific past round (e.g. from a `/:round` URL segment) instead of
+	 *  always following the live one. Omit it, or have it return undefined, to always track the live round. */
+	constructor(getCode: () => string, getRound: () => number | undefined = () => undefined) {
 		this.#getCode = getCode;
-		this.#room = useQuery(api.rooms.get, () => ({ code: this.#getCode() }));
+		this.#getRound = getRound;
+		this.#room = useQuery(api.rooms.get, () => ({
+			code: this.#getCode(),
+			round: this.#getRound()
+		}));
 	}
 
 	get isLoading() {
@@ -121,7 +128,14 @@ export class CheckersRoom {
 	}
 
 	/** True once the room is found but belongs to a different game type — a room-code collision across games. */
-	wrongGameType = $derived(this.data != null && this.data.game !== "checkers");
+	wrongGameType = $derived(this.data != null && this.data.name !== "checkers");
+
+	/** False when `getRound` has pinned this to a past round rather than the one still being played. */
+	isLive = $derived(this.data?.isLive ?? true);
+
+	/** The round currently displayed, and the room's most recent round — for round-by-round navigation. */
+	game = $derived(this.data?.game ?? 1);
+	round = $derived(this.data?.round ?? this.game);
 
 	#state = $derived(this.data && this.data.state.kind === "checkers" ? this.data.state : null);
 
@@ -137,7 +151,7 @@ export class CheckersRoom {
 	myColor = $derived<PieceColor | null>(
 		this.data?.myIndex === 0 ? "cyan" : this.data?.myIndex === 1 ? "pink" : null
 	);
-	isMyTurn = $derived(this.myColor !== null && this.myColor === this.turn);
+	isMyTurn = $derived(this.isLive && this.myColor !== null && this.myColor === this.turn);
 
 	playerCyan = $derived(this.data?.players?.[0] ?? null);
 	playerPink = $derived(this.data?.players?.[1] ?? null);
@@ -193,6 +207,8 @@ export class CheckersRoom {
 	}
 
 	async reset(): Promise<void> {
+		if (!this.isLive) return;
+
 		this.error = null;
 		this.selected = null;
 		try {

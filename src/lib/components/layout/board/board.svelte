@@ -23,21 +23,26 @@
 
 	/** Drives the status bar's center content — whose turn it is, or how the game ended. */
 	export type BoardStatus =
-		| { type: "turn"; player: 0 | 1 }
-		| { type: "winner"; player: 0 | 1; label: string }
-		| { type: "draw" };
+		{ type: "turn"; player: 0 | 1 } | { type: "winner"; player: 0 | 1 } | { type: "draw" };
 
 	export type BoardFooter = {
+		/** False when viewing a past round rather than the room's current one. */
+		isLive: boolean;
+		/** The round currently displayed, and the room's most recent round — 1-indexed. */
+		game: number;
+		round: number;
+		/** Starts a new round. Only called while `isLive` and the round is over. */
 		onReset: () => void;
-		onCopyInvite: () => void;
-		/** Swaps the invite button's icon to a checkmark, e.g. right after copying. */
-		copied?: boolean;
+		/** Navigates to the room's current live round. Only called while `!isLive`. */
+		onGoLive: () => void;
+		/** Navigates to a specific past or present round. */
+		onGoToRound: (round: number) => void;
 		error?: string | null;
 	};
 </script>
 
 <script lang="ts">
-	import { Check, Link, RotateCcw, Trophy } from "@lucide/svelte";
+	import { ChevronLeft, ChevronRight } from "@lucide/svelte";
 	import { fade } from "svelte/transition";
 	import {
 		Button,
@@ -53,7 +58,7 @@
 		players,
 		status,
 		footer,
-		abilitySlots = 3,
+		abilitySlots = 5,
 		size = "34rem",
 		class: className,
 		children
@@ -64,7 +69,8 @@
 		status?: BoardStatus;
 		/** Reset/invite actions and any error message. Omit to hide the action bar. */
 		footer?: BoardFooter;
-		/** Number of ability slots per player. */
+		/** Number of ability slots per player. Same across every game by default — don't override
+		 * per game, or slot count will drift out of sync between them. */
 		abilitySlots?: number;
 		/** Fixed side length of the square board area (any CSS length). */
 		size?: string;
@@ -77,6 +83,19 @@
 		return player.accent?.replace("text-", "bg-");
 	}
 </script>
+
+{#snippet turnIndicator(player: 0 | 1, word: string, pulse: boolean)}
+	{@const color = players[player].accent}
+	{@const arrowClass = cn("text-base leading-none", pulse && "animate-pulse", color)}
+	{@const wordClass = cn("text-[10px] font-semibold tracking-widest uppercase", color)}
+	{#if player === 0}
+		<span class={arrowClass}>◀</span>
+		<span class={wordClass}>{word}</span>
+	{:else}
+		<span class={wordClass}>{word}</span>
+		<span class={arrowClass}>▶</span>
+	{/if}
+{/snippet}
 
 {#snippet abilityBar(player: BoardPlayer)}
 	<div class="flex flex-col items-center gap-2">
@@ -143,17 +162,11 @@
 
 					<div class="flex items-center gap-1.5">
 						{#if status.type === "winner"}
-							{@const color = players[status.player].accent}
-							<Trophy class={cn("size-4", color)} />
-							<span class={cn("font-semibold", color)}>{status.label} wins</span>
+							{@render turnIndicator(status.player, "Winner", false)}
 						{:else if status.type === "draw"}
 							<span class="font-semibold text-muted-foreground">Draw</span>
 						{:else}
-							<span
-								class={cn("animate-pulse text-base leading-none", players[status.player].accent)}
-							>
-								{status.player === 0 ? "◀" : "▶"}
-							</span>
+							{@render turnIndicator(status.player, "Turn", true)}
 						{/if}
 					</div>
 
@@ -172,21 +185,57 @@
 			</div>
 
 			{#if footer}
+				{@const prevDisabled = footer.game <= 1}
+				{@const nextDisabled = footer.game >= footer.round}
+				{@const newGameDisabled = status?.type !== "winner" && status?.type !== "draw"}
 				<div class="flex w-(--board-size) flex-col items-center gap-3">
 					<div class="flex items-center gap-2">
-						<Button variant="outline" size="sm" onclick={footer.onReset}>
-							<RotateCcw />
-							Reset game
-						</Button>
-						<Button variant="outline" size="sm" onclick={footer.onCopyInvite}>
-							{#if footer.copied}
-								<Check />
+						<span class={cn(prevDisabled && "cursor-not-allowed")}>
+							<Button
+								variant="outline"
+								size="icon-sm"
+								aria-label="Previous round"
+								disabled={prevDisabled}
+								onclick={() => footer.onGoToRound(footer.game - 1)}
+							>
+								<ChevronLeft />
+							</Button>
+						</span>
+
+						<span class={cn(footer.isLive && newGameDisabled && "cursor-not-allowed")}>
+							{#if footer.isLive}
+								<Button
+									variant="outline"
+									size="sm"
+									class="w-32 uppercase"
+									onclick={footer.onReset}
+									disabled={newGameDisabled}
+								>
+									New game
+								</Button>
 							{:else}
-								<Link />
+								<Button variant="outline" size="sm" class="w-32 uppercase" onclick={footer.onGoLive}>
+									Go live
+								</Button>
 							{/if}
-							Copy invite link
-						</Button>
+						</span>
+
+						<span class={cn(nextDisabled && "cursor-not-allowed")}>
+							<Button
+								variant="outline"
+								size="icon-sm"
+								aria-label="Next round"
+								disabled={nextDisabled}
+								onclick={() => footer.onGoToRound(footer.game + 1)}
+							>
+								<ChevronRight />
+							</Button>
+						</span>
 					</div>
+
+					<p class="text-xs text-muted-foreground">
+						Round {footer.game} of {footer.round}
+					</p>
 
 					{#if footer.error}
 						<p class="text-sm text-destructive" transition:fade>{footer.error}</p>

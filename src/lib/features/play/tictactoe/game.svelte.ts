@@ -51,13 +51,34 @@ export class TictactoeRoom {
 	error = $state<string | null>(null);
 
 	#getCode: () => string;
+	#getRound: () => number | undefined;
 	#room: UseQueryReturn<typeof api.rooms.get>;
+	#history: UseQueryReturn<typeof api.rooms.history>;
 	#play = useMutation(api.rooms.play);
 	#reset = useMutation(api.rooms.reset);
 
-	constructor(getCode: () => string) {
+	/** Local scrubber position into this round's move history; null means "live" (always the latest state).
+	 *  Purely a per-browser viewing cursor — never sent to the server and never affects the real game. */
+	#cursor = $state<number | null>(null);
+
+	/** `getRound` pins the room to a specific past round (e.g. from a `/:round` URL segment) instead of
+	 *  always following the live one. Omit it, or have it return undefined, to always track the live round. */
+	constructor(getCode: () => string, getRound: () => number | undefined = () => undefined) {
 		this.#getCode = getCode;
-		this.#room = useQuery(api.rooms.get, () => ({ code: this.#getCode() }));
+		this.#getRound = getRound;
+		this.#room = useQuery(api.rooms.get, () => ({
+			code: this.#getCode(),
+			round: this.#getRound()
+		}));
+		this.#history = useQuery(api.rooms.history, () => ({
+			code: this.#getCode(),
+			round: this.#getRound()
+		}));
+
+		$effect(() => {
+			// A round reset clears history server-side; drop any stale cursor back to live.
+			if (this.#historyMoves.length === 0) this.#cursor = null;
+		});
 	}
 
 	get isLoading() {
@@ -69,11 +90,39 @@ export class TictactoeRoom {
 	}
 
 	/** True once the room is found but belongs to a different game type — a room-code collision across games. */
-	wrongGameType = $derived(this.data != null && this.data.game !== "tictactoe");
+	wrongGameType = $derived(this.data != null && this.data.name !== "tictactoe");
+
+	/** False when `getRound` has pinned this to a past round rather than the one still being played. */
+	isLive = $derived(this.data?.isLive ?? true);
+
+	/** The round currently displayed, and the room's most recent round — for round-by-round navigation. */
+	game = $derived(this.data?.game ?? 1);
+	round = $derived(this.data?.round ?? this.game);
 
 	#state = $derived(this.data && this.data.state.kind === "tictactoe" ? this.data.state : null);
 
-	boards = $derived(this.#state?.boards ?? []);
+	get #historyMoves() {
+		return this.#history.data ?? [];
+	}
+
+	/** Index of the latest played move this round, or -1 before any move has been made. */
+	#latestIndex = $derived(this.#historyMoves.length - 1);
+
+	/** True while this browser is scrubbed away from the live position — purely local, doesn't affect the room. */
+	isViewingHistory = $derived(this.#cursor !== null);
+
+	/** The board snapshot currently shown: the cursor's historical snapshot, or the live state when the cursor is null. */
+	#displayState = $derived.by(() => {
+		if (this.#cursor === null) return this.#state;
+		const move = this.#historyMoves[this.#cursor];
+		return move && move.state.kind === "tictactoe" ? move.state : this.#state;
+	});
+
+	/** 1-based position currently shown, for a "move X of Y" indicator. */
+	viewedMoveNumber = $derived((this.#cursor ?? this.#latestIndex) + 1);
+	historyLength = $derived(this.#historyMoves.length);
+
+	boards = $derived(this.#displayState?.boards ?? []);
 	statuses = $derived(this.boards.map(statusOf));
 	mySymbol = $derived<Player | null>(
 		this.data?.myIndex === 0 ? "X" : this.data?.myIndex === 1 ? "O" : null
@@ -119,10 +168,13 @@ export class TictactoeRoom {
 		);
 	}
 
-	/** True when it's this browser's turn to place a mark on that board. */
+	/** True when it's this browser's turn to place a mark on that board. Always false while scrubbing
+	 *  history or while pinned to a past round. */
 	canPlay(boardIndex: number): boolean {
 		const status = this.statuses[boardIndex];
 		return (
+			this.isLive &&
+			!this.isViewingHistory &&
 			!this.isOver &&
 			status?.status === "playing" &&
 			this.mySymbol === this.turn &&
@@ -132,6 +184,30 @@ export class TictactoeRoom {
 
 	isWinningCell(boardIndex: number, cellIndex: number): boolean {
 		return this.statuses[boardIndex]?.winningLine?.includes(cellIndex) ?? false;
+	}
+
+	/** Step one move back in this round's history. A no-op past the first move. Local only. */
+	stepBack(): void {
+		if (this.#historyMoves.length === 0) return;
+		const current = this.#cursor ?? this.#latestIndex;
+		this.#cursor = Math.max(0, current - 1);
+	}
+
+	/** Step one move toward the present. Reaching the latest move returns to the live position. Local only. */
+	stepForward(): void {
+		if (this.#cursor === null) return;
+		this.#cursor = this.#cursor + 1 >= this.#latestIndex ? null : this.#cursor + 1;
+	}
+
+	/** Jump to the live position. Local only. */
+	jumpToLatest(): void {
+		this.#cursor = null;
+	}
+
+	/** Jump to the first move of this round. Local only. */
+	jumpToFirst(): void {
+		if (this.#historyMoves.length === 0) return;
+		this.#cursor = 0;
 	}
 
 	async play(boardIndex: number, cellIndex: number): Promise<void> {
@@ -149,7 +225,10 @@ export class TictactoeRoom {
 	}
 
 	async reset(): Promise<void> {
+		if (!this.isLive) return;
+
 		this.error = null;
+		this.#cursor = null;
 		try {
 			await this.#reset({ code: this.#getCode() });
 		} catch (err) {

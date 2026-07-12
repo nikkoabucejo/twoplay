@@ -27,7 +27,7 @@
 		error = null;
 		creating = true;
 		try {
-			createdCode = await createRoom({ game: "checkers" });
+			createdCode = await createRoom({ name: "checkers" });
 		} catch (err) {
 			error = err instanceof Error ? err.message : "Could not create a room";
 		} finally {
