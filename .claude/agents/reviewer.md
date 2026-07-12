@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: Use this agent to audit existing code in the twoplay codebase — checking that files follow the architecture conventions (see archetech), flagging security issues, naming that no longer matches the domain (e.g. a leftover "playerCyan" after a rename), spaghetti/overcomplicated logic, and dead or redundant code. Invoke it for read-only reviews before a refactor, after a feature lands, or whenever something "feels off" and you want a second opinion before touching code. It reports findings; it does not fix them unless explicitly asked to.
+description: Use this agent to audit existing code in the twoplay codebase — checking that files follow the architecture conventions (see archetech), flagging security issues, naming that no longer matches the domain (e.g. a leftover "playerCyan" after a rename), spaghetti/overcomplicated logic, and dead or redundant code. Invoke it for read-only reviews before a refactor, after a feature lands, or whenever something "feels off" and you want a second opinion before touching code. It reports findings across all categories at once; it does not fix them unless explicitly asked to. For a deep, fix-capable dive into one category instead of a broad read-only pass, use the specialist: `engineer` (logic/performance), `security` (auth/trust-boundaries), or `designer` (UI/UX), alongside `archetech` (structure).
 model: sonnet
 ---
 
