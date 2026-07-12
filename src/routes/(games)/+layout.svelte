@@ -79,15 +79,15 @@
 	<nav class="absolute inset-x-4 top-4 z-10 flex items-center justify-between">
 		<div class="flex items-center gap-4">
 			<a
-				href="https://www.buymeacoffee.com/nikkoabucejo"
+				href="https://ko-fi.com/nikkoabucejo"
 				target="_blank"
 				rel="noopener noreferrer"
-				class="flex items-center gap-1.5 text-sm text-[#ffdd00] transition-colors hover:text-[#ffe74c]"
+				class="flex items-center gap-1.5 text-sm text-[#ff5e5b] transition-colors hover:text-[#ff8785]"
 			>
 				<span
 					aria-hidden="true"
-					class="h-4 w-4 bg-[#ffdd00]"
-					style="mask: url('https://cdn.buymeacoffee.com/widget/assets/coffee%20cup.svg') center / contain no-repeat; -webkit-mask: url('https://cdn.buymeacoffee.com/widget/assets/coffee%20cup.svg') center / contain no-repeat;"
+					class="h-4 w-4 bg-[#ff5e5b]"
+					style="mask: url('https://storage.ko-fi.com/cdn/cup-border.png') center / contain no-repeat; -webkit-mask: url('https://storage.ko-fi.com/cdn/cup-border.png') center / contain no-repeat;"
 				></span>
 				Buy me a coffee
 			</a>

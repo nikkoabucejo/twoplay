@@ -1,7 +1,8 @@
 <script lang="ts">
-	import { Check, Grid3x3, Link, LogIn, Plus } from "@lucide/svelte";
+	import { Check, Link, LogIn, Plus } from "@lucide/svelte";
 	import { useMutation, useQuery } from "convex-svelte";
 	import { goto } from "$app/navigation";
+	import { TicTacToe } from "$lib/assets/icons/games";
 	import { Button } from "$lib/components/ui";
 	import { getClerkAuth } from "$lib/services/auth";
 	import { api } from "../../../../convex/_generated/api.js";
@@ -51,11 +52,7 @@
 
 <div class="flex flex-1 flex-col items-center justify-center gap-8 px-4 py-8 text-center">
 	<div class="flex flex-col items-center gap-3">
-		<div
-			class="flex size-14 items-center justify-center rounded-full bg-muted/40 shadow-sm backdrop-blur-sm"
-		>
-			<Grid3x3 class="size-7" />
-		</div>
+		<TicTacToe class="size-10" />
 		<h1 class="text-2xl font-bold tracking-tight">Tic-Tac-Toe</h1>
 	</div>
 
