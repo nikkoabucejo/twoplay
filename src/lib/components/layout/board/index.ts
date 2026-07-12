@@ -4,6 +4,7 @@ import Root, {
 	type BoardPlayer,
 	type BoardStatus
 } from "./board.svelte";
+import { getMood, setupMood, Mood } from "./mood.svelte.js";
 
 export {
 	Root,
@@ -12,5 +13,8 @@ export {
 	type Ability,
 	type BoardFooter,
 	type BoardPlayer,
-	type BoardStatus
+	type BoardStatus,
+	getMood,
+	setupMood,
+	Mood
 };

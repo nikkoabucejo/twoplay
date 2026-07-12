@@ -54,6 +54,7 @@
 	} from "$lib/components/ui";
 	import { cn } from "$lib/utils/style";
 	import type { Snippet } from "svelte";
+	import { getMood } from "./mood.svelte.js";
 
 	let {
 		players,
@@ -83,6 +84,16 @@
 	function dotClass(player: BoardPlayer) {
 		return player.accent?.replaceAll("text-", "bg-");
 	}
+
+	const mood = getMood();
+
+	$effect(() => {
+		if (!mood) return;
+		mood.status = status ?? null;
+		return () => {
+			mood.status = null;
+		};
+	});
 </script>
 
 {#snippet turnIndicator(player: 0 | 1, word: string, pulse: boolean)}

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { LogOut } from "@lucide/svelte";
 	import { Button } from "$lib/components/ui";
+	import { setupMood } from "$lib/components/layout";
 	import { getClerkAuth } from "$lib/services/auth";
 	import { cn } from "$lib/utils/style";
 	import type { LayoutProps } from "./$types.js";
@@ -8,68 +9,108 @@
 	let { children }: LayoutProps = $props();
 
 	const auth = getClerkAuth();
+	const mood = setupMood();
+
+	// Seat 0 is always cyan and seat 1 is always pink, the fixed convention every
+	// game uses (see $lib/utils/style/accents) — so the background can key off the
+	// seat number alone without knowing which game (or symbol/color scheme) is live.
+	const activeSeat = $derived(mood.status?.type === "turn" ? mood.status.player : null);
+	const winnerSeat = $derived(mood.status?.type === "winner" ? mood.status.player : null);
+
+	function moodScale(seat: 0 | 1) {
+		if (winnerSeat !== null) return winnerSeat === seat ? 1.9 : 0.2;
+		if (activeSeat === seat) return 1.3;
+		if (activeSeat !== null) return 0.85;
+		return 1;
+	}
+
+	function moodOpacity(seat: 0 | 1) {
+		if (winnerSeat !== null) return winnerSeat === seat ? 1 : 0;
+		if (activeSeat === seat) return 1;
+		if (activeSeat !== null) return 0.75;
+		return 1;
+	}
+
+	function moodSpeed(seat: 0 | 1) {
+		if (winnerSeat !== null) return winnerSeat === seat ? "8s" : "40s";
+		if (activeSeat === seat) return "9s";
+		if (activeSeat !== null) return "22s";
+		return "16s";
+	}
 </script>
 
-{#snippet cloud(color: string, position: string, anim: string)}
+{#snippet cloud(seat: 0 | 1, color: string, position: string, anim: string)}
 	<div class={cn("absolute", position, anim)}>
 		<div
-			class={cn("blob-float absolute inset-[15%] rounded-full blur-3xl", color)}
-			style="animation-delay: -2s"
-		></div>
-		<div
-			class={cn(
-				"blob-float absolute top-[-5%] left-[-5%] size-[55%] rounded-full blur-3xl",
-				color
-			)}
-			style="animation-delay: -9s"
-		></div>
-		<div
-			class={cn(
-				"blob-float absolute top-[2%] right-[-8%] size-[50%] rounded-full blur-3xl",
-				color
-			)}
-			style="animation-delay: -4s"
-		></div>
-		<div
-			class={cn(
-				"blob-float absolute bottom-[-6%] left-[6%] size-[48%] rounded-full blur-3xl",
-				color
-			)}
-			style="animation-delay: -12s"
-		></div>
-		<div
-			class={cn(
-				"blob-float absolute right-[-6%] bottom-[-8%] size-[42%] rounded-full blur-3xl",
-				color
-			)}
-			style="animation-delay: -6s"
-		></div>
+			class="size-full transition-[scale,opacity] duration-1400 ease-out"
+			style="scale: {moodScale(seat)}; opacity: {moodOpacity(seat)}; --blob-speed: {moodSpeed(
+				seat
+			)}"
+		>
+			<div
+				class={cn("blob-float absolute inset-[15%] rounded-full blur-3xl", color)}
+				style="animation-delay: -2s"
+			></div>
+			<div
+				class={cn(
+					"blob-float absolute top-[-5%] left-[-5%] size-[55%] rounded-full blur-3xl",
+					color
+				)}
+				style="animation-delay: -9s"
+			></div>
+			<div
+				class={cn(
+					"blob-float absolute top-[2%] right-[-8%] size-[50%] rounded-full blur-3xl",
+					color
+				)}
+				style="animation-delay: -4s"
+			></div>
+			<div
+				class={cn(
+					"blob-float absolute bottom-[-6%] left-[6%] size-[48%] rounded-full blur-3xl",
+					color
+				)}
+				style="animation-delay: -12s"
+			></div>
+			<div
+				class={cn(
+					"blob-float absolute right-[-6%] bottom-[-8%] size-[42%] rounded-full blur-3xl",
+					color
+				)}
+				style="animation-delay: -6s"
+			></div>
+		</div>
 	</div>
 {/snippet}
 
 <div class="relative flex min-h-svh flex-col overflow-hidden">
 	<div class="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
 		{@render cloud(
+			0,
 			"bg-cyan-500/20",
 			"left-[calc(50%-10rem)] top-[calc(50%-23rem)] size-80",
 			"drift-a animation-delay-[0s] animation-duration-[26s]"
 		)}
 		{@render cloud(
+			1,
 			"bg-pink-500/20",
 			"left-[calc(50%-21.5rem)] top-[calc(50%-13rem)] size-72",
 			"drift-b animation-delay-[-6s] animation-duration-[30s]"
 		)}
 		{@render cloud(
+			0,
 			"bg-cyan-500/15",
 			"left-[calc(50%-16.5rem)] top-[calc(50%+1.5rem)] size-72",
 			"drift-c animation-delay-[-13s] animation-duration-[24s]"
 		)}
 		{@render cloud(
+			1,
 			"bg-pink-500/20",
 			"left-[calc(50%-4.5rem)] top-[calc(50%-1.5rem)] size-96",
 			"drift-a animation-delay-[-9s] animation-duration-[28s]"
 		)}
 		{@render cloud(
+			0,
 			"bg-cyan-500/20",
 			"left-[calc(50%+2.5rem)] top-[calc(50%-14rem)] size-80",
 			"drift-b animation-delay-[-16s] animation-duration-[32s]"
@@ -147,7 +188,8 @@
 		animation-name: blob-float;
 		animation-timing-function: ease-in-out;
 		animation-iteration-count: infinite;
-		animation-duration: 16s;
+		animation-duration: var(--blob-speed, 16s);
+		transition: animation-duration 1.4s ease-out;
 	}
 
 	@keyframes drift-a {
