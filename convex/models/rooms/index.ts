@@ -78,6 +78,13 @@ function scoresOf(room: { scores?: number[] }, engine: { playerCount: number }):
 	return room.scores ?? Array(engine.playerCount).fill(0);
 }
 
+const DEFAULT_EMOJI = "1f600";
+
+function emojisOf(room: { emojis?: string[] }, engine: { playerCount: number }): string[] {
+	const emojis = room.emojis ?? [];
+	return Array.from({ length: engine.playerCount }, (_, i) => emojis[i] ?? DEFAULT_EMOJI);
+}
+
 async function generateRoomCode(ctx: MutationCtx): Promise<string> {
 	for (let attempt = 0; attempt < 10; attempt++) {
 		let code = "";
@@ -130,11 +137,12 @@ export const get = query({
 		if (!room) return null;
 
 		const engine = getEngine(room.name);
+		const emojis = emojisOf(room, engine);
 		const playerInfos = await Promise.all(
 			Array.from({ length: engine.playerCount }, (_, i) => room.players[i] ?? null).map(
-				async (id) => {
+				async (id, i) => {
 					const player = id ? await ctx.db.get(id) : null;
-					return player ? { name: player.name } : null;
+					return player ? { name: player.name, emoji: emojis[i] } : null;
 				}
 			)
 		);
@@ -237,5 +245,24 @@ export const newGame = mutation({
 
 		await ctx.db.patch(room._id, { scores });
 		await createGame(ctx, room._id, room.name);
+	}
+});
+
+/** Changes the caller's own status-bar emoji for this room only — scoped per room, not the player's
+ *  identity, so it doesn't follow them into other rooms. */
+export const setEmoji = mutation({
+	args: { code: v.string(), emoji: v.string() },
+	async handler(ctx, { code, emoji }) {
+		const player = await requirePlayer(ctx);
+		const room = await getRoomByCode(ctx, code);
+		if (!room) throw new Error("Room not found");
+
+		const playerIndex = room.players.indexOf(player._id);
+		if (playerIndex === -1) throw new Error("You are not a player in this room");
+
+		const engine = getEngine(room.name);
+		const emojis = emojisOf(room, engine);
+		emojis[playerIndex] = emoji;
+		await ctx.db.patch(room._id, { emojis });
 	}
 });

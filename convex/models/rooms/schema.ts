@@ -11,5 +11,8 @@ export const roomsTable = defineTable({
 	// Ordered; a game's engine derives per-player role (e.g. tictactoe's X/O) from index.
 	players: v.array(v.id("players")),
 	// Rounds won per player index; persists across resets. Optional for rooms created before this field existed.
-	scores: v.optional(v.array(v.number()))
+	scores: v.optional(v.array(v.number())),
+	// Status-bar emoji per player index — scoped to this room, not the player's identity, so the same
+	// person can pick differently across rooms. Optional for rooms created before this field existed.
+	emojis: v.optional(v.array(v.string()))
 }).index("byCode", ["code"]);

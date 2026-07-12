@@ -138,16 +138,20 @@
 			players={[
 				{
 					label: room.players[0] ? firstName(room.players[0].name) : "Player 1",
+					emoji: room.players[0]?.emoji ?? "1f600",
 					accent: ACCENTS[0].text,
 					score: room.scores[0]
 				},
 				{
 					label: room.players[1] ? firstName(room.players[1].name) : "Player 2",
+					emoji: room.players[1]?.emoji ?? "1f600",
 					accent: ACCENTS[1].text,
 					score: room.scores[1]
 				}
 			]}
 			{status}
+			myIndex={room.myIndex}
+			onEmojiChange={(emoji) => room.setEmoji(emoji)}
 			footer={{
 				isLive: room.isLive,
 				game: room.game,

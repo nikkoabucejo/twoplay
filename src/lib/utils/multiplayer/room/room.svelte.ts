@@ -16,6 +16,7 @@ export abstract class Room {
 	#room: UseQueryReturn<typeof api.models.rooms.index.get>;
 	#play = useMutation(api.models.rooms.index.play);
 	#newGame = useMutation(api.models.rooms.index.newGame);
+	#setEmoji = useMutation(api.models.rooms.index.setEmoji);
 
 	/** `getRound` pins the room to a specific past round (e.g. from a `/:round` URL segment) instead of
 	 *  always following the live one. Omit it, or have it return undefined, to always track the live round. */
@@ -55,6 +56,10 @@ export abstract class Room {
 	players = $derived(this.data?.players ?? [null, null]);
 	scores = $derived(this.data?.scores ?? [0, 0]);
 
+	/** Which seat the viewer occupies, or null when spectating/not yet joined. Both games are two-seat,
+	 *  so the query's `number | null` is narrowed here once instead of at every call site. */
+	myIndex = $derived((this.data?.myIndex ?? null) as 0 | 1 | null);
+
 	protected getCode(): string {
 		return this.#getCode();
 	}
@@ -74,6 +79,15 @@ export abstract class Room {
 		this.error = null;
 		try {
 			await this.#newGame({ code: this.#getCode() });
+		} catch (err) {
+			this.error = err instanceof Error ? err.message : "Something went wrong";
+		}
+	}
+
+	async setEmoji(emoji: string): Promise<void> {
+		this.error = null;
+		try {
+			await this.#setEmoji({ code: this.#getCode(), emoji });
 		} catch (err) {
 			this.error = err instanceof Error ? err.message : "Something went wrong";
 		}
