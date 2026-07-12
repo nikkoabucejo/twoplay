@@ -31,5 +31,11 @@ export const abilities: Ability[] = [
 		icon: "M12 3 L19 6 V11 C19 15 16 18 12 21 C8 18 5 15 5 11 V6 Z",
 		charges: 1,
 		description: "Cancel the opponent's next ability."
+	},
+	{
+		name: "Swap",
+		icon: "M8 3 L4 7 L8 11 M4 7 H20 M16 21 L20 17 L16 13 M20 17 H4",
+		charges: 1,
+		description: "Swap the positions of two of your own marks."
 	}
 ];

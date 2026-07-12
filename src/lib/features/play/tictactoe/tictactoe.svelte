@@ -120,8 +120,8 @@
 	<div class="relative h-full w-full">
 		<div
 			class={cn(
-				"grid h-full w-full grid-cols-3 grid-rows-3 gap-1.5 rounded-xl bg-muted/50 p-1.5 backdrop-blur-2xl backdrop-saturate-150 transition-colors dark:bg-muted/40",
-				forbidden && "grayscale"
+				"grid h-full w-full grid-cols-3 grid-rows-3 gap-1.5 rounded-xl bg-muted/50 p-1.5 backdrop-blur-2xl backdrop-saturate-150 transition-[opacity,colors] duration-200 dark:bg-muted/40",
+				forbidden && "opacity-40"
 			)}
 			role="grid"
 			aria-label="Tic-tac-toe board"
@@ -202,6 +202,7 @@
 		</div>
 	{:else if data}
 		<Board
+			abilitySlots={5}
 			players={[
 				{
 					label: room.playerX ? firstName(room.playerX.name) : "Player 1",

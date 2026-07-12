@@ -87,7 +87,7 @@
 					<Tooltip>
 						<TooltipTrigger
 							type="button"
-							class="flex size-12 items-center justify-center rounded-md border bg-background transition-colors hover:bg-muted"
+							class="flex size-12 items-center justify-center rounded-md bg-muted/40 backdrop-blur-sm transition-colors hover:bg-muted/70"
 							aria-label={`${player.label} ability ${slot + 1}: ${ability.name}`}
 						>
 							<svg
@@ -112,7 +112,7 @@
 					</Tooltip>
 				{:else}
 					<div
-						class="size-12 rounded-md border border-dashed"
+						class="size-12 rounded-md bg-muted/20 backdrop-blur-sm"
 						aria-label={`${player.label} ability slot ${slot + 1}, empty`}
 					></div>
 				{/if}
