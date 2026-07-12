@@ -90,7 +90,7 @@ export class TictactoeRoom extends Room {
 		this.data?.myIndex === 0 ? "X" : this.data?.myIndex === 1 ? "O" : null
 	);
 	myLastBoard = $derived(
-		this.mySymbol ? (this.#state?.lastBoardBySymbol?.[this.mySymbol] ?? null) : null
+		this.mySymbol ? (this.#displayState?.lastBoardBySymbol?.[this.mySymbol] ?? null) : null
 	);
 
 	/** Each board's own winner treated as a meta 3x3 grid — three boards in a line wins the room. */
