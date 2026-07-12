@@ -108,7 +108,11 @@
 			aria-label="Change your emoji"
 			class="focus-visible:border-ring focus-visible:ring-ring/50 flex size-full items-center justify-center rounded-lg outline-none transition-opacity focus-visible:ring-3 hover:opacity-80"
 		>
-			<Emoji codepoint={players[seat].emoji} label={emojiLabel(players[seat].emoji)} class="size-6" />
+			<Emoji
+				codepoint={players[seat].emoji}
+				label={emojiLabel(players[seat].emoji)}
+				class="size-6"
+			/>
 		</PopoverTrigger>
 		<PopoverContent side="top" sideOffset={8} align={seat === 0 ? "start" : "end"}>
 			<div class="flex flex-nowrap items-center gap-1">
