@@ -246,7 +246,7 @@
 					<div
 						class="pointer-events-auto flex items-center gap-2 rounded-full border bg-background/90 px-3 py-1 text-xs shadow-sm backdrop-blur-sm"
 					>
-						<span class="text-muted-foreground">
+						<span class="tabular-nums text-muted-foreground">
 							Move {room.viewedMoveNumber} of {room.historyLength}
 						</span>
 						<button

@@ -250,7 +250,7 @@
 					</span>
 				</div>
 
-				<p class="text-xs text-muted-foreground">
+				<p class="text-xs tabular-nums text-muted-foreground">
 					Round {footer.game} of {footer.round}
 				</p>
 
