@@ -4,6 +4,7 @@ import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/s
 import {
 	applyMove,
 	gameMoveValidator,
+	gameStatus,
 	gameTypeValidator,
 	getEngine,
 	roundWinner,
@@ -68,6 +69,10 @@ async function countMoves(ctx: QueryCtx | MutationCtx, gameId: Id<"games">): Pro
 	return moves.length;
 }
 
+function scoresOf(room: { scores?: number[] }, engine: { playerCount: number }): number[] {
+	return room.scores ?? Array(engine.playerCount).fill(0);
+}
+
 async function generateRoomCode(ctx: MutationCtx): Promise<string> {
 	for (let attempt = 0; attempt < 10; attempt++) {
 		let code = "";
@@ -84,14 +89,14 @@ export const create = mutation({
 	async handler(ctx, { name }) {
 		const user = await requireUser(ctx);
 		const code = await generateRoomCode(ctx);
-		const engine = getEngine(name as GameType);
+		const engine = getEngine(name);
 		const roomId = await ctx.db.insert("rooms", {
 			code,
 			name,
 			players: [user._id],
 			scores: Array(engine.playerCount).fill(0)
 		});
-		await createGame(ctx, roomId, name as GameType);
+		await createGame(ctx, roomId, name);
 		return code;
 	}
 });
@@ -105,7 +110,7 @@ export const join = mutation({
 
 		if (room.players.includes(user._id)) return;
 
-		const engine = getEngine(room.name as GameType);
+		const engine = getEngine(room.name);
 		if (room.players.length >= engine.playerCount) throw new Error("Room is full");
 
 		await ctx.db.patch(room._id, { players: [...room.players, user._id] });
@@ -115,20 +120,18 @@ export const join = mutation({
 export const get = query({
 	args: { code: v.string(), round: v.optional(v.number()) },
 	async handler(ctx, { code, round }) {
+		const viewer = await requireUser(ctx);
 		const room = await getRoomByCode(ctx, code);
 		if (!room) return null;
 
-		const identity = await ctx.auth.getUserIdentity();
-		const viewer = identity ? await userByClerkUserId(ctx, identity.subject) : null;
-
-		const engine = getEngine(room.name as GameType);
+		const engine = getEngine(room.name);
 		const playerInfos = await Promise.all(
 			Array.from({ length: engine.playerCount }, (_, i) => room.players[i] ?? null).map((id) =>
 				id ? ctx.db.get(id) : null
 			)
 		);
 
-		const myIndex = viewer ? room.players.indexOf(viewer._id) : -1;
+		const myIndex = room.players.indexOf(viewer._id);
 		const game = await getGame(ctx, room._id, round);
 		if (!game) return null;
 
@@ -149,7 +152,7 @@ export const get = query({
 			// (e.g. disabling "next" past the latest one) without a separate query.
 			round: currentGame?.round ?? game.round,
 			isLive,
-			scores: room.scores ?? Array(engine.playerCount).fill(0)
+			scores: scoresOf(room, engine)
 		};
 	}
 });
@@ -168,7 +171,7 @@ export const play = mutation({
 		const game = await getCurrentGame(ctx, room._id);
 		if (!game) throw new Error("Game not found");
 
-		const nextState = applyMove(room.name as GameType, game.state, playerIndex, move);
+		const nextState = applyMove(room.name, game.state, playerIndex, move);
 		if (nextState === game.state) return;
 
 		const index = await countMoves(ctx, game._id);
@@ -181,6 +184,7 @@ export const play = mutation({
 export const history = query({
 	args: { code: v.string(), round: v.optional(v.number()) },
 	async handler(ctx, { code, round }) {
+		await requireUser(ctx);
 		const room = await getRoomByCode(ctx, code);
 		if (!room) return [];
 
@@ -195,7 +199,9 @@ export const history = query({
 	}
 });
 
-export const reset = mutation({
+/** Starts the room's next round. Only valid once the current one has actually finished — enforced
+ *  here (not just by disabling the button client-side) so a direct call can't dodge a loss. */
+export const newGame = mutation({
 	args: { code: v.string() },
 	async handler(ctx, { code }) {
 		const user = await requireUser(ctx);
@@ -205,15 +211,18 @@ export const reset = mutation({
 			throw new Error("You are not a player in this room");
 		}
 
-		const engine = getEngine(room.name as GameType);
-		const scores = room.scores ?? Array(engine.playerCount).fill(0);
+		const engine = getEngine(room.name);
+		const scores = scoresOf(room, engine);
 		const game = await getCurrentGame(ctx, room._id);
 		if (game) {
-			const winnerIndex = roundWinner(room.name as GameType, game.state);
+			if (!gameStatus(room.name, game.state)?.isOver) {
+				throw new Error("This round isn't over yet");
+			}
+			const winnerIndex = roundWinner(room.name, game.state);
 			if (winnerIndex !== null) scores[winnerIndex] += 1;
 		}
 
 		await ctx.db.patch(room._id, { scores });
-		await createGame(ctx, room._id, room.name as GameType);
+		await createGame(ctx, room._id, room.name);
 	}
 });

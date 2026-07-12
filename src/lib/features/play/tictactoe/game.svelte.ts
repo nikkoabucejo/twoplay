@@ -1,17 +1,11 @@
-import { useMutation, useQuery, type UseQueryReturn } from "convex-svelte";
+import { useQuery, type UseQueryReturn } from "convex-svelte";
+import {
+	hasOtherPlayableBoard,
+	WINNING_LINES
+} from "../../../../../convex/games/tictactoe/rules.js";
 import { api } from "../../../../../convex/_generated/api.js";
+import { Room } from "$lib/utils/multiplayer";
 import type { Board, GameStatus, Player } from "./types.js";
-
-const WINNING_LINES: readonly (readonly [number, number, number])[] = [
-	[0, 1, 2],
-	[3, 4, 5],
-	[6, 7, 8], // rows
-	[0, 3, 6],
-	[1, 4, 7],
-	[2, 5, 8], // columns
-	[0, 4, 8],
-	[2, 4, 6] // diagonals
-];
 
 function findWinningLine(board: Board): readonly [number, number, number] | null {
 	for (const line of WINNING_LINES) {
@@ -47,32 +41,18 @@ function statusOf(board: Board): BoardStatus {
  * for legality — whose turn it is, who's a player in the room); this class
  * mirrors that data for the UI and derives per-board status from it.
  */
-export class TictactoeRoom {
-	error = $state<string | null>(null);
-
-	#getCode: () => string;
-	#getRound: () => number | undefined;
-	#room: UseQueryReturn<typeof api.rooms.get>;
+export class TictactoeRoom extends Room {
 	#history: UseQueryReturn<typeof api.rooms.history>;
-	#play = useMutation(api.rooms.play);
-	#reset = useMutation(api.rooms.reset);
 
 	/** Local scrubber position into this round's move history; null means "live" (always the latest state).
 	 *  Purely a per-browser viewing cursor — never sent to the server and never affects the real game. */
 	#cursor = $state<number | null>(null);
 
-	/** `getRound` pins the room to a specific past round (e.g. from a `/:round` URL segment) instead of
-	 *  always following the live one. Omit it, or have it return undefined, to always track the live round. */
 	constructor(getCode: () => string, getRound: () => number | undefined = () => undefined) {
-		this.#getCode = getCode;
-		this.#getRound = getRound;
-		this.#room = useQuery(api.rooms.get, () => ({
-			code: this.#getCode(),
-			round: this.#getRound()
-		}));
+		super("tictactoe", getCode, getRound);
 		this.#history = useQuery(api.rooms.history, () => ({
-			code: this.#getCode(),
-			round: this.#getRound()
+			code: this.getCode(),
+			round: getRound()
 		}));
 
 		$effect(() => {
@@ -80,24 +60,6 @@ export class TictactoeRoom {
 			if (this.#historyMoves.length === 0) this.#cursor = null;
 		});
 	}
-
-	get isLoading() {
-		return this.#room.isLoading;
-	}
-
-	get data() {
-		return this.#room.data;
-	}
-
-	/** True once the room is found but belongs to a different game type — a room-code collision across games. */
-	wrongGameType = $derived(this.data != null && this.data.name !== "tictactoe");
-
-	/** False when `getRound` has pinned this to a past round rather than the one still being played. */
-	isLive = $derived(this.data?.isLive ?? true);
-
-	/** The round currently displayed, and the room's most recent round — for round-by-round navigation. */
-	game = $derived(this.data?.game ?? 1);
-	round = $derived(this.data?.round ?? this.game);
 
 	#state = $derived(this.data && this.data.state.kind === "tictactoe" ? this.data.state : null);
 
@@ -131,13 +93,6 @@ export class TictactoeRoom {
 		this.mySymbol ? (this.#state?.lastBoardBySymbol?.[this.mySymbol] ?? null) : null
 	);
 
-	playerX = $derived(this.data?.players?.[0] ?? null);
-	playerO = $derived(this.data?.players?.[1] ?? null);
-
-	/** Rounds won by each side, persisted on the room and carried across resets. */
-	scoreX = $derived(this.data?.scores?.[0] ?? 0);
-	scoreO = $derived(this.data?.scores?.[1] ?? 0);
-
 	/** Each board's own winner treated as a meta 3x3 grid — three boards in a line wins the room. */
 	metaBoard = $derived<Board>(this.statuses.map((s) => s.winner));
 	metaStatus = $derived(statusOf(this.metaBoard));
@@ -154,17 +109,12 @@ export class TictactoeRoom {
 			: "O") as Player
 	);
 
-	/** Whether some board other than `boardIndex` is still open — the repeat-board rule lifts when it's the only option left. */
-	private hasOtherPlayableBoard(boardIndex: number): boolean {
-		return this.statuses.some((status, i) => i !== boardIndex && status.status === "playing");
-	}
-
 	/** True when playing here would repeat this player's own last-turn board, and another board is still available. */
 	isForbidden(boardIndex: number): boolean {
 		return (
 			this.mySymbol === this.turn &&
 			boardIndex === this.myLastBoard &&
-			this.hasOtherPlayableBoard(boardIndex)
+			hasOtherPlayableBoard(this.boards, boardIndex)
 		);
 	}
 
@@ -212,27 +162,11 @@ export class TictactoeRoom {
 
 	async play(boardIndex: number, cellIndex: number): Promise<void> {
 		if (this.boards[boardIndex]?.[cellIndex] !== null || !this.canPlay(boardIndex)) return;
-
-		this.error = null;
-		try {
-			await this.#play({
-				code: this.#getCode(),
-				move: { kind: "tictactoe", boardIndex, cellIndex }
-			});
-		} catch (err) {
-			this.error = err instanceof Error ? err.message : "Something went wrong";
-		}
+		await this.submitMove({ kind: "tictactoe", boardIndex, cellIndex });
 	}
 
-	async reset(): Promise<void> {
-		if (!this.isLive) return;
-
-		this.error = null;
+	override async newGame(): Promise<void> {
 		this.#cursor = null;
-		try {
-			await this.#reset({ code: this.#getCode() });
-		} catch (err) {
-			this.error = err instanceof Error ? err.message : "Something went wrong";
-		}
+		await super.newGame();
 	}
 }

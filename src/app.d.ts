@@ -1,6 +1,6 @@
 // See https://svelte.dev/docs/kit/types#app.d.ts
 // for information about these interfaces
-import type { clerkClient } from "$lib/services/auth/clerk.server";
+import type { clerkClient } from "$lib/services/auth/server";
 
 declare global {
 	namespace App {

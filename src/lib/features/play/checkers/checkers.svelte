@@ -7,7 +7,7 @@
 	import { Button, Spinner } from "$lib/components/ui";
 	import { Cursor } from "$lib/features/presence";
 	import { getClerkAuth } from "$lib/services/auth";
-	import { cn } from "$lib/utils/style";
+	import { cn, ACCENTS } from "$lib/utils/style";
 	import { api } from "../../../../../convex/_generated/api.js";
 	import { CheckersRoom } from "./game.svelte.js";
 	import type { Piece } from "./types.js";
@@ -94,7 +94,7 @@
 	<div
 		class={cn(
 			"relative flex h-4/5 w-4/5 items-center justify-center rounded-full shadow-md",
-			p.color === "cyan" ? "bg-cyan-500" : "bg-pink-500"
+			p.color === "cyan" ? ACCENTS[0].bg : ACCENTS[1].bg
 		)}
 		in:liquidIn
 		out:fade={{ duration: 150 }}
@@ -137,14 +137,14 @@
 		<Board
 			players={[
 				{
-					label: room.playerCyan ? firstName(room.playerCyan.name) : "Player 1",
-					accent: "text-cyan-500",
-					score: room.scoreCyan
+					label: room.players[0] ? firstName(room.players[0].name) : "Player 1",
+					accent: ACCENTS[0].text,
+					score: room.scores[0]
 				},
 				{
-					label: room.playerPink ? firstName(room.playerPink.name) : "Player 2",
-					accent: "text-pink-500",
-					score: room.scorePink
+					label: room.players[1] ? firstName(room.players[1].name) : "Player 2",
+					accent: ACCENTS[1].text,
+					score: room.scores[1]
 				}
 			]}
 			{status}
@@ -152,7 +152,7 @@
 				isLive: room.isLive,
 				game: room.game,
 				round: room.round,
-				onReset: () => room.reset(),
+				onNewGame: () => room.newGame(),
 				onGoLive: goLive,
 				onGoToRound: goToRound,
 				error: room.error
@@ -162,8 +162,7 @@
 				{roomCode}
 				{flip}
 				class="size-full"
-				colorFor={(index) =>
-					index === 0 ? "text-cyan-500" : index === 1 ? "text-pink-500" : "text-muted-foreground"}
+				colorFor={(index) => ACCENTS[index]?.text ?? "text-muted-foreground"}
 			>
 				<div class="grid size-full grid-cols-8 grid-rows-8 overflow-hidden rounded-xl border">
 					{#each { length: 64 } as _, slot (slot)}

@@ -1,4 +1,6 @@
+import type { Cell } from "../../../../../convex/games/tictactoe/rules.js";
+
 export type Player = "X" | "O";
-export type Cell = Player | null;
+export type { Cell };
 export type Board = Cell[];
 export type GameStatus = "playing" | "won" | "draw";

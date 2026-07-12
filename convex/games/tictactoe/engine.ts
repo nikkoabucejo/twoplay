@@ -1,48 +1,13 @@
 import type { Infer } from "convex/values";
 import type { GameEngine, GameStatus } from "../engine.js";
+import { hasOtherPlayableBoard, isBoardFinished, metaWinnerOf } from "./rules.js";
 import { tictactoeMove, tictactoeState } from "./schema.js";
 
 export type TictactoeState = Infer<typeof tictactoeState>;
 export type TictactoeMove = Infer<typeof tictactoeMove>;
-type Cell = TictactoeState["boards"][number][number];
 
 const BOARD_COUNT = 9;
 const CELLS_PER_BOARD = 9;
-
-const WINNING_LINES: readonly (readonly [number, number, number])[] = [
-	[0, 1, 2],
-	[3, 4, 5],
-	[6, 7, 8],
-	[0, 3, 6],
-	[1, 4, 7],
-	[2, 5, 8],
-	[0, 4, 8],
-	[2, 4, 6]
-];
-
-function winnerOf(board: Cell[]): Cell {
-	for (const [a, b, c] of WINNING_LINES) {
-		if (board[a] !== null && board[a] === board[b] && board[a] === board[c]) return board[a];
-	}
-	return null;
-}
-
-function isBoardFinished(board: Cell[]): boolean {
-	return winnerOf(board) !== null || board.every((cell) => cell !== null);
-}
-
-function hasOtherPlayableBoard(boards: Cell[][], excludeIndex: number): boolean {
-	return boards.some((b, i) => i !== excludeIndex && !isBoardFinished(b));
-}
-
-/**
- * Treats the nine boards' individual winners as a meta 3x3 grid and checks it with the same
- * line logic as a single board — winning three boards in a row/column/diagonal wins the room.
- * A drawn board contributes null, same as an empty cell, so it can't complete a meta line.
- */
-function metaWinnerOf(boards: Cell[][]): Cell {
-	return winnerOf(boards.map(winnerOf));
-}
 
 function roleLabel(index: number): "X" | "O" {
 	return index === 0 ? "X" : "O";
@@ -51,7 +16,9 @@ function roleLabel(index: number): "X" | "O" {
 function createInitialState(): TictactoeState {
 	return {
 		kind: "tictactoe",
-		boards: Array.from({ length: BOARD_COUNT }, () => Array<Cell>(CELLS_PER_BOARD).fill(null))
+		boards: Array.from({ length: BOARD_COUNT }, () =>
+			Array<TictactoeState["boards"][number][number]>(CELLS_PER_BOARD).fill(null)
+		)
 	};
 }
 
@@ -112,6 +79,5 @@ export const tictactoeEngine: GameEngine<TictactoeState, TictactoeMove> = {
 	createInitialState,
 	applyMove,
 	status,
-	roleLabel,
 	roundWinner
 };

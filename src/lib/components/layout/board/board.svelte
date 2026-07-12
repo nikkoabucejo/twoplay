@@ -6,7 +6,8 @@
 		description: string;
 		/** SVG path data (`d`), drawn in a uniform 24×24 viewBox with a currentColor stroke. */
 		icon: string;
-		/** How many times the ability can be used per match. */
+		/** How many times the ability can be used per match. Not consumed anywhere yet — the ability
+		 *  bar is currently a display-only affordance with no click handler. */
 		charges: number;
 	};
 
@@ -32,7 +33,7 @@
 		game: number;
 		round: number;
 		/** Starts a new round. Only called while `isLive` and the round is over. */
-		onReset: () => void;
+		onNewGame: () => void;
 		/** Navigates to the room's current live round. Only called while `!isLive`. */
 		onGoLive: () => void;
 		/** Navigates to a specific past or present round. */
@@ -80,7 +81,7 @@
 	} = $props();
 
 	function dotClass(player: BoardPlayer) {
-		return player.accent?.replace("text-", "bg-");
+		return player.accent?.replaceAll("text-", "bg-");
 	}
 </script>
 
@@ -208,13 +209,18 @@
 									variant="outline"
 									size="sm"
 									class="w-32 uppercase"
-									onclick={footer.onReset}
+									onclick={footer.onNewGame}
 									disabled={newGameDisabled}
 								>
 									New game
 								</Button>
 							{:else}
-								<Button variant="outline" size="sm" class="w-32 uppercase" onclick={footer.onGoLive}>
+								<Button
+									variant="outline"
+									size="sm"
+									class="w-32 uppercase"
+									onclick={footer.onGoLive}
+								>
 									Go live
 								</Button>
 							{/if}

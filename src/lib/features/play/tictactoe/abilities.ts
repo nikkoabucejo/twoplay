@@ -2,7 +2,8 @@ import type { Ability } from "$lib/components/layout";
 
 /**
  * Bank of abilities for tic-tac-toe. The board equips the first few; this list
- * can hold more than a player uses. Effects are not wired up yet — UI only.
+ * can hold more than a player uses. Effects are not wired up yet: the ability bar
+ * has no click handler at all, so these render as inert tooltips, not a depletion mechanic.
  *
  * `icon` is SVG path data drawn in a uniform 24×24 viewBox (currentColor stroke).
  * Redraw a path to customize an icon — the wrapper keeps every icon uniform.

@@ -1,13 +1,13 @@
 <script lang="ts" module>
 	import { cn } from "$lib/utils/style";
 
-	export type TicTacToeProps = {
+	export type TictactoeIconProps = {
 		class?: string;
 	};
 </script>
 
 <script lang="ts">
-	let { class: className }: TicTacToeProps = $props();
+	let { class: className }: TictactoeIconProps = $props();
 </script>
 
 <svg

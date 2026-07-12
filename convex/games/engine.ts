@@ -1,5 +1,5 @@
 export interface GameStatus {
-	turnIndex: number | null;
+	turnIndex: number;
 	winnerIndex: number | null;
 	isOver: boolean;
 }
@@ -10,7 +10,6 @@ export interface GameEngine<State, Move> {
 	createInitialState(): State;
 	applyMove(state: State, playerIndex: number, move: Move): State;
 	status(state: State): GameStatus;
-	roleLabel(index: number): string;
-	/** Index of the round's winner (for score-keeping when a room resets), or null if undecided/tied. */
+	/** Index of the round's winner (for score-keeping when a room starts a new game), or null if undecided/tied. */
 	roundWinner(state: State): number | null;
 }

@@ -1,21 +1,21 @@
 <script lang="ts">
-	import { Checkers, TicTacToe } from "$lib/assets/icons/games";
+	import { CheckersIcon, TictactoeIcon } from "$lib/assets/icons/games";
 	import { Button } from "$lib/components/ui";
 	import { getClerkAuth } from "$lib/services/auth";
 
 	const auth = getClerkAuth();
 
 	const games = [
-		{ href: "/tictactoe", name: "Tic-Tac-Toe", icon: TicTacToe },
-		{ href: "/checkers", name: "Checkers", icon: Checkers }
+		{ href: "/tictactoe", name: "Tic-Tac-Toe", icon: TictactoeIcon },
+		{ href: "/checkers", name: "Checkers", icon: CheckersIcon }
 	];
 </script>
 
 <div class="flex flex-1 flex-col items-center justify-center gap-10 px-4 py-8 text-center">
 	<div class="flex flex-col items-center gap-2">
-		<h1 class="text-3xl font-bold tracking-tight"><span class="gradient-title">TWO</span><span
-				class="glow-title">PLAY</span
-			></h1>
+		<h1 class="text-3xl font-bold tracking-tight">
+			<span class="gradient-title">TWO</span><span class="glow-title">PLAY</span>
+		</h1>
 		<p class="text-muted-foreground">Pick a game to create or join a room.</p>
 	</div>
 

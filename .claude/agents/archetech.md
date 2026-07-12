@@ -1,5 +1,5 @@
 ---
-name: twoplay-architecture
+name: archetech
 description: Use this agent when adding, moving, or organizing files in the twoplay codebase — creating components, hooks, or utilities, wiring up barrel exports, or deciding where something belongs. It encodes this project's folder structure and import/export conventions so new code stays consistent. Invoke it before scaffolding new modules or when reviewing whether a file is in the right place with the right exports.
 model: sonnet
 ---

@@ -7,7 +7,7 @@
 	import { Button, Spinner } from "$lib/components/ui";
 	import { Cursor } from "$lib/features/presence";
 	import { getClerkAuth } from "$lib/services/auth";
-	import { cn } from "$lib/utils/style";
+	import { cn, ACCENTS } from "$lib/utils/style";
 	import { api } from "../../../../../convex/_generated/api.js";
 	import { abilities } from "./abilities.js";
 	import { TictactoeRoom } from "./game.svelte.js";
@@ -165,8 +165,8 @@
 					class={cn(
 						"flex items-center justify-center rounded-md bg-background/90 shadow-sm backdrop-blur-md transition-colors",
 						"hover:bg-background/95 disabled:cursor-not-allowed",
-						cell === "X" && "text-cyan-500",
-						cell === "O" && "text-pink-500"
+						cell === "X" && ACCENTS[0].text,
+						cell === "O" && ACCENTS[1].text
 					)}
 					disabled={cell !== null || !room.canPlay(boardIndex)}
 					aria-label={cell ? `Cell ${cellIndex + 1}, ${cell}` : `Cell ${cellIndex + 1}, empty`}
@@ -185,7 +185,7 @@
 					viewBox="0 0 3 3"
 					class={cn(
 						"pointer-events-none absolute inset-0 h-full w-full",
-						status.winner === "X" ? "text-cyan-500" : "text-pink-500"
+						status.winner === "X" ? ACCENTS[0].text : ACCENTS[1].text
 					)}
 				>
 					<line
@@ -203,7 +203,9 @@
 			<div
 				class={cn(
 					"absolute inset-0 flex items-center justify-center rounded-xl backdrop-blur-[3px] transition-colors",
-					status.winner === "X" ? "bg-cyan-500/25 text-cyan-500" : "bg-pink-500/25 text-pink-500"
+					status.winner === "X"
+						? cn(ACCENTS[0].winBg, ACCENTS[0].text)
+						: cn(ACCENTS[1].winBg, ACCENTS[1].text)
 				)}
 				in:fade={{ duration: MARK_DURATION }}
 			>
@@ -261,15 +263,15 @@
 			<Board
 				players={[
 					{
-						label: room.playerX ? firstName(room.playerX.name) : "Player 1",
-						accent: "text-cyan-500",
-						score: room.scoreX,
+						label: room.players[0] ? firstName(room.players[0].name) : "Player 1",
+						accent: ACCENTS[0].text,
+						score: room.scores[0],
 						abilities
 					},
 					{
-						label: room.playerO ? firstName(room.playerO.name) : "Player 2",
-						accent: "text-pink-500",
-						score: room.scoreO,
+						label: room.players[1] ? firstName(room.players[1].name) : "Player 2",
+						accent: ACCENTS[1].text,
+						score: room.scores[1],
 						abilities
 					}
 				]}
@@ -278,7 +280,7 @@
 					isLive: room.isLive,
 					game: room.game,
 					round: room.round,
-					onReset: () => room.reset(),
+					onNewGame: () => room.newGame(),
 					onGoLive: goLive,
 					onGoToRound: goToRound,
 					error: room.error
@@ -287,8 +289,7 @@
 				<Cursor
 					{roomCode}
 					class="size-full"
-					colorFor={(index) =>
-						index === 0 ? "text-cyan-500" : index === 1 ? "text-pink-500" : "text-muted-foreground"}
+					colorFor={(index) => ACCENTS[index]?.text ?? "text-muted-foreground"}
 				>
 					<div class="grid size-full grid-cols-3 grid-rows-3 gap-3">
 						{#each room.boards as cells, boardIndex (boardIndex)}
@@ -301,7 +302,7 @@
 							viewBox="0 0 3 3"
 							class={cn(
 								"pointer-events-none absolute inset-0 h-full w-full",
-								room.winner === "X" ? "text-cyan-500" : "text-pink-500"
+								room.winner === "X" ? ACCENTS[0].text : ACCENTS[1].text
 							)}
 						>
 							<line

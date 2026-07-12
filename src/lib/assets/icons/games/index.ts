@@ -1,2 +1,2 @@
-export { default as Checkers, type CheckersProps } from "./checkers.svelte";
-export { default as TicTacToe, type TicTacToeProps } from "./tictactoe.svelte";
+export { default as CheckersIcon, type CheckersIconProps } from "./checkers.svelte";
+export { default as TictactoeIcon, type TictactoeIconProps } from "./tictactoe.svelte";

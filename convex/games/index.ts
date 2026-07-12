@@ -6,6 +6,7 @@ import {
 	type CheckersMove,
 	type CheckersState
 } from "./checkers/index.js";
+export type { GameEngine, GameStatus } from "./engine.js";
 import {
 	tictactoeEngine,
 	tictactoeMove,
@@ -69,6 +70,20 @@ export function roundWinner(gameType: GameType, state: GameState): number | null
 		case "checkers": {
 			if (state.kind !== "checkers") throw new Error("State does not match this room's game");
 			return checkersEngine.roundWinner(state);
+		}
+	}
+}
+
+/** Dispatches to the matching engine's `status`, for the same reason `applyMove` above does. */
+export function gameStatus(gameType: GameType, state: GameState) {
+	switch (gameType) {
+		case "tictactoe": {
+			if (state.kind !== "tictactoe") throw new Error("State does not match this room's game");
+			return tictactoeEngine.status(state);
+		}
+		case "checkers": {
+			if (state.kind !== "checkers") throw new Error("State does not match this room's game");
+			return checkersEngine.status(state);
 		}
 	}
 }

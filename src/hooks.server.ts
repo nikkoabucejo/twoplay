@@ -1,5 +1,5 @@
 import type { Handle } from "@sveltejs/kit";
-import { clerkClient } from "$lib/services/auth/clerk.server";
+import { clerkClient } from "$lib/services/auth/server";
 
 export const handle: Handle = async ({ event, resolve }) => {
 	const requestState = await clerkClient.authenticateRequest(event.request, {

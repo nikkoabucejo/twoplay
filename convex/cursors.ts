@@ -1,7 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { getRoomByCode, requireUser } from "./rooms.js";
-import { userByClerkUserId } from "./users.js";
 
 export const update = mutation({
 	args: { code: v.string(), x: v.number(), y: v.number() },
@@ -43,11 +42,9 @@ export const clear = mutation({
 export const list = query({
 	args: { code: v.string() },
 	async handler(ctx, { code }) {
+		const viewer = await requireUser(ctx);
 		const room = await getRoomByCode(ctx, code);
 		if (!room) return [];
-
-		const identity = await ctx.auth.getUserIdentity();
-		const viewer = identity ? await userByClerkUserId(ctx, identity.subject) : null;
 
 		const cursors = await ctx.db
 			.query("cursors")
@@ -56,7 +53,7 @@ export const list = query({
 
 		return await Promise.all(
 			cursors
-				.filter((cursor) => cursor.userId !== viewer?._id)
+				.filter((cursor) => cursor.userId !== viewer._id)
 				.map(async (cursor) => {
 					const player = await ctx.db.get(cursor.userId);
 					return {

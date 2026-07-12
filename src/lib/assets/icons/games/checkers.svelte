@@ -1,13 +1,13 @@
 <script lang="ts" module>
 	import { cn } from "$lib/utils/style";
 
-	export type CheckersProps = {
+	export type CheckersIconProps = {
 		class?: string;
 	};
 </script>
 
 <script lang="ts">
-	let { class: className }: CheckersProps = $props();
+	let { class: className }: CheckersIconProps = $props();
 </script>
 
 <svg
@@ -41,7 +41,13 @@
 		/>
 	</polygon>
 	<circle cx="12" cy="2.5" r="1.5" fill="#ff0080">
-		<animate attributeName="cy" values="2.5;1;2.5" dur="2.6s" begin="0.3s" repeatCount="indefinite" />
+		<animate
+			attributeName="cy"
+			values="2.5;1;2.5"
+			dur="2.6s"
+			begin="0.3s"
+			repeatCount="indefinite"
+		/>
 	</circle>
 
 	<polygon points="15.33,17 21,17 18.17,7" fill="#00e5ff">
