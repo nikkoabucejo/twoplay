@@ -89,9 +89,6 @@ export class TictactoeRoom extends Room {
 	mySymbol = $derived<Player | null>(
 		this.data?.myIndex === 0 ? "X" : this.data?.myIndex === 1 ? "O" : null
 	);
-	myLastBoard = $derived(
-		this.mySymbol ? (this.#displayState?.lastBoardBySymbol?.[this.mySymbol] ?? null) : null
-	);
 
 	/** Each board's own winner treated as a meta 3x3 grid — three boards in a line wins the room. */
 	metaBoard = $derived<Board>(this.statuses.map((s) => s.winner));
@@ -109,13 +106,13 @@ export class TictactoeRoom extends Room {
 			: "O") as Player
 	);
 
-	/** True when playing here would repeat this player's own last-turn board, and another board is still available. */
+	/** Board the currently active player (whoever's turn it is) last played on — visible to both
+	 *  browsers alike, so you can see your opponent's restricted board while it's their turn too. */
+	activeLastBoard = $derived(this.#displayState?.lastBoardBySymbol?.[this.turn] ?? null);
+
+	/** True when playing here would repeat the active player's own last-turn board, and another board is still available. */
 	isForbidden(boardIndex: number): boolean {
-		return (
-			this.mySymbol === this.turn &&
-			boardIndex === this.myLastBoard &&
-			hasOtherPlayableBoard(this.boards, boardIndex)
-		);
+		return boardIndex === this.activeLastBoard && hasOtherPlayableBoard(this.boards, boardIndex);
 	}
 
 	/** True when it's this browser's turn to place a mark on that board. Always false while scrubbing
