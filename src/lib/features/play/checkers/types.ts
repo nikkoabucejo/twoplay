@@ -3,7 +3,7 @@ import type {
 	Piece,
 	PieceColor,
 	Square
-} from "../../../../../convex/games/checkers/rules.js";
+} from "../../../../../convex/models/games/checkers/rules.js";
 
 export type { Move, Piece, PieceColor, Square };
 export type Board = Square[];

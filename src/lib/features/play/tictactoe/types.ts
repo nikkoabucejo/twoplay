@@ -1,4 +1,4 @@
-import type { Cell } from "../../../../../convex/games/tictactoe/rules.js";
+import type { Cell } from "../../../../../convex/models/games/tictactoe/rules.js";
 
 export type Player = "X" | "O";
 export type { Cell };

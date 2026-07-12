@@ -1,6 +1,6 @@
 import { v } from "convex/values";
-import type { Id } from "./_generated/dataModel";
-import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
+import type { Id } from "../../_generated/dataModel";
+import { mutation, query, type MutationCtx, type QueryCtx } from "../../_generated/server";
 import {
 	applyMove,
 	gameMoveValidator,
@@ -9,21 +9,26 @@ import {
 	getEngine,
 	roundWinner,
 	type GameType
-} from "./games/index.js";
-import { userByClerkUserId } from "./users.js";
+} from "../games/index.js";
+import { playerByUserId } from "../players/index.js";
+import { userByClerkUserId } from "../users/index.js";
 
 const CODE_LENGTH = 6;
 // No 0/O/1/I/L — avoids ambiguous shared-code typos.
 const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 
-export async function requireUser(ctx: QueryCtx | MutationCtx) {
+/** The signed-in visitor's player — game data references players, never users, directly. */
+export async function requirePlayer(ctx: QueryCtx | MutationCtx) {
 	const identity = await ctx.auth.getUserIdentity();
 	if (!identity) throw new Error("Sign in to play");
 
 	const user = await userByClerkUserId(ctx, identity.subject);
 	if (!user) throw new Error("Sign in to play");
 
-	return user;
+	const player = await playerByUserId(ctx, user._id);
+	if (!player) throw new Error("Sign in to play");
+
+	return player;
 }
 
 export async function getRoomByCode(ctx: QueryCtx | MutationCtx, code: string) {
@@ -87,13 +92,13 @@ async function generateRoomCode(ctx: MutationCtx): Promise<string> {
 export const create = mutation({
 	args: { name: gameTypeValidator },
 	async handler(ctx, { name }) {
-		const user = await requireUser(ctx);
+		const player = await requirePlayer(ctx);
 		const code = await generateRoomCode(ctx);
 		const engine = getEngine(name);
 		const roomId = await ctx.db.insert("rooms", {
 			code,
 			name,
-			players: [user._id],
+			players: [player._id],
 			scores: Array(engine.playerCount).fill(0)
 		});
 		await createGame(ctx, roomId, name);
@@ -104,30 +109,33 @@ export const create = mutation({
 export const join = mutation({
 	args: { code: v.string() },
 	async handler(ctx, { code }) {
-		const user = await requireUser(ctx);
+		const player = await requirePlayer(ctx);
 		const room = await getRoomByCode(ctx, code);
 		if (!room) throw new Error("Room not found");
 
-		if (room.players.includes(user._id)) return;
+		if (room.players.includes(player._id)) return;
 
 		const engine = getEngine(room.name);
 		if (room.players.length >= engine.playerCount) throw new Error("Room is full");
 
-		await ctx.db.patch(room._id, { players: [...room.players, user._id] });
+		await ctx.db.patch(room._id, { players: [...room.players, player._id] });
 	}
 });
 
 export const get = query({
 	args: { code: v.string(), round: v.optional(v.number()) },
 	async handler(ctx, { code, round }) {
-		const viewer = await requireUser(ctx);
+		const viewer = await requirePlayer(ctx);
 		const room = await getRoomByCode(ctx, code);
 		if (!room) return null;
 
 		const engine = getEngine(room.name);
 		const playerInfos = await Promise.all(
-			Array.from({ length: engine.playerCount }, (_, i) => room.players[i] ?? null).map((id) =>
-				id ? ctx.db.get(id) : null
+			Array.from({ length: engine.playerCount }, (_, i) => room.players[i] ?? null).map(
+				async (id) => {
+					const player = id ? await ctx.db.get(id) : null;
+					return player ? { name: player.name } : null;
+				}
 			)
 		);
 
@@ -143,7 +151,7 @@ export const get = query({
 		return {
 			code: room.code,
 			name: room.name,
-			players: playerInfos.map((p) => (p ? { name: p.name } : null)),
+			players: playerInfos,
 			myIndex: myIndex >= 0 ? myIndex : null,
 			state: game.state,
 			// The specific round/game instance currently displayed.
@@ -160,11 +168,11 @@ export const get = query({
 export const play = mutation({
 	args: { code: v.string(), move: gameMoveValidator },
 	async handler(ctx, { code, move }) {
-		const user = await requireUser(ctx);
+		const player = await requirePlayer(ctx);
 		const room = await getRoomByCode(ctx, code);
 		if (!room) throw new Error("Room not found");
 
-		const playerIndex = room.players.indexOf(user._id);
+		const playerIndex = room.players.indexOf(player._id);
 		if (playerIndex === -1) throw new Error("You are not a player in this room");
 		if (move.kind !== room.name) throw new Error("Move does not match this room's game");
 
@@ -176,7 +184,12 @@ export const play = mutation({
 
 		const index = await countMoves(ctx, game._id);
 		await ctx.db.patch(game._id, { state: nextState });
-		await ctx.db.insert("moves", { gameId: game._id, index, player: user._id, state: nextState });
+		await ctx.db.insert("moves", {
+			gameId: game._id,
+			index,
+			player: player._id,
+			state: nextState
+		});
 	}
 });
 
@@ -184,7 +197,7 @@ export const play = mutation({
 export const history = query({
 	args: { code: v.string(), round: v.optional(v.number()) },
 	async handler(ctx, { code, round }) {
-		await requireUser(ctx);
+		await requirePlayer(ctx);
 		const room = await getRoomByCode(ctx, code);
 		if (!room) return [];
 
@@ -204,10 +217,10 @@ export const history = query({
 export const newGame = mutation({
 	args: { code: v.string() },
 	async handler(ctx, { code }) {
-		const user = await requireUser(ctx);
+		const player = await requirePlayer(ctx);
 		const room = await getRoomByCode(ctx, code);
 		if (!room) throw new Error("Room not found");
-		if (!room.players.includes(user._id)) {
+		if (!room.players.includes(player._id)) {
 			throw new Error("You are not a player in this room");
 		}
 

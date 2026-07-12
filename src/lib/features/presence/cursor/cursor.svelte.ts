@@ -13,9 +13,9 @@ const STALE_MS = 4000;
  */
 export class CursorPresence {
 	#getCode: () => string;
-	#peers: UseQueryReturn<typeof api.cursors.list>;
-	#update = useMutation(api.cursors.update);
-	#clear = useMutation(api.cursors.clear);
+	#peers: UseQueryReturn<typeof api.models.cursors.index.list>;
+	#update = useMutation(api.models.cursors.index.update);
+	#clear = useMutation(api.models.cursors.index.clear);
 	#lastSentAt = 0;
 
 	#now = $state(Date.now());
@@ -23,7 +23,7 @@ export class CursorPresence {
 
 	constructor(getCode: () => string) {
 		this.#getCode = getCode;
-		this.#peers = useQuery(api.cursors.list, () => ({ code: this.#getCode() }));
+		this.#peers = useQuery(api.models.cursors.index.list, () => ({ code: this.#getCode() }));
 		this.#tick = setInterval(() => (this.#now = Date.now()), 1000);
 	}
 

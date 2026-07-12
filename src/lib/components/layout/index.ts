@@ -1,6 +1,5 @@
 export {
 	Board,
-	type Ability,
 	type BoardFooter,
 	type BoardPlayer,
 	type BoardStatus,

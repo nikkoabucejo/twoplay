@@ -1,5 +1,5 @@
 export type PeerCursor = {
-	userId: string;
+	playerId: string;
 	name: string;
 	/** This player's seat in the room (e.g. 0/1 for X/O), or -1 if not seated. */
 	index: number;

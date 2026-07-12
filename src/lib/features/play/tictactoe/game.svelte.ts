@@ -2,7 +2,7 @@ import { useQuery, type UseQueryReturn } from "convex-svelte";
 import {
 	hasOtherPlayableBoard,
 	WINNING_LINES
-} from "../../../../../convex/games/tictactoe/rules.js";
+} from "../../../../../convex/models/games/tictactoe/rules.js";
 import { api } from "../../../../../convex/_generated/api.js";
 import { Room } from "$lib/utils/multiplayer";
 import type { Board, GameStatus, Player } from "./types.js";
@@ -37,12 +37,12 @@ function statusOf(board: Board): BoardStatus {
 
 /**
  * Rune-backed multiplayer state for a room of nine synced tic-tac-toe boards.
- * Wraps a live Convex subscription (convex/rooms.ts is the source of truth
+ * Wraps a live Convex subscription (convex/models/rooms is the source of truth
  * for legality — whose turn it is, who's a player in the room); this class
  * mirrors that data for the UI and derives per-board status from it.
  */
 export class TictactoeRoom extends Room {
-	#history: UseQueryReturn<typeof api.rooms.history>;
+	#history: UseQueryReturn<typeof api.models.rooms.index.history>;
 
 	/** Local scrubber position into this round's move history; null means "live" (always the latest state).
 	 *  Purely a per-browser viewing cursor — never sent to the server and never affects the real game. */
@@ -50,7 +50,7 @@ export class TictactoeRoom extends Room {
 
 	constructor(getCode: () => string, getRound: () => number | undefined = () => undefined) {
 		super("tictactoe", getCode, getRound);
-		this.#history = useQuery(api.rooms.history, () => ({
+		this.#history = useQuery(api.models.rooms.index.history, () => ({
 			code: this.getCode(),
 			round: getRound()
 		}));

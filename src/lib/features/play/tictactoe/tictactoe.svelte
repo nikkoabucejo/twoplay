@@ -9,7 +9,6 @@
 	import { getClerkAuth } from "$lib/services/auth";
 	import { cn, ACCENTS } from "$lib/utils/style";
 	import { api } from "../../../../../convex/_generated/api.js";
-	import { abilities } from "./abilities.js";
 	import { TictactoeRoom } from "./game.svelte.js";
 	import type { Board as CellBoard } from "./types.js";
 
@@ -41,7 +40,7 @@
 	}: { roomCode: string; round?: number; class?: string } = $props();
 
 	const auth = getClerkAuth();
-	const joinRoom = useMutation(api.rooms.join);
+	const joinRoom = useMutation(api.models.rooms.index.join);
 	const room = new TictactoeRoom(
 		() => roomCode,
 		() => round
@@ -265,14 +264,12 @@
 					{
 						label: room.players[0] ? firstName(room.players[0].name) : "Player 1",
 						accent: ACCENTS[0].text,
-						score: room.scores[0],
-						abilities
+						score: room.scores[0]
 					},
 					{
 						label: room.players[1] ? firstName(room.players[1].name) : "Player 2",
 						accent: ACCENTS[1].text,
-						score: room.scores[1],
-						abilities
+						score: room.scores[1]
 					}
 				]}
 				{status}

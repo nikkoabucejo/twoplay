@@ -1,5 +1,6 @@
 import { v } from "convex/values";
-import { mutation, type QueryCtx } from "./_generated/server";
+import { mutation, type QueryCtx } from "../../_generated/server";
+import { ensurePlayer } from "../players/index.js";
 
 const MAX_NAME_LENGTH = 100;
 
@@ -12,13 +13,20 @@ export const store = mutation({
 		const trimmed = name.trim().slice(0, MAX_NAME_LENGTH);
 		if (!trimmed) throw new Error("Name can't be empty");
 
-		const user = await userByClerkUserId(ctx, identity.subject);
+		const existing = await userByClerkUserId(ctx, identity.subject);
 
-		if (user === null) {
-			await ctx.db.insert("users", { name: trimmed, clerk__userId: identity.subject });
-		} else if (user.name !== trimmed) {
-			await ctx.db.patch(user._id, { name: trimmed });
+		const userId =
+			existing === null
+				? await ctx.db.insert("users", { name: trimmed, clerk__userId: identity.subject })
+				: existing._id;
+
+		if (existing && existing.name !== trimmed) {
+			await ctx.db.patch(existing._id, { name: trimmed });
 		}
+
+		// Ensures a player exists both for a brand-new user and for one that predates this table,
+		// and keeps its name mirroring the user's.
+		await ensurePlayer(ctx, userId, trimmed);
 	}
 });
 

@@ -1,10 +1,10 @@
-import { computeLegalMoves } from "../../../../../convex/games/checkers/rules.js";
+import { computeLegalMoves } from "../../../../../convex/models/games/checkers/rules.js";
 import { Room } from "$lib/utils/multiplayer";
 import type { Board, Move, PieceColor } from "./types.js";
 
 /**
  * Rune-backed multiplayer state for a room of checkers. Wraps a live Convex subscription
- * (convex/rooms.ts is the source of truth for legality); this class mirrors that data for the UI
+ * (convex/models/rooms is the source of truth for legality); this class mirrors that data for the UI
  * and derives legal moves / win state from it, the same way TictactoeRoom derives board status.
  */
 export class CheckersRoom extends Room {

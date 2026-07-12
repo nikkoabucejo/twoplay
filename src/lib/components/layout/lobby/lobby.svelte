@@ -5,7 +5,7 @@
 	import { goto } from "$app/navigation";
 	import { Button } from "$lib/components/ui";
 	import { getClerkAuth } from "$lib/services/auth";
-	import type { GameType } from "../../../../../convex/games/index.js";
+	import type { GameType } from "../../../../../convex/models/games/index.js";
 	import { api } from "../../../../../convex/_generated/api.js";
 
 	let {
@@ -20,7 +20,7 @@
 	} = $props();
 
 	const auth = getClerkAuth();
-	const createRoom = useMutation(api.rooms.create);
+	const createRoom = useMutation(api.models.rooms.index.create);
 
 	let joinCode = $state("");
 	let error = $state<string | null>(null);
@@ -29,7 +29,9 @@
 	let copied = $state(false);
 	let copiedTimeout: ReturnType<typeof setTimeout> | undefined;
 
-	const createdRoom = useQuery(api.rooms.get, () => (createdCode ? { code: createdCode } : "skip"));
+	const createdRoom = useQuery(api.models.rooms.index.get, () =>
+		createdCode ? { code: createdCode } : "skip"
+	);
 
 	$effect(() => {
 		if (createdCode && createdRoom.data?.players[1]) goto(`/${gameType}/${createdCode}`);

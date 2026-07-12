@@ -26,7 +26,7 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 		if (token) {
 			const convex = new ConvexHttpClient(PUBLIC_CONVEX_URL);
 			convex.setAuth(token);
-			await convex.mutation(api.users.store, { name });
+			await convex.mutation(api.models.users.index.store, { name });
 		}
 
 		return {

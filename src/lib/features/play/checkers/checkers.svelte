@@ -36,7 +36,7 @@
 	}: { roomCode: string; round?: number; class?: string } = $props();
 
 	const auth = getClerkAuth();
-	const joinRoom = useMutation(api.rooms.join);
+	const joinRoom = useMutation(api.models.rooms.index.join);
 	const room = new CheckersRoom(
 		() => roomCode,
 		() => round

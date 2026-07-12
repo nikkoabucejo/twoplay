@@ -46,7 +46,7 @@
 >
 	{@render children()}
 
-	{#each presence.peers as peer (peer.userId)}
+	{#each presence.peers as peer (peer.playerId)}
 		{@const x = flip ? 1 - peer.x : peer.x}
 		{@const y = flip ? 1 - peer.y : peer.y}
 		{@const color = colorFor(peer.index)}

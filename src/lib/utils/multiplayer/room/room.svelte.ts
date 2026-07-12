@@ -1,5 +1,5 @@
 import { useMutation, useQuery, type UseQueryReturn } from "convex-svelte";
-import type { GameMove, GameType } from "../../../../../convex/games/index.js";
+import type { GameMove, GameType } from "../../../../../convex/models/games/index.js";
 import { api } from "../../../../../convex/_generated/api.js";
 
 /**
@@ -13,9 +13,9 @@ export abstract class Room {
 
 	#kind: GameType;
 	#getCode: () => string;
-	#room: UseQueryReturn<typeof api.rooms.get>;
-	#play = useMutation(api.rooms.play);
-	#newGame = useMutation(api.rooms.newGame);
+	#room: UseQueryReturn<typeof api.models.rooms.index.get>;
+	#play = useMutation(api.models.rooms.index.play);
+	#newGame = useMutation(api.models.rooms.index.newGame);
 
 	/** `getRound` pins the room to a specific past round (e.g. from a `/:round` URL segment) instead of
 	 *  always following the live one. Omit it, or have it return undefined, to always track the live round. */
@@ -26,7 +26,7 @@ export abstract class Room {
 	) {
 		this.#kind = kind;
 		this.#getCode = getCode;
-		this.#room = useQuery(api.rooms.get, () => ({
+		this.#room = useQuery(api.models.rooms.index.get, () => ({
 			code: this.#getCode(),
 			round: getRound()
 		}));

@@ -8,17 +8,18 @@
  * @module
  */
 
-import type * as cursors from "../cursors.js";
-import type * as games_checkers_engine from "../games/checkers/engine.js";
-import type * as games_checkers_index from "../games/checkers/index.js";
-import type * as games_checkers_rules from "../games/checkers/rules.js";
-import type * as games_engine from "../games/engine.js";
-import type * as games_index from "../games/index.js";
-import type * as games_tictactoe_engine from "../games/tictactoe/engine.js";
-import type * as games_tictactoe_index from "../games/tictactoe/index.js";
-import type * as games_tictactoe_rules from "../games/tictactoe/rules.js";
-import type * as rooms from "../rooms.js";
-import type * as users from "../users.js";
+import type * as models_cursors_index from "../models/cursors/index.js";
+import type * as models_games_checkers_engine from "../models/games/checkers/engine.js";
+import type * as models_games_checkers_index from "../models/games/checkers/index.js";
+import type * as models_games_checkers_rules from "../models/games/checkers/rules.js";
+import type * as models_games_engine from "../models/games/engine.js";
+import type * as models_games_index from "../models/games/index.js";
+import type * as models_games_tictactoe_engine from "../models/games/tictactoe/engine.js";
+import type * as models_games_tictactoe_index from "../models/games/tictactoe/index.js";
+import type * as models_games_tictactoe_rules from "../models/games/tictactoe/rules.js";
+import type * as models_players_index from "../models/players/index.js";
+import type * as models_rooms_index from "../models/rooms/index.js";
+import type * as models_users_index from "../models/users/index.js";
 
 import type {
   ApiFromModules,
@@ -27,17 +28,18 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
-  cursors: typeof cursors;
-  "games/checkers/engine": typeof games_checkers_engine;
-  "games/checkers/index": typeof games_checkers_index;
-  "games/checkers/rules": typeof games_checkers_rules;
-  "games/engine": typeof games_engine;
-  "games/index": typeof games_index;
-  "games/tictactoe/engine": typeof games_tictactoe_engine;
-  "games/tictactoe/index": typeof games_tictactoe_index;
-  "games/tictactoe/rules": typeof games_tictactoe_rules;
-  rooms: typeof rooms;
-  users: typeof users;
+  "models/cursors/index": typeof models_cursors_index;
+  "models/games/checkers/engine": typeof models_games_checkers_engine;
+  "models/games/checkers/index": typeof models_games_checkers_index;
+  "models/games/checkers/rules": typeof models_games_checkers_rules;
+  "models/games/engine": typeof models_games_engine;
+  "models/games/index": typeof models_games_index;
+  "models/games/tictactoe/engine": typeof models_games_tictactoe_engine;
+  "models/games/tictactoe/index": typeof models_games_tictactoe_index;
+  "models/games/tictactoe/rules": typeof models_games_tictactoe_rules;
+  "models/players/index": typeof models_players_index;
+  "models/rooms/index": typeof models_rooms_index;
+  "models/users/index": typeof models_users_index;
 }>;
 
 /**
