@@ -7,6 +7,7 @@
 	import { Button, Spinner } from "$lib/components/ui";
 	import { Cursor } from "$lib/features/presence";
 	import { getClerkAuth } from "$lib/services/auth";
+	import { playCaptureSound, playMoveSound } from "$lib/utils/sound";
 	import { cn, ACCENTS } from "$lib/utils/style";
 	import { api } from "../../../../../convex/_generated/api.js";
 	import { DEFAULT_EMOJI } from "../../../../../convex/models/players/index.js";
@@ -18,8 +19,13 @@
 	/** A gooey pop-in, matching the tic-tac-toe mark: an overshooting scale-up so a piece feels dropped onto the board. */
 	function liquidIn(
 		_node: Element,
-		{ duration = PIECE_DURATION, delay = 0 }: { duration?: number; delay?: number } = {}
+		{
+			duration = PIECE_DURATION,
+			delay = 0,
+			seat = 0
+		}: { duration?: number; delay?: number; seat?: number } = {}
 	) {
+		playMoveSound(seat);
 		return {
 			delay,
 			duration,
@@ -28,6 +34,15 @@
 				return `transform: scale(${scale}); opacity: ${Math.min(t * 2.5, 1)};`;
 			}
 		};
+	}
+
+	/** A piece being captured: fades out over the same window a sound cue plays over, so the piece feels swept off the board rather than just vanishing. */
+	function liquidOut(
+		node: Element,
+		{ duration = 150, seat = 0 }: { duration?: number; seat?: number } = {}
+	) {
+		playCaptureSound(seat);
+		return fade(node, { duration });
 	}
 
 	let {
@@ -132,8 +147,8 @@
 			"relative flex h-4/5 w-4/5 items-center justify-center rounded-full shadow-md",
 			p.color === "cyan" ? ACCENTS[0].bg : ACCENTS[1].bg
 		)}
-		in:liquidIn
-		out:fade={{ duration: 150 }}
+		in:liquidIn={{ seat: p.color === "cyan" ? 0 : 1 }}
+		out:liquidOut={{ seat: p.color === "cyan" ? 0 : 1 }}
 	>
 		{#if isSelected}
 			<div

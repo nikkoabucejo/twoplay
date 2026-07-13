@@ -7,6 +7,7 @@
 	import { Button, Spinner } from "$lib/components/ui";
 	import { Cursor } from "$lib/features/presence";
 	import { getClerkAuth } from "$lib/services/auth";
+	import { playMoveSound } from "$lib/utils/sound";
 	import { cn, ACCENTS } from "$lib/utils/style";
 	import { api } from "../../../../../convex/_generated/api.js";
 	import { DEFAULT_EMOJI } from "../../../../../convex/models/players/index.js";
@@ -18,8 +19,13 @@
 	/** A gooey pop-in: an overshooting scale-up with a brief squash/stretch wobble, so a mark feels like a droplet settling rather than snapping into place. */
 	function liquidIn(
 		_node: Element,
-		{ duration = MARK_DURATION, delay = 0 }: { duration?: number; delay?: number } = {}
+		{
+			duration = MARK_DURATION,
+			delay = 0,
+			seat = 0
+		}: { duration?: number; delay?: number; seat?: number } = {}
 	) {
+		playMoveSound(seat);
 		return {
 			delay,
 			duration,
@@ -121,7 +127,7 @@
 </script>
 
 {#snippet mark(value: "X" | "O", size: string = "h-3/5 w-3/5")}
-	<svg viewBox="0 0 24 24" class={size} in:liquidIn>
+	<svg viewBox="0 0 24 24" class={size} in:liquidIn={{ seat: value === "X" ? 0 : 1 }}>
 		{#if value === "X"}
 			<line
 				x1="7"
