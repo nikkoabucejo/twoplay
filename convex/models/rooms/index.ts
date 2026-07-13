@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import type { Id } from "../../_generated/dataModel";
 import { mutation, query, type MutationCtx } from "../../_generated/server";
 import { clockByGameAndPlayer, clocksByGame } from "../clocks/index.js";
+import { otherPlayer } from "../games/engine.js";
 import {
 	applyMove,
 	countMoves,
@@ -12,7 +13,8 @@ import {
 	getCurrentGame,
 	getEngine,
 	getGame,
-	roundWinner
+	roundWinner,
+	type GameType
 } from "../games/index.js";
 import { ensurePlayer, playerByUserAndRoom } from "../players/index.js";
 import { currentPlayer, getRoomByCode, requirePlayer, requireUser } from "./auth.js";
@@ -282,5 +284,80 @@ export const rematch = mutation({
 
 		const timeControlMs = room.time ?? DEFAULT_TIME_CONTROL_MS;
 		await createGame(ctx, room, timeControlMs, true);
+	}
+});
+
+export type GameHistoryEntry = {
+	round: number;
+	createdAt: number;
+	result: "win" | "loss" | "draw" | "in-progress";
+};
+
+export type RoomHistoryEntry = {
+	code: string;
+	type: GameType;
+	opponentName: string | null;
+	games: GameHistoryEntry[];
+};
+
+/** Every room the caller has ever played in, most recently active first, each with its own rounds
+ *  oldest-round-first — powers the signed-in-only history page. Walks rooms via the player's own
+ *  rows rather than a single indexed scan since a round's outcome depends on that room's own player
+ *  order and game engine. */
+export const listForUser = query({
+	args: {},
+	async handler(ctx): Promise<RoomHistoryEntry[]> {
+		const user = await requireUser(ctx);
+		const playerRows = await ctx.db
+			.query("players")
+			.withIndex("byUser", (q) => q.eq("userId", user._id))
+			.collect();
+
+		const rooms = await Promise.all(
+			playerRows.map(async (player): Promise<RoomHistoryEntry | null> => {
+				const room = await ctx.db.get(player.roomId);
+				if (!room) return null;
+
+				const myIndex = room.players.indexOf(player._id);
+				const opponentId = room.players.find((id) => id !== player._id) ?? null;
+				const opponent = opponentId ? await ctx.db.get(opponentId) : null;
+
+				const games = await ctx.db
+					.query("games")
+					.withIndex("byRoom", (q) => q.eq("roomId", room._id))
+					.collect();
+
+				const entries = await Promise.all(
+					games.map(async (game): Promise<GameHistoryEntry> => {
+						const clocks = await clocksByGame(ctx, game._id);
+						const endedClock = clocks.find((clock) => clock.endReason !== undefined);
+						const status = gameStatus(room.type, game.state);
+						const isOver = endedClock !== undefined || (status?.isOver ?? false);
+
+						let result: GameHistoryEntry["result"] = "in-progress";
+						if (isOver) {
+							const winnerIndex = endedClock
+								? otherPlayer(room.players.indexOf(endedClock.playerId))
+								: roundWinner(room.type, game.state);
+							result = winnerIndex === null ? "draw" : winnerIndex === myIndex ? "win" : "loss";
+						}
+
+						return { round: game.round, createdAt: game._creationTime, result };
+					})
+				);
+				entries.sort((a, b) => a.round - b.round);
+
+				return {
+					code: room.code,
+					type: room.type,
+					opponentName: opponent?.name ?? null,
+					games: entries
+				};
+			})
+		);
+
+		return rooms
+			.filter((room): room is RoomHistoryEntry => room !== null && room.games.length > 0)
+			.sort((a, b) => b.games.at(-1)!.createdAt - a.games.at(-1)!.createdAt);
 	}
 });

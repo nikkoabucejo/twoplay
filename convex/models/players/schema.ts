@@ -15,4 +15,6 @@ export const playersTable = defineTable({
 	// Status-bar emoji — scoped to this room's player row, not the user's identity, so the same
 	// person can pick differently in a different room.
 	emoji: v.string()
-}).index("byUserAndRoom", ["userId", "roomId"]);
+})
+	.index("byUserAndRoom", ["userId", "roomId"])
+	.index("byUser", ["userId"]);
