@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from "svelte";
+	import { fade } from "svelte/transition";
 	import { cn } from "$lib/utils/style";
 	import { CursorPresence } from "./cursor.svelte.js";
 
@@ -33,6 +34,10 @@
 		presence.move(flip ? 1 - x : x, flip ? 1 - y : y);
 	}
 
+	function handlePointerLeave() {
+		presence.leave();
+	}
+
 	$effect(() => () => presence.dispose());
 </script>
 
@@ -42,7 +47,7 @@
 	bind:this={container}
 	class={cn("relative", className)}
 	onpointermove={handlePointerMove}
-	onpointerleave={() => presence.leave()}
+	onpointerleave={handlePointerLeave}
 >
 	{@render children()}
 
@@ -53,6 +58,7 @@
 		<div
 			class="pointer-events-none absolute z-50 -translate-x-0.5 -translate-y-0.5 transition-[left,top] duration-100 ease-linear"
 			style={`left: ${x * 100}%; top: ${y * 100}%;`}
+			out:fade={{ duration: 400 }}
 		>
 			<div class="relative">
 				<svg

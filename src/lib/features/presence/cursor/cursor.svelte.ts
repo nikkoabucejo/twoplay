@@ -4,8 +4,10 @@ import type { PeerCursor } from "./types.js";
 
 /** Minimum time between cursor-position mutations, so a mouse-move flood doesn't flood Convex. */
 const SEND_INTERVAL_MS = 80;
-/** A peer's cursor is hidden once its last update is older than this — covers crashed tabs/lost network. */
-const STALE_MS = 4000;
+/** A peer's cursor is hidden once its last update is older than this — covers crashed tabs/lost network.
+ *  The common case (pointer leaves the tracked area) clears instantly via `clear()`/`leave()` instead;
+ *  this is only the fallback for an ungraceful disconnect. */
+const STALE_MS = 4_000;
 
 /**
  * Rune-backed presence for a room: throttles and sends the local pointer position,
@@ -41,7 +43,8 @@ export class CursorPresence {
 		this.#update({ code: this.#getCode(), x, y }).catch(() => {});
 	}
 
-	/** Call when the pointer leaves the tracked area, so this player's cursor disappears immediately for peers. */
+	/** Call when the pointer leaves the tracked area, so this player's cursor disappears for peers
+	 *  immediately rather than lingering until `STALE_MS` elapses. */
 	leave(): void {
 		this.#clear({ code: this.#getCode() }).catch(() => {});
 	}
@@ -49,6 +52,6 @@ export class CursorPresence {
 	/** Call on component teardown to stop the staleness clock and hide this player's cursor for peers. */
 	dispose(): void {
 		clearInterval(this.#tick);
-		this.leave();
+		this.#clear({ code: this.#getCode() }).catch(() => {});
 	}
 }

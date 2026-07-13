@@ -1,14 +1,13 @@
 import { v } from "convex/values";
 import { mutation, query } from "../../_generated/server";
-import { getRoomByCode, requirePlayer } from "../rooms/index.js";
+import { currentPlayer, getRoomByCode, requirePlayer } from "../rooms/auth.js";
 
 export const update = mutation({
 	args: { code: v.string(), x: v.number(), y: v.number() },
 	async handler(ctx, { code, x, y }) {
-		const player = await requirePlayer(ctx);
 		const room = await getRoomByCode(ctx, code);
 		if (!room) throw new Error("Room not found");
-		if (!room.players.includes(player._id)) throw new Error("You are not a player in this room");
+		const player = await requirePlayer(ctx, room._id);
 
 		const existing = await ctx.db
 			.query("cursors")
@@ -27,9 +26,11 @@ export const update = mutation({
 export const clear = mutation({
 	args: { code: v.string() },
 	async handler(ctx, { code }) {
-		const player = await requirePlayer(ctx);
 		const room = await getRoomByCode(ctx, code);
 		if (!room) return;
+
+		const player = await currentPlayer(ctx, room._id);
+		if (!player) return;
 
 		const existing = await ctx.db
 			.query("cursors")
@@ -42,10 +43,10 @@ export const clear = mutation({
 export const list = query({
 	args: { code: v.string() },
 	async handler(ctx, { code }) {
-		const viewer = await requirePlayer(ctx);
 		const room = await getRoomByCode(ctx, code);
 		if (!room) return [];
 
+		const viewer = await currentPlayer(ctx, room._id);
 		const cursors = await ctx.db
 			.query("cursors")
 			.withIndex("byRoom", (q) => q.eq("roomId", room._id))
@@ -53,7 +54,7 @@ export const list = query({
 
 		return await Promise.all(
 			cursors
-				.filter((cursor) => cursor.playerId !== viewer._id)
+				.filter((cursor) => cursor.playerId !== viewer?._id)
 				.map(async (cursor) => {
 					const player = await ctx.db.get(cursor.playerId);
 					return {

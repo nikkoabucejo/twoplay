@@ -3,10 +3,16 @@
 	import { useMutation, useQuery } from "convex-svelte";
 	import type { Component } from "svelte";
 	import { goto } from "$app/navigation";
-	import { Button } from "$lib/components/ui";
+	import { Button, Tabs } from "$lib/components/ui";
 	import { getClerkAuth } from "$lib/services/auth";
 	import type { GameType } from "../../../../../convex/models/games/index.js";
+	import { DEFAULT_TIME_CONTROL_MS } from "../../../../../convex/models/rooms/index.js";
 	import { api } from "../../../../../convex/_generated/api.js";
+
+	/** Minutes offered for each player's starting clock bank. The default is derived from the server's
+	 *  `DEFAULT_TIME_CONTROL_MS` (convex/models/rooms/index.ts) so the two can't drift out of sync. */
+	const TIME_CONTROL_MINUTES = [3, 5, 10] as const;
+	const DEFAULT_TIME_CONTROL_MINUTES = DEFAULT_TIME_CONTROL_MS / 60_000;
 
 	let {
 		gameType,
@@ -25,6 +31,7 @@
 	let joinCode = $state("");
 	let error = $state<string | null>(null);
 	let creating = $state(false);
+	let timeControlMinutes = $state<number>(DEFAULT_TIME_CONTROL_MINUTES);
 	let createdCode = $state<string | null>(null);
 	let copied = $state(false);
 	let copiedTimeout: ReturnType<typeof setTimeout> | undefined;
@@ -41,7 +48,10 @@
 		error = null;
 		creating = true;
 		try {
-			createdCode = await createRoom({ name: gameType });
+			createdCode = await createRoom({
+				type: gameType,
+				timeControlMs: timeControlMinutes * 60_000
+			});
 		} catch (err) {
 			error = err instanceof Error ? err.message : "Could not create a room";
 		} finally {
@@ -79,6 +89,14 @@
 		<div
 			class="flex w-full max-w-xs flex-col items-center gap-6 rounded-2xl border bg-muted/40 p-6 backdrop-blur-sm"
 		>
+			<Tabs
+				items={TIME_CONTROL_MINUTES.map((minutes) => ({ value: minutes, label: `${minutes} min` }))}
+				value={timeControlMinutes}
+				onValueChange={(minutes) => (timeControlMinutes = minutes)}
+				disabled={!!createdCode}
+				aria-label="Starting clock per player"
+			/>
+
 			<div class="flex w-full items-center gap-2">
 				{#if createdCode}
 					<p

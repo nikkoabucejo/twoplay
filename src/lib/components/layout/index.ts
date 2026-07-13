@@ -1,5 +1,6 @@
 export {
 	Board,
+	type BoardClock,
 	type BoardFooter,
 	type BoardPlayer,
 	type BoardStatus,

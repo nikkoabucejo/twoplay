@@ -1,4 +1,5 @@
 import { defineSchema } from "convex/server";
+import { clocksTable } from "./models/clocks/schema.js";
 import { cursorsTable } from "./models/cursors/schema.js";
 import { gamesTable } from "./models/games/schema.js";
 import { movesTable } from "./models/moves/schema.js";
@@ -13,6 +14,7 @@ export default defineSchema({
 	players: playersTable,
 	rooms: roomsTable,
 	games: gamesTable,
+	clocks: clocksTable,
 	moves: movesTable,
 	cursors: cursorsTable
 });

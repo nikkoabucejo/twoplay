@@ -9,6 +9,7 @@
 	import { getClerkAuth } from "$lib/services/auth";
 	import { cn, ACCENTS } from "$lib/utils/style";
 	import { api } from "../../../../../convex/_generated/api.js";
+	import { DEFAULT_EMOJI } from "../../../../../convex/models/players/index.js";
 	import { TictactoeRoom } from "./game.svelte.js";
 	import type { Board as CellBoard } from "./types.js";
 
@@ -60,8 +61,10 @@
 	});
 
 	$effect(() => {
-		if (room.wrongGameType && data) goto(`/${data.name}/${roomCode}`, { replaceState: true });
+		if (room.wrongGameType && data) goto(`/${data.type}/${roomCode}`, { replaceState: true });
 	});
+
+	$effect(() => () => room.dispose());
 
 	function goLive() {
 		goto(`/tictactoe/${roomCode}`);
@@ -103,11 +106,17 @@
 	}
 
 	const status: BoardStatus = $derived(
-		room.winner
-			? { type: "winner", player: room.winner === "X" ? 0 : 1 }
-			: room.isOver
-				? { type: "draw" }
-				: { type: "turn", player: room.turn === "X" ? 0 : 1 }
+		room.game.endedSeat !== null
+			? {
+					type: "winner",
+					player: room.game.endedSeat === 0 ? 1 : 0,
+					reason: room.game.endReason ?? undefined
+				}
+			: room.winner
+				? { type: "winner", player: room.winner === "X" ? 0 : 1 }
+				: room.isOver
+					? { type: "draw" }
+					: { type: "turn", player: room.turn === "X" ? 0 : 1 }
 	);
 </script>
 
@@ -263,25 +272,27 @@
 				players={[
 					{
 						label: room.players[0] ? firstName(room.players[0].name) : "Player 1",
-						emoji: room.players[0]?.emoji ?? "1f600",
+						emoji: room.players[0]?.emoji ?? DEFAULT_EMOJI,
 						accent: ACCENTS[0].text,
-						score: room.scores[0]
+						score: room.players[0]?.score ?? 0
 					},
 					{
 						label: room.players[1] ? firstName(room.players[1].name) : "Player 2",
-						emoji: room.players[1]?.emoji ?? "1f600",
+						emoji: room.players[1]?.emoji ?? DEFAULT_EMOJI,
 						accent: ACCENTS[1].text,
-						score: room.scores[1]
+						score: room.players[1]?.score ?? 0
 					}
 				]}
 				{status}
+				clock={room.clock}
 				myIndex={room.myIndex}
-				onEmojiChange={(emoji) => room.setEmoji(emoji)}
+				onTrashtalk={(emoji) => room.trashtalk(emoji)}
 				footer={{
-					isLive: room.isLive,
-					game: room.game,
-					round: room.round,
-					onNewGame: () => room.newGame(),
+					isLive: room.game.isLive,
+					round: room.game.round,
+					latestRound: room.game.latestRound,
+					onResign: () => room.resign(),
+					onRematch: () => room.rematch(),
 					onGoLive: goLive,
 					onGoToRound: goToRound,
 					error: room.error

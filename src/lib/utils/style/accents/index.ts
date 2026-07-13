@@ -5,7 +5,7 @@
  * `dotClass`, worked around it by string-replacing `text-` with `bg-`, which breaks on multi-class
  * accents like `dark:` variants).
  */
-export const ACCENTS: readonly { text: string; bg: string; winBg: string }[] = [
-	{ text: "text-cyan-500", bg: "bg-cyan-500", winBg: "bg-cyan-500/25" },
-	{ text: "text-pink-500", bg: "bg-pink-500", winBg: "bg-pink-500/25" }
+export const ACCENTS: readonly { text: string; bg: string; winBg: string; tintBg: string }[] = [
+	{ text: "text-cyan-500", bg: "bg-cyan-500", winBg: "bg-cyan-500/25", tintBg: "bg-cyan-500/10" },
+	{ text: "text-pink-500", bg: "bg-pink-500", winBg: "bg-pink-500/25", tintBg: "bg-pink-500/10" }
 ];

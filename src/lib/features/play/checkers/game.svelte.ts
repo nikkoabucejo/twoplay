@@ -14,7 +14,7 @@ export class CheckersRoom extends Room {
 		super("checkers", getCode, getRound);
 	}
 
-	#state = $derived(this.data && this.data.state.kind === "checkers" ? this.data.state : null);
+	#state = $derived(this.data && this.data.game.state.kind === "checkers" ? this.data.game.state : null);
 
 	board = $derived<Board>(this.#state?.board ?? []);
 	turn = $derived<PieceColor>(this.#state?.turn ?? "cyan");
@@ -28,7 +28,7 @@ export class CheckersRoom extends Room {
 	myColor = $derived<PieceColor | null>(
 		this.data?.myIndex === 0 ? "cyan" : this.data?.myIndex === 1 ? "pink" : null
 	);
-	isMyTurn = $derived(this.isLive && this.myColor !== null && this.myColor === this.turn);
+	isMyTurn = $derived(this.game.isLive && this.myColor !== null && this.myColor === this.turn);
 
 	/** No legal moves for the side to move means that side is out of moves or pieces — the other color wins. */
 	winner = $derived<PieceColor | null>(
@@ -36,6 +36,14 @@ export class CheckersRoom extends Room {
 			? this.turn === "cyan"
 				? "pink"
 				: "cyan"
+			: null
+	);
+
+	override activeSeat = $derived<0 | 1 | null>(
+		this.game.isLive && this.game.endedSeat === null && this.winner === null
+			? this.turn === "cyan"
+				? 0
+				: 1
 			: null
 	);
 

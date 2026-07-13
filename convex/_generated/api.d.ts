@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as models_clocks_index from "../models/clocks/index.js";
 import type * as models_cursors_index from "../models/cursors/index.js";
 import type * as models_games_checkers_engine from "../models/games/checkers/engine.js";
 import type * as models_games_checkers_index from "../models/games/checkers/index.js";
@@ -18,6 +19,7 @@ import type * as models_games_tictactoe_engine from "../models/games/tictactoe/e
 import type * as models_games_tictactoe_index from "../models/games/tictactoe/index.js";
 import type * as models_games_tictactoe_rules from "../models/games/tictactoe/rules.js";
 import type * as models_players_index from "../models/players/index.js";
+import type * as models_rooms_auth from "../models/rooms/auth.js";
 import type * as models_rooms_index from "../models/rooms/index.js";
 import type * as models_users_index from "../models/users/index.js";
 
@@ -28,6 +30,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  "models/clocks/index": typeof models_clocks_index;
   "models/cursors/index": typeof models_cursors_index;
   "models/games/checkers/engine": typeof models_games_checkers_engine;
   "models/games/checkers/index": typeof models_games_checkers_index;
@@ -38,6 +41,7 @@ declare const fullApi: ApiFromModules<{
   "models/games/tictactoe/index": typeof models_games_tictactoe_index;
   "models/games/tictactoe/rules": typeof models_games_tictactoe_rules;
   "models/players/index": typeof models_players_index;
+  "models/rooms/auth": typeof models_rooms_auth;
   "models/rooms/index": typeof models_rooms_index;
   "models/users/index": typeof models_users_index;
 }>;

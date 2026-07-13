@@ -35,6 +35,14 @@ function statusOf(board: Board): BoardStatus {
 	};
 }
 
+function turnOf(boards: Board[]): Player {
+	return boards.reduce((sum, board) => sum + board.filter((cell) => cell !== null).length, 0) %
+		2 ===
+		0
+		? "X"
+		: "O";
+}
+
 /**
  * Rune-backed multiplayer state for a room of nine synced tic-tac-toe boards.
  * Wraps a live Convex subscription (convex/models/rooms is the source of truth
@@ -42,7 +50,7 @@ function statusOf(board: Board): BoardStatus {
  * mirrors that data for the UI and derives per-board status from it.
  */
 export class TictactoeRoom extends Room {
-	#history: UseQueryReturn<typeof api.models.rooms.index.history>;
+	#history: UseQueryReturn<typeof api.models.games.index.history>;
 
 	/** Local scrubber position into this round's move history; null means "live" (always the latest state).
 	 *  Purely a per-browser viewing cursor — never sent to the server and never affects the real game. */
@@ -50,7 +58,7 @@ export class TictactoeRoom extends Room {
 
 	constructor(getCode: () => string, getRound: () => number | undefined = () => undefined) {
 		super("tictactoe", getCode, getRound);
-		this.#history = useQuery(api.models.rooms.index.history, () => ({
+		this.#history = useQuery(api.models.games.index.history, () => ({
 			code: this.getCode(),
 			round: getRound()
 		}));
@@ -61,7 +69,10 @@ export class TictactoeRoom extends Room {
 		});
 	}
 
-	#state = $derived(this.data && this.data.state.kind === "tictactoe" ? this.data.state : null);
+	#state = $derived(this.data && this.data.game.state.kind === "tictactoe" ? this.data.game.state : null);
+	#liveBoards = $derived(this.#state?.boards ?? []);
+	#liveMetaStatus = $derived(statusOf(this.#liveBoards.map((board) => statusOf(board).winner)));
+	#liveTurn = $derived(turnOf(this.#liveBoards));
 
 	get #historyMoves() {
 		return this.#history.data ?? [];
@@ -98,13 +109,22 @@ export class TictactoeRoom extends Room {
 	isOver = $derived(this.metaStatus.status !== "playing");
 
 	/** Whose mark lands next across the whole room, derived from total filled cells — no state to fall out of sync. */
-	turn = $derived(
-		(this.boards.reduce((sum, board) => sum + board.filter((cell) => cell !== null).length, 0) %
-			2 ===
-		0
-			? "X"
-			: "O") as Player
+	turn = $derived(turnOf(this.boards));
+
+	override activeSeat = $derived<0 | 1 | null>(
+		this.game.isLive &&
+			this.#state !== null &&
+			this.game.endedSeat === null &&
+			this.#liveMetaStatus.status === "playing"
+			? this.#liveTurn === "X"
+				? 0
+				: 1
+			: null
 	);
+
+	protected override get isClockDisplayFrozen(): boolean {
+		return this.isViewingHistory;
+	}
 
 	/** Board the currently active player (whoever's turn it is) last played on — visible to both
 	 *  browsers alike, so you can see your opponent's restricted board while it's their turn too. */
@@ -120,7 +140,7 @@ export class TictactoeRoom extends Room {
 	canPlay(boardIndex: number): boolean {
 		const status = this.statuses[boardIndex];
 		return (
-			this.isLive &&
+			this.game.isLive &&
 			!this.isViewingHistory &&
 			!this.isOver &&
 			status?.status === "playing" &&
@@ -162,8 +182,8 @@ export class TictactoeRoom extends Room {
 		await this.submitMove({ kind: "tictactoe", boardIndex, cellIndex });
 	}
 
-	override async newGame(): Promise<void> {
+	override async rematch(): Promise<void> {
 		this.#cursor = null;
-		await super.newGame();
+		await super.rematch();
 	}
 }

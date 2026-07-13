@@ -87,6 +87,13 @@ this: if removing the comment wouldn't confuse a future reader, don't write it.
 
 ## Naming
 
+- **Boolean-typed values are prefixed `is`/`has` (or `should`/`can` where those read better)** so the
+  name signals its type on its own — `isSignedIn` (`clerk.svelte.ts`), `isLive`/`isMyTurn`/`isOver`
+  (`room.svelte.ts`, `game.svelte.ts`), `isOver` on `GameStatus` (`convex/models/games/engine.ts`).
+  Applies to `$state`/`$derived`, props, and plain params alike — not just locals. Existing
+  unprefixed booleans like `Room`'s `wrongGameType` or `lobby.svelte`'s `creating`/`copied` predate
+  this convention; don't copy them for new code, and rename in passing if you're already touching
+  the declaration.
 - A `*Room` class name matches its game (`TictactoeRoom`, `CheckersRoom`); a `*Engine` object name
   matches its game (`tictactoeEngine`, `checkersEngine`). Follow this pattern for a new game rather
   than inventing a different suffix.

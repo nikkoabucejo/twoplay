@@ -26,16 +26,31 @@
 
 	/** Drives the status bar's center content — whose turn it is, or how the game ended. */
 	export type BoardStatus =
-		{ type: "turn"; player: 0 | 1 } | { type: "winner"; player: 0 | 1 } | { type: "draw" };
+		| { type: "turn"; player: 0 | 1 }
+		| { type: "winner"; player: 0 | 1; reason?: "timeout" | "resign" }
+		| { type: "draw" };
+
+	/** Server-derived clock display — `board.svelte` only renders these numbers, it never ticks its own. */
+	export type BoardClock = {
+		/** Remaining time per seat, in ms. */
+		remaining: [number, number];
+		/** The seat currently burning clock, or null while frozen (not live, waiting for an opponent, or
+		 *  the round is over). */
+		activeSeat: 0 | 1 | null;
+	};
 
 	export type BoardFooter = {
 		/** False when viewing a past round rather than the room's current one. */
 		isLive: boolean;
-		/** The round currently displayed, and the room's most recent round — 1-indexed. */
-		game: number;
+		/** The round currently displayed — 1-indexed. */
 		round: number;
-		/** Starts a new round. Only called while `isLive` and the round is over. */
-		onNewGame: () => void;
+		/** The room's most recent round — 1-indexed. */
+		latestRound: number;
+		/** Forfeits the round in progress in favor of the opponent. Only called while `isLive` and the
+		 *  round is still running. */
+		onResign: () => void;
+		/** Starts the room's next round. Only called while `isLive` and the round is over. */
+		onRematch: () => void;
 		/** Navigates to the room's current live round. Only called while `!isLive`. */
 		onGoLive: () => void;
 		/** Navigates to a specific past or present round. */
@@ -48,7 +63,7 @@
 	import { ChevronLeft, ChevronRight } from "@lucide/svelte";
 	import { fade } from "svelte/transition";
 	import { Button, Emoji, Popover, PopoverContent, PopoverTrigger } from "$lib/components/ui";
-	import { cn } from "$lib/utils/style";
+	import { ACCENTS, cn } from "$lib/utils/style";
 	import type { Snippet } from "svelte";
 	import { getMood } from "./mood.svelte.js";
 
@@ -56,10 +71,11 @@
 		players,
 		status,
 		footer,
+		clock,
 		size = "34rem",
 		class: className,
 		myIndex = null,
-		onEmojiChange,
+		onTrashtalk,
 		children
 	}: {
 		/** The two players, rendered left and right of the board. */
@@ -68,6 +84,8 @@
 		status?: BoardStatus;
 		/** Reset/invite actions and any error message. Omit to hide the action bar. */
 		footer?: BoardFooter;
+		/** Per-seat clock display. Omit to hide the clocks entirely. */
+		clock?: BoardClock;
 		/** Fixed side length of the square board area (any CSS length). */
 		size?: string;
 		class?: string;
@@ -75,10 +93,13 @@
 		 *  spectating) keeps both emoji purely decorative. */
 		myIndex?: 0 | 1 | null;
 		/** Called with the chosen codepoint when the viewer picks a new emoji for their own seat. */
-		onEmojiChange?: (emoji: string) => void;
+		onTrashtalk?: (emoji: string) => void;
 		/** The game itself. Fills the square board area — use `size-full`. */
 		children: Snippet;
 	} = $props();
+
+	/** Clock digits turn destructive-colored at or below this remaining time. */
+	const LOW_TIME_MS = 10_000;
 
 	const mood = getMood();
 
@@ -89,8 +110,14 @@
 	}
 
 	function selectEmoji(codepoint: string) {
-		onEmojiChange?.(codepoint);
+		onTrashtalk?.(codepoint);
 		pickerOpen = false;
+	}
+
+	function formatClock(ms: number): string {
+		const totalSeconds = Math.ceil(ms / 1000);
+		const minutes = Math.floor(totalSeconds / 60);
+		return `${minutes}:${(totalSeconds % 60).toString().padStart(2, "0")}`;
 	}
 
 	$effect(() => {
@@ -147,6 +174,29 @@
 	</div>
 {/snippet}
 
+{#snippet clockBox(seat: 0 | 1)}
+	{@const ms = clock?.remaining[seat] ?? 0}
+	{@const timedOut = ms <= 0}
+	{@const low = ms <= LOW_TIME_MS}
+	{@const lost = status?.type === "winner" && status.player !== seat}
+	<div
+		class={cn(
+			"flex h-12 w-20 shrink-0 items-center justify-center rounded-lg",
+			lost ? "bg-muted/40" : ACCENTS[seat].tintBg
+		)}
+	>
+		<span
+			class={cn(
+				"text-lg font-semibold tabular-nums",
+				timedOut || lost ? "text-muted-foreground" : low ? "text-destructive" : players[seat].accent
+			)}
+			aria-label={`${players[seat].label}'s clock: ${formatClock(ms)} remaining`}
+		>
+			{formatClock(ms)}
+		</span>
+	</div>
+{/snippet}
+
 {#snippet turnIndicator(player: 0 | 1, word: string, pulse: boolean)}
 	{@const color = players[player].accent}
 	{@const arrowClass = cn("text-base leading-none", pulse && "animate-pulse", color)}
@@ -181,7 +231,15 @@
 
 					<div class="flex items-center gap-1.5">
 						{#if status.type === "winner"}
-							{@render turnIndicator(status.player, "Winner", false)}
+							{@render turnIndicator(
+								status.player,
+								status.reason === "timeout"
+									? "Timeout"
+									: status.reason === "resign"
+										? "Resigned"
+										: "Winner",
+								false
+							)}
 						{:else if status.type === "draw"}
 							<span class="font-semibold text-muted-foreground">Draw</span>
 						{:else}
@@ -206,56 +264,82 @@
 		</div>
 
 		{#if footer}
-			{@const prevDisabled = footer.game <= 1}
-			{@const nextDisabled = footer.game >= footer.round}
-			{@const newGameDisabled = status?.type !== "winner" && status?.type !== "draw"}
+			{@const prevDisabled = footer.round <= 1}
+			{@const nextDisabled = footer.round >= footer.latestRound}
+			{@const roundOver = status?.type === "winner" || status?.type === "draw"}
+			{@const isSpectator = myIndex === null}
 			<div class="flex w-(--board-size) flex-col items-center gap-3">
-				<div class="flex items-center gap-2">
-					<span class={cn(prevDisabled && "cursor-not-allowed")}>
-						<Button
-							variant="outline"
-							size="icon-sm"
-							aria-label="Previous round"
-							disabled={prevDisabled}
-							onclick={() => footer.onGoToRound(footer.game - 1)}
-						>
-							<ChevronLeft />
-						</Button>
-					</span>
+				<div class="flex w-(--board-size) items-center justify-between">
+					{#if clock}
+						{@render clockBox(0)}
+					{/if}
 
-					<span class={cn(footer.isLive && newGameDisabled && "cursor-not-allowed")}>
-						{#if footer.isLive}
+					<div class="flex items-center gap-2">
+						<span class={cn(prevDisabled && "cursor-not-allowed")}>
 							<Button
 								variant="outline"
-								size="sm"
-								class="w-32 uppercase"
-								onclick={footer.onNewGame}
-								disabled={newGameDisabled}
+								size="icon-sm"
+								aria-label="Previous round"
+								disabled={prevDisabled}
+								onclick={() => footer.onGoToRound(footer.round - 1)}
 							>
-								New game
+								<ChevronLeft />
 							</Button>
-						{:else}
-							<Button variant="outline" size="sm" class="w-32 uppercase" onclick={footer.onGoLive}>
-								Go live
-							</Button>
-						{/if}
-					</span>
+						</span>
 
-					<span class={cn(nextDisabled && "cursor-not-allowed")}>
-						<Button
-							variant="outline"
-							size="icon-sm"
-							aria-label="Next round"
-							disabled={nextDisabled}
-							onclick={() => footer.onGoToRound(footer.game + 1)}
-						>
-							<ChevronRight />
-						</Button>
-					</span>
+						<span class={cn(footer.isLive && isSpectator && "cursor-not-allowed")}>
+							{#if !footer.isLive}
+								<Button
+									variant="outline"
+									size="sm"
+									class="w-32 uppercase"
+									onclick={footer.onGoLive}
+								>
+									Go live
+								</Button>
+							{:else if !roundOver}
+								<Button
+									variant="outline"
+									size="sm"
+									class="w-32 uppercase"
+									onclick={footer.onResign}
+									disabled={isSpectator}
+								>
+									Resign
+								</Button>
+							{:else}
+								<Button
+									variant="outline"
+									size="sm"
+									class="w-32 uppercase"
+									onclick={footer.onRematch}
+									disabled={isSpectator}
+								>
+									Rematch
+								</Button>
+							{/if}
+						</span>
+
+						<span class={cn(nextDisabled && "cursor-not-allowed")}>
+							<Button
+								variant="outline"
+								size="icon-sm"
+								aria-label="Next round"
+								disabled={nextDisabled}
+								onclick={() => footer.onGoToRound(footer.round + 1)}
+							>
+								<ChevronRight />
+							</Button>
+						</span>
+					</div>
+
+					{#if clock}
+						{@render clockBox(1)}
+					{/if}
 				</div>
 
 				<p class="text-xs tabular-nums text-muted-foreground">
-					Round {footer.game} of {footer.round}
+					Round {footer.round} of {footer.latestRound}
 				</p>
 
 				{#if footer.error}

@@ -1,4 +1,8 @@
 import { v } from "convex/values";
+import type { Doc, Id } from "../../_generated/dataModel";
+import { mutation, query, type MutationCtx, type QueryCtx } from "../../_generated/server";
+import { clocksByGame } from "../clocks/index.js";
+import { getRoomByCode, requirePlayer, requireUser } from "../rooms/auth.js";
 import {
 	checkersEngine,
 	checkersMove,
@@ -87,3 +91,144 @@ export function gameStatus(gameType: GameType, state: GameState) {
 		}
 	}
 }
+
+/** The room's live game — the one with the highest `round`. */
+export async function getCurrentGame(ctx: QueryCtx | MutationCtx, roomId: Id<"rooms">) {
+	return await ctx.db
+		.query("games")
+		.withIndex("byRoom", (q) => q.eq("roomId", roomId))
+		.order("desc")
+		.first();
+}
+
+/** A specific past or present round, or the live game when `round` is omitted. */
+export async function getGame(ctx: QueryCtx | MutationCtx, roomId: Id<"rooms">, round?: number) {
+	if (round === undefined) return await getCurrentGame(ctx, roomId);
+	return await ctx.db
+		.query("games")
+		.withIndex("byRoom", (q) => q.eq("roomId", roomId).eq("round", round))
+		.unique();
+}
+
+/** `shouldStartClock` is false right after room creation (only one seat is filled yet) and true for
+ *  every later round (both seats are necessarily already filled — a round can only finish once they
+ *  are). Only creates clock rows for seats already filled in `room.players`; `join` creates the
+ *  latecomer's once they take the last seat. */
+export async function createGame(
+	ctx: MutationCtx,
+	room: Pick<Doc<"rooms">, "_id" | "type" | "players">,
+	timeControlMs: number,
+	shouldStartClock: boolean
+) {
+	const previous = await getCurrentGame(ctx, room._id);
+	const state = getEngine(room.type).createInitialState();
+	const gameId = await ctx.db.insert("games", {
+		roomId: room._id,
+		round: previous ? previous.round + 1 : 1,
+		state
+	});
+
+	const status = gameStatus(room.type, state);
+	await Promise.all(
+		room.players.map((playerId, index) =>
+			ctx.db.insert("clocks", {
+				gameId,
+				playerId,
+				remaining: timeControlMs,
+				turnedAt: shouldStartClock && status?.turnIndex === index ? Date.now() : undefined
+			})
+		)
+	);
+
+	return gameId;
+}
+
+/** How many moves have been played in a game — also next move's `moves.turn`. */
+export async function countMoves(
+	ctx: QueryCtx | MutationCtx,
+	gameId: Id<"games">
+): Promise<number> {
+	const moves = await ctx.db
+		.query("moves")
+		.withIndex("byGame", (q) => q.eq("gameId", gameId))
+		.collect();
+	return moves.length;
+}
+
+/** Forfeits the caller's own current round in favor of their opponent — sets the same `endReason`
+ *  field a real clock timeout sets, tagged with the distinct "resign" cause, since both end a round
+ *  identically from there on but the client still needs to tell them apart when displaying why. */
+export const resign = mutation({
+	args: { code: v.string() },
+	async handler(ctx, { code }) {
+		const room = await getRoomByCode(ctx, code);
+		if (!room) throw new Error("Room not found");
+		const player = await requirePlayer(ctx, room._id);
+
+		const game = await getCurrentGame(ctx, room._id);
+		if (!game) throw new Error("Game not found");
+
+		const clocks = await clocksByGame(ctx, game._id);
+		if (clocks.some((clock) => clock.endReason !== undefined)) return;
+		const status = gameStatus(room.type, game.state);
+		if (!status || status.isOver) return;
+
+		const ownClock = clocks.find((clock) => clock.playerId === player._id);
+		if (!ownClock) throw new Error("You are not playing this round");
+
+		await ctx.db.patch(ownClock._id, { endReason: "resign", turnedAt: undefined });
+	}
+});
+
+/** Ends the current round in favor of whoever's opponent let their clock run out. Re-derives elapsed
+ *  time server-side rather than trusting the caller's claim — any connected client (either player, or a
+ *  spectator) can call this once it locally computes a seat's clock has hit zero. */
+export const timeout = mutation({
+	args: { code: v.string() },
+	async handler(ctx, { code }) {
+		await requireUser(ctx);
+		const room = await getRoomByCode(ctx, code);
+		if (!room) throw new Error("Room not found");
+
+		const game = await getCurrentGame(ctx, room._id);
+		if (!game) throw new Error("Game not found");
+
+		const clocks = await clocksByGame(ctx, game._id);
+		if (clocks.some((clock) => clock.endReason !== undefined)) return;
+
+		const status = gameStatus(room.type, game.state);
+		if (!status || status.isOver) return;
+
+		const activeClock = clocks.find((clock) => clock.playerId === room.players[status.turnIndex]);
+		if (!activeClock || activeClock.turnedAt === undefined) return;
+
+		const elapsed = Date.now() - activeClock.turnedAt;
+		const remaining = activeClock.remaining - elapsed;
+		if (remaining > 0) return;
+
+		await ctx.db.patch(activeClock._id, {
+			endReason: "timeout",
+			remaining: 0,
+			turnedAt: undefined
+		});
+	}
+});
+
+/** Ordered history of moves played in a room's game — the current one when `round` is omitted. */
+export const history = query({
+	args: { code: v.string(), round: v.optional(v.number()) },
+	async handler(ctx, { code, round }) {
+		await requireUser(ctx);
+		const room = await getRoomByCode(ctx, code);
+		if (!room) return [];
+
+		const game = await getGame(ctx, room._id, round);
+		if (!game) return [];
+
+		return await ctx.db
+			.query("moves")
+			.withIndex("byGame", (q) => q.eq("gameId", game._id))
+			.order("asc")
+			.collect();
+	}
+});
