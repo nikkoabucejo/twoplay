@@ -10,3 +10,4 @@ export {
 } from "./board/index.js";
 export { History } from "./history/index.js";
 export { Lobby } from "./lobby/index.js";
+export { Rooms } from "./rooms/index.js";

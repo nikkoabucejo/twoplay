@@ -197,8 +197,7 @@
 	</div>
 {/snippet}
 
-{#snippet turnIndicator(player: 0 | 1, word: string, pulse: boolean)}
-	{@const color = players[player].accent}
+{#snippet turnIndicator(player: 0 | 1, word: string, pulse: boolean, color?: string)}
 	{@const arrowClass = cn("text-base leading-none", pulse && "animate-pulse", color)}
 	{@const wordClass = cn("text-[10px] font-semibold tracking-widest uppercase", color)}
 	{#if player === 0}
@@ -231,19 +230,19 @@
 
 					<div class="flex items-center gap-1.5">
 						{#if status.type === "winner"}
-							{@render turnIndicator(
-								status.player,
-								status.reason === "timeout"
-									? "Timeout"
-									: status.reason === "resign"
-										? "Resigned"
-										: "Winner",
-								false
-							)}
+							{@const winColor = (seat: 0 | 1) =>
+								seat === status.player ? "text-emerald-500" : "text-destructive"}
+							{@render turnIndicator(0, status.player === 0 ? "Win" : "Loss", false, winColor(0))}
+							<span class="text-muted-foreground">·</span>
+							{@render turnIndicator(1, status.player === 1 ? "Win" : "Loss", false, winColor(1))}
 						{:else if status.type === "draw"}
-							<span class="font-semibold text-muted-foreground">DRAW</span>
+							<span
+								class="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase"
+							>
+								Draw
+							</span>
 						{:else}
-							{@render turnIndicator(status.player, "Turn", true)}
+							{@render turnIndicator(status.player, "Turn", true, players[status.player].accent)}
 						{/if}
 					</div>
 

@@ -3,7 +3,7 @@
 	import { useMutation, useQuery } from "convex-svelte";
 	import type { Component } from "svelte";
 	import { goto } from "$app/navigation";
-	import { Button, Tabs } from "$lib/components/ui";
+	import { Button, Tabs, type TabItem } from "$lib/components/ui";
 	import { getClerkAuth } from "$lib/services/auth";
 	import type { GameType } from "../../../../../convex/models/games/index.js";
 	import { DEFAULT_TIME_CONTROL_MS } from "../../../../../convex/models/rooms/index.js";
@@ -13,6 +13,10 @@
 	 *  `DEFAULT_TIME_CONTROL_MS` (convex/models/rooms/index.ts) so the two can't drift out of sync. */
 	const TIME_CONTROL_MINUTES = [3, 5, 10] as const;
 	const DEFAULT_TIME_CONTROL_MINUTES = DEFAULT_TIME_CONTROL_MS / 60_000;
+	const VISIBILITY_OPTIONS: TabItem<"private" | "public">[] = [
+		{ value: "private", label: "Private" },
+		{ value: "public", label: "Public" }
+	];
 
 	let {
 		gameType,
@@ -32,6 +36,7 @@
 	let error = $state<string | null>(null);
 	let creating = $state(false);
 	let timeControlMinutes = $state<number>(DEFAULT_TIME_CONTROL_MINUTES);
+	let visibility = $state<"private" | "public">("private");
 	let createdCode = $state<string | null>(null);
 	let copied = $state(false);
 	let copiedTimeout: ReturnType<typeof setTimeout> | undefined;
@@ -50,7 +55,8 @@
 		try {
 			createdCode = await createRoom({
 				type: gameType,
-				timeControlMs: timeControlMinutes * 60_000
+				timeControlMs: timeControlMinutes * 60_000,
+				visibility
 			});
 		} catch (err) {
 			error = err instanceof Error ? err.message : "Could not create a room";
@@ -89,6 +95,14 @@
 		<div
 			class="flex w-full max-w-xs flex-col items-center gap-6 rounded-2xl border bg-muted/40 p-6 backdrop-blur-sm"
 		>
+			<Tabs
+				items={VISIBILITY_OPTIONS}
+				value={visibility}
+				onValueChange={(value) => (visibility = value)}
+				disabled={!!createdCode}
+				aria-label="Room visibility"
+			/>
+
 			<Tabs
 				items={TIME_CONTROL_MINUTES.map((minutes) => ({ value: minutes, label: `${minutes} min` }))}
 				value={timeControlMinutes}

@@ -18,6 +18,7 @@ import {
 } from "../games/index.js";
 import { ensurePlayer, playerByUserAndRoom } from "../players/index.js";
 import { currentPlayer, getRoomByCode, requirePlayer, requireUser } from "./auth.js";
+import { roomVisibilityValidator } from "./schema.js";
 
 export { currentPlayer, getRoomByCode, requirePlayer, requireUser };
 
@@ -56,15 +57,20 @@ async function generateRoomCode(ctx: MutationCtx): Promise<string> {
 }
 
 export const create = mutation({
-	args: { type: gameTypeValidator, timeControlMs: v.optional(v.number()) },
-	async handler(ctx, { type, timeControlMs }) {
+	args: {
+		type: gameTypeValidator,
+		timeControlMs: v.optional(v.number()),
+		visibility: v.optional(roomVisibilityValidator)
+	},
+	async handler(ctx, { type, timeControlMs, visibility }) {
 		const code = await generateRoomCode(ctx);
 		const resolvedTimeControlMs = resolveTimeControlMs(timeControlMs);
 		const roomId = await ctx.db.insert("rooms", {
 			code,
 			type,
 			players: [],
-			time: resolvedTimeControlMs
+			time: resolvedTimeControlMs,
+			visibility: visibility ?? "private"
 		});
 		const player = await ensurePlayerForCurrentUser(ctx, roomId);
 		await ctx.db.patch(roomId, { players: [player._id] });
@@ -359,5 +365,57 @@ export const listForUser = query({
 		return rooms
 			.filter((room): room is RoomHistoryEntry => room !== null && room.games.length > 0)
 			.sort((a, b) => b.games.at(-1)!.createdAt - a.games.at(-1)!.createdAt);
+	}
+});
+
+export type OpenRoomEntry = {
+	code: string;
+	type: GameType;
+	hostName: string | null;
+	timeControlMs: number;
+	createdAt: number;
+	/** True when the viewer is already in this room (they hosted it) — they can't join their own
+	 *  room, so the client shows a "View" action here instead of "Join". */
+	isOwn: boolean;
+};
+
+/** Public rooms still waiting for an opponent, newest first — powers the room browser. A room drops
+ *  off this list the moment its last seat fills, since it's no longer "waiting to be opened". */
+export const listOpenPublicRooms = query({
+	args: {},
+	async handler(ctx): Promise<OpenRoomEntry[]> {
+		const user = await requireUser(ctx);
+		const ownPlayerRows = await ctx.db
+			.query("players")
+			.withIndex("byUser", (q) => q.eq("userId", user._id))
+			.collect();
+		const ownRoomIds = new Set(ownPlayerRows.map((player) => player.roomId));
+
+		const rooms = await ctx.db
+			.query("rooms")
+			.withIndex("byVisibility", (q) => q.eq("visibility", "public"))
+			.order("desc")
+			.collect();
+
+		const entries = await Promise.all(
+			rooms.map(async (room): Promise<OpenRoomEntry | null> => {
+				const engine = getEngine(room.type);
+				if (room.players.length >= engine.playerCount) return null;
+
+				const hostId = room.players[0] ?? null;
+				const host = hostId ? await ctx.db.get(hostId) : null;
+
+				return {
+					code: room.code,
+					type: room.type,
+					hostName: host?.name ?? null,
+					timeControlMs: room.time ?? DEFAULT_TIME_CONTROL_MS,
+					createdAt: room._creationTime,
+					isOwn: ownRoomIds.has(room._id)
+				};
+			})
+		);
+
+		return entries.filter((room): room is OpenRoomEntry => room !== null);
 	}
 });

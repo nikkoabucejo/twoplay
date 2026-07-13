@@ -170,6 +170,12 @@
 			</a>
 			{#if auth.isSignedIn}
 				<a
+					href="/rooms"
+					class="text-sm text-muted-foreground transition-colors hover:text-foreground"
+				>
+					Play
+				</a>
+				<a
 					href="/history"
 					class="text-sm text-muted-foreground transition-colors hover:text-foreground"
 				>
