@@ -3,11 +3,12 @@
 	import { backOut } from "svelte/easing";
 	import { fade } from "svelte/transition";
 	import { goto } from "$app/navigation";
+	import { resolve } from "$app/paths";
 	import { Board, type BoardStatus } from "$lib/components/layout";
 	import { Button, Spinner } from "$lib/components/ui";
 	import { Cursor } from "$lib/features/presence";
 	import { getClerkAuth } from "$lib/services/auth";
-	import { playCaptureSound, playMoveSound } from "$lib/utils/sound";
+	import { playCaptureSound, playMoveSound, prepareSound } from "$lib/utils/sound";
 	import { cn, ACCENTS } from "$lib/utils/style";
 	import { api } from "../../../../../convex/_generated/api.js";
 	import { DEFAULT_EMOJI } from "../../../../../convex/models/players/index.js";
@@ -21,11 +22,9 @@
 		_node: Element,
 		{
 			duration = PIECE_DURATION,
-			delay = 0,
-			seat = 0
-		}: { duration?: number; delay?: number; seat?: number } = {}
+			delay = 0
+		}: { duration?: number; delay?: number } = {}
 	) {
-		playMoveSound(seat);
 		return {
 			delay,
 			duration,
@@ -34,15 +33,6 @@
 				return `transform: scale(${scale}); opacity: ${Math.min(t * 2.5, 1)};`;
 			}
 		};
-	}
-
-	/** A piece being captured: fades out over the same window a sound cue plays over, so the piece feels swept off the board rather than just vanishing. */
-	function liquidOut(
-		node: Element,
-		{ duration = 150, seat = 0 }: { duration?: number; seat?: number } = {}
-	) {
-		playCaptureSound(seat);
-		return fade(node, { duration });
 	}
 
 	let {
@@ -72,21 +62,42 @@
 	});
 
 	$effect(() => {
-		if (room.wrongGameType && data) goto(`/${data.type}/${roomCode}`, { replaceState: true });
+		if (room.wrongGameType && data) goto(resolve(`/${data.type}/${roomCode}`), { replaceState: true });
 	});
 
 	$effect(() => () => room.dispose());
 
 	function goLive() {
-		goto(`/checkers/${roomCode}`);
+		goto(resolve(`/checkers/${roomCode}`));
 	}
 
 	function goToRound(round: number) {
-		goto(`/checkers/${roomCode}/${round}`);
+		goto(resolve(`/checkers/${roomCode}/${round}`));
 	}
 
 	function firstName(name: string) {
 		return name.split(" ")[0];
+	}
+
+	function pieceKey(index: number, p: Piece | null) {
+		return p ? `${index}:${p.color}:${p.king ? "king" : "man"}` : `${index}:empty`;
+	}
+
+	function seatFor(piece: Piece | null | undefined) {
+		return piece?.color === "pink" ? 1 : 0;
+	}
+
+	function select(index: number) {
+		const from = room.effectiveSelected;
+		const move = from !== null ? room.movesFrom(from).find((move) => move.to === index) : null;
+		if (move) {
+			prepareSound();
+			playMoveSound(seatFor(room.board[move.from]));
+			if (move.captured !== null) playCaptureSound(seatFor(room.board[move.captured]));
+		} else if (room.canSelect(index)) {
+			prepareSound();
+		}
+		void room.select(index);
 	}
 
 	/** Arrow keys scrub this browser's personal view of the current round's move history — local only,
@@ -147,8 +158,7 @@
 			"relative flex h-4/5 w-4/5 items-center justify-center rounded-full shadow-md",
 			p.color === "cyan" ? ACCENTS[0].bg : ACCENTS[1].bg
 		)}
-		in:liquidIn={{ seat: p.color === "cyan" ? 0 : 1 }}
-		out:liquidOut={{ seat: p.color === "cyan" ? 0 : 1 }}
+		in:liquidIn
 	>
 		{#if isSelected}
 			<div
@@ -272,7 +282,7 @@
 								aria-label={cell
 									? `Row ${row + 1}, column ${col + 1}, ${cell.color}${cell.king ? " king" : ""}`
 									: `Row ${row + 1}, column ${col + 1}, empty`}
-								onclick={() => room.select(index)}
+								onclick={() => select(index)}
 							>
 								{#if isForcedMover}
 									<div
@@ -286,9 +296,11 @@
 										in:fade={{ duration: 150 }}
 									></span>
 								{/if}
-								{#if cell}
-									{@render piece(cell, isSelected)}
-								{/if}
+								{#key pieceKey(index, cell)}
+									{#if cell}
+										{@render piece(cell, isSelected)}
+									{/if}
+								{/key}
 							</button>
 						{/each}
 					</div>

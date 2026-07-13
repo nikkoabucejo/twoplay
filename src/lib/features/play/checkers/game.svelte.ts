@@ -37,8 +37,13 @@ export class CheckersRoom extends Room {
 
 	legalMoves = $derived(computeLegalMoves(this.board, this.turn, this.mustContinueFrom));
 
-	/** The piece the UI treats as selected: a forced multi-jump continuation always wins over a free click. */
-	effectiveSelected = $derived(this.mustContinueFrom ?? this.selected);
+	/** The piece the UI treats as selected: a forced multi-jump continuation always wins over a free click.
+	 *  Free selections are ignored as soon as the live board advances and that source is no longer legal. */
+	effectiveSelected = $derived.by(() => {
+		if (this.mustContinueFrom !== null) return this.mustContinueFrom;
+		if (this.selected === null) return null;
+		return this.legalMoves.some((move) => move.from === this.selected) ? this.selected : null;
+	});
 
 	myColor = $derived<PieceColor | null>(
 		this.data?.myIndex === 0 ? "cyan" : this.data?.myIndex === 1 ? "pink" : null

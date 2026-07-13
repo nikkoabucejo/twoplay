@@ -3,11 +3,12 @@
 	import { backOut } from "svelte/easing";
 	import { draw, fade } from "svelte/transition";
 	import { goto } from "$app/navigation";
+	import { resolve } from "$app/paths";
 	import { Board, type BoardStatus } from "$lib/components/layout";
 	import { Button, Spinner } from "$lib/components/ui";
 	import { Cursor } from "$lib/features/presence";
 	import { getClerkAuth } from "$lib/services/auth";
-	import { playMoveSound } from "$lib/utils/sound";
+	import { playMoveSound, prepareSound } from "$lib/utils/sound";
 	import { cn, ACCENTS } from "$lib/utils/style";
 	import { api } from "../../../../../convex/_generated/api.js";
 	import { DEFAULT_EMOJI } from "../../../../../convex/models/players/index.js";
@@ -67,21 +68,27 @@
 	});
 
 	$effect(() => {
-		if (room.wrongGameType && data) goto(`/${data.type}/${roomCode}`, { replaceState: true });
+		if (room.wrongGameType && data) goto(resolve(`/${data.type}/${roomCode}`), { replaceState: true });
 	});
 
 	$effect(() => () => room.dispose());
 
 	function goLive() {
-		goto(`/tictactoe/${roomCode}`);
+		goto(resolve(`/tictactoe/${roomCode}`));
 	}
 
 	function goToRound(round: number) {
-		goto(`/tictactoe/${roomCode}/${round}`);
+		goto(resolve(`/tictactoe/${roomCode}/${round}`));
 	}
 
 	function firstName(name: string) {
 		return name.split(" ")[0];
+	}
+
+	function play(boardIndex: number, cellIndex: number) {
+		if (room.boards[boardIndex]?.[cellIndex] !== null || !room.canPlay(boardIndex)) return;
+		prepareSound();
+		void room.play(boardIndex, cellIndex);
 	}
 
 	/** Arrow keys scrub this browser's personal view of the current round's move history — local only,
@@ -184,7 +191,7 @@
 					)}
 					disabled={cell !== null || !room.canPlay(boardIndex)}
 					aria-label={cell ? `Cell ${cellIndex + 1}, ${cell}` : `Cell ${cellIndex + 1}, empty`}
-					onclick={() => room.play(boardIndex, cellIndex)}
+					onclick={() => play(boardIndex, cellIndex)}
 				>
 					{#if cell}
 						{@render mark(cell)}

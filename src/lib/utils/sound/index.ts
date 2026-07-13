@@ -7,6 +7,10 @@ function getContext(): AudioContext | null {
 	return context;
 }
 
+export function prepareSound() {
+	void getContext();
+}
+
 /** A fourth apart, so both seats sound like one instrument rather than two unrelated tones. */
 const SEAT_PITCH = [261.63, 349.23] as const; // C4, F4
 
