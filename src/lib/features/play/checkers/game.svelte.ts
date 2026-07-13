@@ -15,10 +15,25 @@ export class CheckersRoom extends Room {
 	}
 
 	#state = $derived(this.data && this.data.game.state.kind === "checkers" ? this.data.game.state : null);
+	#liveTurn = $derived<PieceColor>(this.#state?.turn ?? "cyan");
+	#liveLegalMoves = $derived(
+		computeLegalMoves(this.#state?.board ?? [], this.#liveTurn, this.#state?.mustContinueFrom ?? null)
+	);
+	/** No legal moves for the side to move means that side is out of moves or pieces — the other color wins. */
+	#liveWinner = $derived<PieceColor | null>(
+		this.#state !== null && this.#liveLegalMoves.length === 0
+			? this.#liveTurn === "cyan"
+				? "pink"
+				: "cyan"
+			: null
+	);
 
-	board = $derived<Board>(this.#state?.board ?? []);
-	turn = $derived<PieceColor>(this.#state?.turn ?? "cyan");
-	mustContinueFrom = $derived(this.#state?.mustContinueFrom ?? null);
+	/** The board snapshot currently shown: the cursor's historical snapshot, or the live state when live. */
+	#displayState = $derived(this.displayState?.kind === "checkers" ? this.displayState : null);
+
+	board = $derived<Board>(this.#displayState?.board ?? []);
+	turn = $derived<PieceColor>(this.#displayState?.turn ?? "cyan");
+	mustContinueFrom = $derived(this.#displayState?.mustContinueFrom ?? null);
 
 	legalMoves = $derived(computeLegalMoves(this.board, this.turn, this.mustContinueFrom));
 
@@ -28,11 +43,15 @@ export class CheckersRoom extends Room {
 	myColor = $derived<PieceColor | null>(
 		this.data?.myIndex === 0 ? "cyan" : this.data?.myIndex === 1 ? "pink" : null
 	);
-	isMyTurn = $derived(this.game.isLive && this.myColor !== null && this.myColor === this.turn);
+	isMyTurn = $derived(
+		this.game.isLive &&
+			!this.isViewingHistory &&
+			this.myColor !== null &&
+			this.myColor === this.#liveTurn
+	);
 
-	/** No legal moves for the side to move means that side is out of moves or pieces — the other color wins. */
 	winner = $derived<PieceColor | null>(
-		this.#state !== null && this.legalMoves.length === 0
+		this.#displayState !== null && this.legalMoves.length === 0
 			? this.turn === "cyan"
 				? "pink"
 				: "cyan"
@@ -40,8 +59,8 @@ export class CheckersRoom extends Room {
 	);
 
 	override activeSeat = $derived<0 | 1 | null>(
-		this.game.isLive && this.game.endedSeat === null && this.winner === null
-			? this.turn === "cyan"
+		this.game.isLive && this.game.endedSeat === null && this.#liveWinner === null
+			? this.#liveTurn === "cyan"
 				? 0
 				: 1
 			: null
@@ -70,5 +89,10 @@ export class CheckersRoom extends Room {
 
 		if (this.mustContinueFrom !== null) return;
 		this.selected = this.canSelect(index) ? index : null;
+	}
+
+	override async rematch(): Promise<void> {
+		this.selected = null;
+		await super.rematch();
 	}
 }

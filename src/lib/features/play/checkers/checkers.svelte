@@ -74,6 +74,33 @@
 		return name.split(" ")[0];
 	}
 
+	/** Arrow keys scrub this browser's personal view of the current round's move history — local only,
+	 *  never touches the real game state or other players' views. */
+	function handleKeydown(event: KeyboardEvent) {
+		if (!data) return;
+		const target = event.target as HTMLElement | null;
+		if (target && ["INPUT", "TEXTAREA"].includes(target.tagName)) return;
+
+		switch (event.key) {
+			case "ArrowLeft":
+				event.preventDefault();
+				room.stepBack();
+				break;
+			case "ArrowRight":
+				event.preventDefault();
+				room.stepForward();
+				break;
+			case "ArrowUp":
+				event.preventDefault();
+				room.jumpToLatest();
+				break;
+			case "ArrowDown":
+				event.preventDefault();
+				room.jumpToFirst();
+				break;
+		}
+	}
+
 	const destinations = $derived(
 		room.effectiveSelected !== null ? room.movesFrom(room.effectiveSelected).map((m) => m.to) : []
 	);
@@ -122,6 +149,8 @@
 	</div>
 {/snippet}
 
+<svelte:window onkeydown={handleKeydown} />
+
 <div class={cn("flex flex-col items-center gap-6", className)}>
 	{#if !auth.isSignedIn}
 		<div class="flex flex-col items-center gap-3">
@@ -143,90 +172,113 @@
 			<Button variant="outline" href="/checkers">Back to lobby</Button>
 		</div>
 	{:else if data}
-		<Board
-			players={[
-				{
-					label: room.players[0] ? firstName(room.players[0].name) : "Player 1",
-					emoji: room.players[0]?.emoji ?? DEFAULT_EMOJI,
-					accent: ACCENTS[0].text,
-					score: room.players[0]?.score ?? 0
-				},
-				{
-					label: room.players[1] ? firstName(room.players[1].name) : "Player 2",
-					emoji: room.players[1]?.emoji ?? DEFAULT_EMOJI,
-					accent: ACCENTS[1].text,
-					score: room.players[1]?.score ?? 0
-				}
-			]}
-			{status}
-			clock={room.clock}
-			myIndex={room.myIndex}
-			onTrashtalk={(emoji) => room.trashtalk(emoji)}
-			footer={{
-				isLive: room.game.isLive,
-				round: room.game.round,
-				latestRound: room.game.latestRound,
-				onResign: () => room.resign(),
-				onRematch: () => room.rematch(),
-				onGoLive: goLive,
-				onGoToRound: goToRound,
-				error: room.error
-			}}
-		>
-			<Cursor
-				{roomCode}
-				{flip}
-				class="size-full"
-				colorFor={(index) => ACCENTS[index]?.text ?? "text-muted-foreground"}
-			>
+		<div class="relative">
+			{#if room.isViewingHistory}
 				<div
-					class="grid size-full grid-cols-8 grid-rows-8 overflow-hidden rounded-xl border"
-					role="grid"
-					aria-label="Checkers board"
+					class="pointer-events-none absolute inset-x-0 top-0 z-20 flex -translate-y-[calc(100%+0.5rem)] justify-center"
+					transition:fade={{ duration: 150 }}
 				>
-					{#each { length: 64 } as _, slot (slot)}
-						{@const index = flip ? 63 - slot : slot}
-						{@const row = Math.floor(index / 8)}
-						{@const col = index % 8}
-						{@const dark = (row + col) % 2 === 1}
-						{@const cell = room.board[index]}
-						{@const isDestination = destinations.includes(index)}
-						{@const isSelected = room.effectiveSelected === index}
-						{@const isForcedMover = dark && cell?.color === room.turn && forcedMovers.has(index)}
+					<div
+						class="pointer-events-auto flex items-center gap-2 rounded-full border bg-background/90 px-3 py-1 text-xs shadow-sm backdrop-blur-sm"
+					>
+						<span class="tabular-nums text-muted-foreground">
+							Move {room.viewedMoveNumber} of {room.historyLength}
+						</span>
 						<button
 							type="button"
-							class={cn(
-								"relative flex items-center justify-center",
-								dark
-									? "bg-foreground/10 hover:bg-foreground/15 dark:bg-foreground/15"
-									: "bg-background",
-								!dark && "cursor-default"
-							)}
-							disabled={!dark}
-							aria-label={cell
-								? `Row ${row + 1}, column ${col + 1}, ${cell.color}${cell.king ? " king" : ""}`
-								: `Row ${row + 1}, column ${col + 1}, empty`}
-							onclick={() => room.select(index)}
+							class="font-semibold text-primary hover:underline"
+							onclick={() => room.jumpToLatest()}
 						>
-							{#if isForcedMover}
-								<div
-									class="absolute inset-[12%] rounded-full ring-2 ring-amber-400/70"
-									out:fade
-								></div>
-							{/if}
-							{#if isDestination}
-								<span
-									class="absolute size-1/4 rounded-full bg-emerald-400/70"
-									in:fade={{ duration: 150 }}
-								></span>
-							{/if}
-							{#if cell}
-								{@render piece(cell, isSelected)}
-							{/if}
+							Return to live
 						</button>
-					{/each}
+					</div>
 				</div>
-			</Cursor>
-		</Board>
+			{/if}
+			<Board
+				players={[
+					{
+						label: room.players[0] ? firstName(room.players[0].name) : "Player 1",
+						emoji: room.players[0]?.emoji ?? DEFAULT_EMOJI,
+						accent: ACCENTS[0].text,
+						score: room.players[0]?.score ?? 0
+					},
+					{
+						label: room.players[1] ? firstName(room.players[1].name) : "Player 2",
+						emoji: room.players[1]?.emoji ?? DEFAULT_EMOJI,
+						accent: ACCENTS[1].text,
+						score: room.players[1]?.score ?? 0
+					}
+				]}
+				{status}
+				clock={room.clock}
+				myIndex={room.myIndex}
+				onTrashtalk={(emoji) => room.trashtalk(emoji)}
+				footer={{
+					isLive: room.game.isLive,
+					round: room.game.round,
+					latestRound: room.game.latestRound,
+					onResign: () => room.resign(),
+					onRematch: () => room.rematch(),
+					onGoLive: goLive,
+					onGoToRound: goToRound,
+					error: room.error
+				}}
+			>
+				<Cursor
+					{roomCode}
+					{flip}
+					class="size-full"
+					colorFor={(index) => ACCENTS[index]?.text ?? "text-muted-foreground"}
+				>
+					<div
+						class="grid size-full grid-cols-8 grid-rows-8 overflow-hidden rounded-xl border"
+						role="grid"
+						aria-label="Checkers board"
+					>
+						{#each { length: 64 } as _, slot (slot)}
+							{@const index = flip ? 63 - slot : slot}
+							{@const row = Math.floor(index / 8)}
+							{@const col = index % 8}
+							{@const dark = (row + col) % 2 === 1}
+							{@const cell = room.board[index]}
+							{@const isDestination = destinations.includes(index)}
+							{@const isSelected = room.effectiveSelected === index}
+							{@const isForcedMover = dark && cell?.color === room.turn && forcedMovers.has(index)}
+							<button
+								type="button"
+								class={cn(
+									"relative flex items-center justify-center",
+									dark
+										? "bg-foreground/10 hover:bg-foreground/15 dark:bg-foreground/15"
+										: "bg-background",
+									!dark && "cursor-default"
+								)}
+								disabled={!dark}
+								aria-label={cell
+									? `Row ${row + 1}, column ${col + 1}, ${cell.color}${cell.king ? " king" : ""}`
+									: `Row ${row + 1}, column ${col + 1}, empty`}
+								onclick={() => room.select(index)}
+							>
+								{#if isForcedMover}
+									<div
+										class="absolute inset-[12%] rounded-full ring-2 ring-amber-400/70"
+										out:fade
+									></div>
+								{/if}
+								{#if isDestination}
+									<span
+										class="absolute size-1/4 rounded-full bg-emerald-400/70"
+										in:fade={{ duration: 150 }}
+									></span>
+								{/if}
+								{#if cell}
+									{@render piece(cell, isSelected)}
+								{/if}
+							</button>
+						{/each}
+					</div>
+				</Cursor>
+			</Board>
+		</div>
 	{/if}
 </div>

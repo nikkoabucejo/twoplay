@@ -1,13 +1,14 @@
 import { useMutation, useQuery, type UseQueryReturn } from "convex-svelte";
-import type { GameMove, GameType } from "../../../../../convex/models/games/index.js";
+import type { GameMove, GameState, GameType } from "../../../../../convex/models/games/index.js";
 import { api } from "../../../../../convex/_generated/api.js";
 
 /**
  * Shared multiplayer-room plumbing: the live Convex subscription, move/rematch/resign/timeout
- * mutations, and the round/live/players/clock state every game's room class needs. Subclasses
- * (`TictactoeRoom`, `CheckersRoom`) add only their own game-specific derived state (board, legal
- * moves, turn, winner, …), implement `activeSeat` by mapping that state to a generic seat index, and
- * call `submitMove` after validating a move is theirs to make.
+ * mutations, the round/live/players/clock state, and local move-history scrubbing every game's room
+ * class needs. Subclasses (`TictactoeRoom`, `CheckersRoom`) add only their own game-specific derived
+ * state (board, legal moves, turn, winner, …) — narrowing `displayState`/`data.game.state` to their own
+ * `kind` the way the base class can't — implement `activeSeat` by mapping that state to a generic seat
+ * index, and call `submitMove` after validating a move is theirs to make.
  */
 export abstract class Room {
 	error = $state<string | null>(null);
@@ -15,6 +16,7 @@ export abstract class Room {
 	#kind: GameType;
 	#getCode: () => string;
 	#room: UseQueryReturn<typeof api.models.rooms.index.get>;
+	#history: UseQueryReturn<typeof api.models.games.index.history>;
 	#play = useMutation(api.models.rooms.index.play);
 	#rematch = useMutation(api.models.rooms.index.rematch);
 	#resign = useMutation(api.models.games.index.resign);
@@ -27,6 +29,10 @@ export abstract class Room {
 
 	#isClaimingTimeout = $state(false);
 	#frozenRemaining = $state<[number, number] | null>(null);
+
+	/** Local scrubber position into this round's move history; null means "live" (always the latest state).
+	 *  Purely a per-browser viewing cursor — never sent to the server and never affects the real game. */
+	#cursor = $state<number | null>(null);
 
 	/** `getRound` pins the room to a specific past round (e.g. from a `/:round` URL segment) instead of
 	 *  always following the live one. Omit it, or have it return undefined, to always track the live round. */
@@ -41,6 +47,10 @@ export abstract class Room {
 			code: this.#getCode(),
 			round: getRound()
 		}));
+		this.#history = useQuery(api.models.games.index.history, () => ({
+			code: this.#getCode(),
+			round: getRound()
+		}));
 		this.#tick = setInterval(() => (this.#now = Date.now()), 1000);
 
 		$effect(() => {
@@ -49,6 +59,11 @@ export abstract class Room {
 				return;
 			}
 			this.#frozenRemaining = null;
+		});
+
+		$effect(() => {
+			// A round reset clears history server-side; drop any stale cursor back to live.
+			if (this.#historyMoves.length === 0) this.#cursor = null;
 		});
 
 		// Auto-claims the timeout as soon as this browser's live countdown reaches zero for the active
@@ -112,8 +127,55 @@ export abstract class Room {
 	 *  or the round is over) — each `*Room` subclass maps its own turn/winner state to a seat index. */
 	abstract get activeSeat(): 0 | 1 | null;
 
+	/** Frozen (not ticking) while reviewing history by default — a subclass can override for its own
+	 *  additional freeze conditions, but every game freezes the clock display while scrubbing. */
 	protected get isClockDisplayFrozen(): boolean {
-		return false;
+		return this.isViewingHistory;
+	}
+
+	get #historyMoves() {
+		return this.#history.data ?? [];
+	}
+
+	/** Index of the latest played move this round, or -1 before any move has been made. */
+	#latestIndex = $derived(this.#historyMoves.length - 1);
+
+	/** True while this browser is scrubbed away from the live position — purely local, doesn't affect the room. */
+	isViewingHistory = $derived(this.#cursor !== null);
+
+	/** 1-based position currently shown, for a "move X of Y" indicator. */
+	viewedMoveNumber = $derived((this.#cursor ?? this.#latestIndex) + 1);
+	historyLength = $derived(this.#historyMoves.length);
+
+	/** The live game state, or the historical snapshot at the scrub cursor. Subclasses narrow this to
+	 *  their own game's `kind` the same way they narrow the live state off `data.game.state`. */
+	protected displayState = $derived.by((): GameState | null => {
+		if (this.#cursor === null) return this.data?.game.state ?? null;
+		return this.#historyMoves[this.#cursor]?.state ?? this.data?.game.state ?? null;
+	});
+
+	/** Step one move back in this round's history. A no-op past the first move. Local only. */
+	stepBack(): void {
+		if (this.#historyMoves.length === 0) return;
+		const current = this.#cursor ?? this.#latestIndex;
+		this.#cursor = Math.max(0, current - 1);
+	}
+
+	/** Step one move toward the present. Reaching the latest move returns to the live position. Local only. */
+	stepForward(): void {
+		if (this.#cursor === null) return;
+		this.#cursor = this.#cursor + 1 >= this.#latestIndex ? null : this.#cursor + 1;
+	}
+
+	/** Jump to the live position. Local only. */
+	jumpToLatest(): void {
+		this.#cursor = null;
+	}
+
+	/** Jump to the first move of this round. Local only. */
+	jumpToFirst(): void {
+		if (this.#historyMoves.length === 0) return;
+		this.#cursor = 0;
 	}
 
 	#liveRemaining = $derived.by((): [number, number] => {
@@ -155,6 +217,7 @@ export abstract class Room {
 	async rematch(): Promise<void> {
 		if (!this.game.isLive) return;
 
+		this.#cursor = null;
 		this.error = null;
 		try {
 			await this.#rematch({ code: this.#getCode() });
