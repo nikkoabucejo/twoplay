@@ -241,7 +241,7 @@
 								false
 							)}
 						{:else if status.type === "draw"}
-							<span class="font-semibold text-muted-foreground">Draw</span>
+							<span class="font-semibold text-muted-foreground">DRAW</span>
 						{:else}
 							{@render turnIndicator(status.player, "Turn", true)}
 						{/if}

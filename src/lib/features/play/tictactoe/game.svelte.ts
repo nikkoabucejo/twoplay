@@ -58,7 +58,12 @@ export class TictactoeRoom extends Room {
 		this.data && this.data.game.state.kind === "tictactoe" ? this.data.game.state : null
 	);
 	#liveBoards = $derived(this.#state?.boards ?? []);
-	#liveMetaStatus = $derived(statusOf(this.#liveBoards.map((board) => statusOf(board).winner)));
+	#liveBoardStatuses = $derived(this.#liveBoards.map(statusOf));
+	#liveMetaStatus = $derived(statusOf(this.#liveBoardStatuses.map((s) => s.winner)));
+	#liveIsOver = $derived(
+		this.#liveMetaStatus.winner !== null ||
+			this.#liveBoardStatuses.every((s) => s.status !== "playing")
+	);
 	#liveTurn = $derived(turnOf(this.#liveBoards));
 
 	/** The board snapshot currently shown: the cursor's historical snapshot, or the live state when live. */
@@ -68,12 +73,18 @@ export class TictactoeRoom extends Room {
 	statuses = $derived(this.boards.map(statusOf));
 	mySymbol = $derived<Player | null>(this.myIndex === null ? null : markOf(this.myIndex));
 
-	/** Each board's own winner treated as a meta 3x3 grid — three boards in a line wins the room. */
+	/** Each board's own winner treated as a meta 3x3 grid — three boards in a line wins the room.
+	 *  A drawn board contributes null, same as an empty cell, so it can't complete a meta line —
+	 *  meaning the meta board alone can't tell a draw apart from boards still in progress. */
 	metaBoard = $derived<Board>(this.statuses.map((s) => s.winner));
 	metaStatus = $derived(statusOf(this.metaBoard));
 	winner = $derived(this.metaStatus.winner);
 	winningLine = $derived(this.metaStatus.winningLine);
-	isOver = $derived(this.metaStatus.status !== "playing");
+	/** The room is over once a meta line is won, or every individual board has finished (won or drawn) —
+	 *  checking metaStatus alone would miss a draw, since drawn boards never fill the meta board. */
+	isOver = $derived(
+		this.winner !== null || this.statuses.every((s) => s.status !== "playing")
+	);
 
 	/** Whose mark lands next across the whole room, derived from total filled cells — no state to fall out of sync. */
 	turn = $derived(turnOf(this.boards));
@@ -82,7 +93,7 @@ export class TictactoeRoom extends Room {
 		this.game.isLive &&
 			this.#state !== null &&
 			this.game.endedSeat === null &&
-			this.#liveMetaStatus.status === "playing"
+			!this.#liveIsOver
 			? playerIndexOf(this.#liveTurn)
 			: null
 	);

@@ -16,8 +16,10 @@
 	// off the seat number alone without knowing which game (or symbol/color scheme) is live.
 	const activeSeat = $derived(mood.status?.type === "turn" ? mood.status.player : null);
 	const winnerSeat = $derived(mood.status?.type === "winner" ? mood.status.player : null);
+	const isDraw = $derived(mood.status?.type === "draw");
 
 	function moodScale(seat: 0 | 1) {
+		if (isDraw) return 1;
 		if (winnerSeat !== null) return winnerSeat === seat ? 1.9 : 0.2;
 		if (activeSeat === seat) return 1.3;
 		if (activeSeat !== null) return 0.85;
@@ -25,6 +27,7 @@
 	}
 
 	function moodOpacity(seat: 0 | 1) {
+		if (isDraw) return 1;
 		if (winnerSeat !== null) return winnerSeat === seat ? 1 : 0;
 		if (activeSeat === seat) return 1;
 		if (activeSeat !== null) return 0.75;
@@ -84,7 +87,12 @@
 {/snippet}
 
 <div class="relative flex min-h-svh flex-col overflow-hidden">
-	<div class="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+	<div
+		class={cn(
+			"pointer-events-none absolute inset-0 -z-10 overflow-hidden transition-[filter] duration-1400 ease-out",
+			isDraw && "grayscale saturate-0"
+		)}
+	>
 		{@render cloud(
 			0,
 			"bg-cyan-500/20",
