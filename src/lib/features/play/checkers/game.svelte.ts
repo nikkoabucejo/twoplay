@@ -1,4 +1,9 @@
-import { computeLegalMoves } from "../../../../../convex/models/games/checkers/rules.js";
+import {
+	colorOfPlayer,
+	computeLegalMoves,
+	otherPlayer,
+	playerIndexOf
+} from "../../../../../convex/models/games/checkers/rules.js";
 import { Room } from "$lib/utils/multiplayer";
 import type { Board, Move, PieceColor } from "./types.js";
 
@@ -14,17 +19,22 @@ export class CheckersRoom extends Room {
 		super("checkers", getCode, getRound);
 	}
 
-	#state = $derived(this.data && this.data.game.state.kind === "checkers" ? this.data.game.state : null);
-	#liveTurn = $derived<PieceColor>(this.#state?.turn ?? "cyan");
-	#liveLegalMoves = $derived(
-		computeLegalMoves(this.#state?.board ?? [], this.#liveTurn, this.#state?.mustContinueFrom ?? null)
+	#state = $derived(
+		this.data && this.data.game.state.kind === "checkers" ? this.data.game.state : null
 	);
-	/** No legal moves for the side to move means that side is out of moves or pieces — the other color wins. */
+	#liveTurn = $derived<PieceColor>(this.#state?.turn ?? colorOfPlayer(0));
+	#liveLegalMoves = $derived(
+		computeLegalMoves(
+			this.#state?.board ?? [],
+			this.#liveTurn,
+			this.#state?.mustContinueFrom ?? null
+		)
+	);
+	/** No legal moves for player 1 or player 2 (whichever is to move) means they're out of moves or
+	 *  pieces — the other player wins. */
 	#liveWinner = $derived<PieceColor | null>(
 		this.#state !== null && this.#liveLegalMoves.length === 0
-			? this.#liveTurn === "cyan"
-				? "pink"
-				: "cyan"
+			? colorOfPlayer(otherPlayer(playerIndexOf(this.#liveTurn)))
 			: null
 	);
 
@@ -32,7 +42,7 @@ export class CheckersRoom extends Room {
 	#displayState = $derived(this.displayState?.kind === "checkers" ? this.displayState : null);
 
 	board = $derived<Board>(this.#displayState?.board ?? []);
-	turn = $derived<PieceColor>(this.#displayState?.turn ?? "cyan");
+	turn = $derived<PieceColor>(this.#displayState?.turn ?? colorOfPlayer(0));
 	mustContinueFrom = $derived(this.#displayState?.mustContinueFrom ?? null);
 
 	legalMoves = $derived(computeLegalMoves(this.board, this.turn, this.mustContinueFrom));
@@ -45,9 +55,7 @@ export class CheckersRoom extends Room {
 		return this.legalMoves.some((move) => move.from === this.selected) ? this.selected : null;
 	});
 
-	myColor = $derived<PieceColor | null>(
-		this.data?.myIndex === 0 ? "cyan" : this.data?.myIndex === 1 ? "pink" : null
-	);
+	myColor = $derived<PieceColor | null>(this.myIndex === null ? null : colorOfPlayer(this.myIndex));
 	isMyTurn = $derived(
 		this.game.isLive &&
 			!this.isViewingHistory &&
@@ -57,17 +65,13 @@ export class CheckersRoom extends Room {
 
 	winner = $derived<PieceColor | null>(
 		this.#displayState !== null && this.legalMoves.length === 0
-			? this.turn === "cyan"
-				? "pink"
-				: "cyan"
+			? colorOfPlayer(otherPlayer(playerIndexOf(this.turn)))
 			: null
 	);
 
 	override activeSeat = $derived<0 | 1 | null>(
 		this.game.isLive && this.game.endedSeat === null && this.#liveWinner === null
-			? this.#liveTurn === "cyan"
-				? 0
-				: 1
+			? playerIndexOf(this.#liveTurn)
 			: null
 	);
 

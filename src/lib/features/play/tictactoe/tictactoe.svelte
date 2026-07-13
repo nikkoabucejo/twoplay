@@ -13,6 +13,7 @@
 	import { api } from "../../../../../convex/_generated/api.js";
 	import { DEFAULT_EMOJI } from "../../../../../convex/models/players/index.js";
 	import { TictactoeRoom } from "./game.svelte.js";
+	import { playerIndexOf } from "./types.js";
 	import type { Board as CellBoard } from "./types.js";
 
 	const MARK_DURATION = 240;
@@ -68,7 +69,8 @@
 	});
 
 	$effect(() => {
-		if (room.wrongGameType && data) goto(resolve(`/${data.type}/${roomCode}`), { replaceState: true });
+		if (room.wrongGameType && data)
+			goto(resolve(`/${data.type}/${roomCode}`), { replaceState: true });
 	});
 
 	$effect(() => () => room.dispose());
@@ -126,15 +128,15 @@
 					reason: room.game.endReason ?? undefined
 				}
 			: room.winner
-				? { type: "winner", player: room.winner === "X" ? 0 : 1 }
+				? { type: "winner", player: playerIndexOf(room.winner) }
 				: room.isOver
 					? { type: "draw" }
-					: { type: "turn", player: room.turn === "X" ? 0 : 1 }
+					: { type: "turn", player: playerIndexOf(room.turn) }
 	);
 </script>
 
 {#snippet mark(value: "X" | "O", size: string = "h-3/5 w-3/5")}
-	<svg viewBox="0 0 24 24" class={size} in:liquidIn={{ seat: value === "X" ? 0 : 1 }}>
+	<svg viewBox="0 0 24 24" class={size} in:liquidIn={{ seat: playerIndexOf(value) }}>
 		{#if value === "X"}
 			<line
 				x1="7"
@@ -186,8 +188,7 @@
 					class={cn(
 						"flex items-center justify-center rounded-md bg-background/90 shadow-sm backdrop-blur-md transition-colors",
 						"hover:bg-background/95 disabled:cursor-not-allowed",
-						cell === "X" && ACCENTS[0].text,
-						cell === "O" && ACCENTS[1].text
+						cell !== null && ACCENTS[playerIndexOf(cell)].text
 					)}
 					disabled={cell !== null || !room.canPlay(boardIndex)}
 					aria-label={cell ? `Cell ${cellIndex + 1}, ${cell}` : `Cell ${cellIndex + 1}, empty`}
@@ -206,7 +207,7 @@
 					viewBox="0 0 3 3"
 					class={cn(
 						"pointer-events-none absolute inset-0 h-full w-full",
-						status.winner === "X" ? ACCENTS[0].text : ACCENTS[1].text
+						ACCENTS[playerIndexOf(status.winner)].text
 					)}
 				>
 					<line
@@ -224,9 +225,10 @@
 			<div
 				class={cn(
 					"absolute inset-0 flex items-center justify-center rounded-xl backdrop-blur-[3px] transition-colors",
-					status.winner === "X"
-						? cn(ACCENTS[0].winBg, ACCENTS[0].text)
-						: cn(ACCENTS[1].winBg, ACCENTS[1].text)
+					cn(
+						ACCENTS[playerIndexOf(status.winner)].winBg,
+						ACCENTS[playerIndexOf(status.winner)].text
+					)
 				)}
 				in:fade={{ duration: MARK_DURATION }}
 			>
@@ -327,7 +329,7 @@
 							viewBox="0 0 3 3"
 							class={cn(
 								"pointer-events-none absolute inset-0 h-full w-full",
-								room.winner === "X" ? ACCENTS[0].text : ACCENTS[1].text
+								ACCENTS[playerIndexOf(room.winner ?? "O")].text
 							)}
 						>
 							<line

@@ -94,7 +94,7 @@ export abstract class Room {
 	wrongGameType = $derived.by(() => this.data != null && this.data.type !== this.#kind);
 
 	/** The two seats' player info — name, emoji, and running score — indexed by seat, each game maps
-	 *  0/1 to its own domain labels (X/O, cyan/pink, …) itself; this class only knows about generic seats. */
+	 *  0/1 to its own domain labels (X/O, player 1/player 2, …) itself; this class only knows about generic seats. */
 	players = $derived(this.data?.players ?? [null, null]);
 
 	/** Which seat the viewer occupies, or null when spectating/not yet joined. Both games are two-seat,

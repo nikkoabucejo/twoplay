@@ -16,7 +16,7 @@
 		<div class="relative">
 			<Sparkle colors={["#06b6d4", "#ec4899"]} class="-inset-x-8 -inset-y-4 -z-10" />
 			<h1 class="text-3xl font-bold tracking-tight">
-				<span class="title-cyan">TWO</span><span class="title-pink">PLAY</span>
+				<span class="title-player1">TWO</span><span class="title-player2">PLAY</span>
 			</h1>
 		</div>
 		<p class="text-muted-foreground">Pick a game to create or join a room.</p>
@@ -44,14 +44,14 @@
 </div>
 
 <style>
-	/* "TWO" mirrors seat 0's cyan and "PLAY" mirrors seat 1's pink (see $lib/utils/style/accents) —
+	/* "TWO" mirrors player 1's accent and "PLAY" mirrors player 2's (see $lib/utils/style/accents) —
 	   the wordmark itself echoes the app's two-player duality instead of an arbitrary gradient. */
-	.title-cyan {
+	.title-player1 {
 		color: #06b6d4;
-		animation: glow-pulse-cyan 3s ease-in-out infinite;
+		animation: glow-pulse-player1 3s ease-in-out infinite;
 	}
 
-	@keyframes glow-pulse-cyan {
+	@keyframes glow-pulse-player1 {
 		0%,
 		100% {
 			text-shadow:
@@ -67,12 +67,12 @@
 		}
 	}
 
-	.title-pink {
+	.title-player2 {
 		color: #ec4899;
-		animation: glow-pulse-pink 3s ease-in-out infinite;
+		animation: glow-pulse-player2 3s ease-in-out infinite;
 	}
 
-	@keyframes glow-pulse-pink {
+	@keyframes glow-pulse-player2 {
 		0%,
 		100% {
 			text-shadow:

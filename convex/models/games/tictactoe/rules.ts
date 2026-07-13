@@ -1,7 +1,13 @@
 import type { Infer } from "convex/values";
+import { playerSymbols } from "../engine.js";
 import type { tictactoeState } from "./schema.js";
 
 export type Cell = Infer<typeof tictactoeState>["boards"][number][number];
+export type Mark = NonNullable<Cell>;
+
+/** The only place a mark's persisted literal is read as, or built from, a player index —
+ *  everywhere else in game logic should think in terms of player 1 / player 2, not "X" / "O". */
+export const { indexOf: playerIndexOf, symbolOf: markOf } = playerSymbols<Mark>(["X", "O"]);
 
 export const WINNING_LINES: readonly (readonly [number, number, number])[] = [
 	[0, 1, 2],

@@ -13,17 +13,14 @@
 	import { api } from "../../../../../convex/_generated/api.js";
 	import { DEFAULT_EMOJI } from "../../../../../convex/models/players/index.js";
 	import { CheckersRoom } from "./game.svelte.js";
-	import type { Piece } from "./types.js";
+	import { playerIndexOf, type Piece } from "./types.js";
 
 	const PIECE_DURATION = 220;
 
 	/** A gooey pop-in, matching the tic-tac-toe mark: an overshooting scale-up so a piece feels dropped onto the board. */
 	function liquidIn(
 		_node: Element,
-		{
-			duration = PIECE_DURATION,
-			delay = 0
-		}: { duration?: number; delay?: number } = {}
+		{ duration = PIECE_DURATION, delay = 0 }: { duration?: number; delay?: number } = {}
 	) {
 		return {
 			delay,
@@ -62,7 +59,8 @@
 	});
 
 	$effect(() => {
-		if (room.wrongGameType && data) goto(resolve(`/${data.type}/${roomCode}`), { replaceState: true });
+		if (room.wrongGameType && data)
+			goto(resolve(`/${data.type}/${roomCode}`), { replaceState: true });
 	});
 
 	$effect(() => () => room.dispose());
@@ -84,7 +82,7 @@
 	}
 
 	function seatFor(piece: Piece | null | undefined) {
-		return piece?.color === "pink" ? 1 : 0;
+		return piece ? playerIndexOf(piece.color) : 0;
 	}
 
 	function select(index: number) {
@@ -144,19 +142,20 @@
 					reason: room.game.endReason ?? undefined
 				}
 			: room.winner
-				? { type: "winner", player: room.winner === "cyan" ? 0 : 1 }
-				: { type: "turn", player: room.turn === "cyan" ? 0 : 1 }
+				? { type: "winner", player: playerIndexOf(room.winner) }
+				: { type: "turn", player: playerIndexOf(room.turn) }
 	);
 
-	/** Cyan starts at the bottom of the raw board; flip so pink's own pieces are always nearest them too. */
-	const flip = $derived(room.myColor === "pink");
+	/** Player 1's pieces start at the bottom of the raw board; flip it so player 2 sees their own
+	 *  pieces nearest them too. */
+	const flip = $derived(room.myIndex === 1);
 </script>
 
 {#snippet piece(p: Piece, isSelected: boolean)}
 	<div
 		class={cn(
 			"relative flex h-4/5 w-4/5 items-center justify-center rounded-full shadow-md",
-			p.color === "cyan" ? ACCENTS[0].bg : ACCENTS[1].bg
+			ACCENTS[playerIndexOf(p.color)].bg
 		)}
 		in:liquidIn
 	>
@@ -280,7 +279,7 @@
 								)}
 								disabled={!dark}
 								aria-label={cell
-									? `Row ${row + 1}, column ${col + 1}, ${cell.color}${cell.king ? " king" : ""}`
+									? `Row ${row + 1}, column ${col + 1}, player ${playerIndexOf(cell.color) + 1}${cell.king ? " king" : ""}`
 									: `Row ${row + 1}, column ${col + 1}, empty`}
 								onclick={() => select(index)}
 							>

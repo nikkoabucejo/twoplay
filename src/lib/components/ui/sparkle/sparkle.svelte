@@ -3,7 +3,7 @@
 	import type { AnimationItem } from "lottie-web";
 
 	export type SparkleProps = {
-		/** Two hex colors, one per sparkle group — e.g. the app's cyan/pink seat accents. */
+		/** Two hex colors, one per sparkle group — e.g. the app's player 1/player 2 seat accents. */
 		colors: [string, string];
 		class?: string;
 	};

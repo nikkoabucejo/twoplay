@@ -1,6 +1,8 @@
-import type { Cell } from "../../../../../convex/models/games/tictactoe/rules.js";
+import { markOf, playerIndexOf } from "../../../../../convex/models/games/tictactoe/rules.js";
+import type { Cell, Mark } from "../../../../../convex/models/games/tictactoe/rules.js";
 
-export type Player = "X" | "O";
+export type Player = Mark;
+export { markOf, playerIndexOf };
 export type { Cell };
 export type Board = Cell[];
 export type GameStatus = "playing" | "won" | "draw";

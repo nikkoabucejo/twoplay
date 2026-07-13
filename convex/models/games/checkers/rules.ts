@@ -1,4 +1,5 @@
 import type { Infer } from "convex/values";
+import { otherPlayer, playerSymbols } from "../engine.js";
 import type { checkersState } from "./schema.js";
 
 export type Square = Infer<typeof checkersState>["board"][number];
@@ -7,6 +8,15 @@ export type PieceColor = Piece["color"];
 export type Move = { from: number; to: number; captured: number | null };
 
 export const SIZE = 8;
+
+/** The only place a piece's persisted color literal is read as, or built from, a player index —
+ *  everywhere else in game logic should think in terms of player 1 / player 2, not "cyan" / "pink". */
+export const { indexOf: playerIndexOf, symbolOf: colorOfPlayer } = playerSymbols<PieceColor>([
+	"cyan",
+	"pink"
+]);
+
+export { otherPlayer };
 
 const KING_DIRECTIONS: readonly [number, number][] = [
 	[-1, -1],
@@ -29,7 +39,7 @@ export function inBounds(row: number, col: number): boolean {
 
 export function directionsFor(piece: Piece): readonly [number, number][] {
 	if (piece.king) return KING_DIRECTIONS;
-	return piece.color === "cyan"
+	return playerIndexOf(piece.color) === 0
 		? [
 				[-1, -1],
 				[-1, 1]

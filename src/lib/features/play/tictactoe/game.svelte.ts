@@ -1,5 +1,7 @@
 import {
 	hasOtherPlayableBoard,
+	markOf,
+	playerIndexOf,
 	WINNING_LINES
 } from "../../../../../convex/models/games/tictactoe/rules.js";
 import { Room } from "$lib/utils/multiplayer";
@@ -34,11 +36,11 @@ function statusOf(board: Board): BoardStatus {
 }
 
 function turnOf(boards: Board[]): Player {
-	return boards.reduce((sum, board) => sum + board.filter((cell) => cell !== null).length, 0) %
-		2 ===
+	const totalFilled = boards.reduce(
+		(sum, board) => sum + board.filter((cell) => cell !== null).length,
 		0
-		? "X"
-		: "O";
+	);
+	return markOf(totalFilled % 2);
 }
 
 /**
@@ -52,7 +54,9 @@ export class TictactoeRoom extends Room {
 		super("tictactoe", getCode, getRound);
 	}
 
-	#state = $derived(this.data && this.data.game.state.kind === "tictactoe" ? this.data.game.state : null);
+	#state = $derived(
+		this.data && this.data.game.state.kind === "tictactoe" ? this.data.game.state : null
+	);
 	#liveBoards = $derived(this.#state?.boards ?? []);
 	#liveMetaStatus = $derived(statusOf(this.#liveBoards.map((board) => statusOf(board).winner)));
 	#liveTurn = $derived(turnOf(this.#liveBoards));
@@ -62,9 +66,7 @@ export class TictactoeRoom extends Room {
 
 	boards = $derived(this.#displayState?.boards ?? []);
 	statuses = $derived(this.boards.map(statusOf));
-	mySymbol = $derived<Player | null>(
-		this.data?.myIndex === 0 ? "X" : this.data?.myIndex === 1 ? "O" : null
-	);
+	mySymbol = $derived<Player | null>(this.myIndex === null ? null : markOf(this.myIndex));
 
 	/** Each board's own winner treated as a meta 3x3 grid — three boards in a line wins the room. */
 	metaBoard = $derived<Board>(this.statuses.map((s) => s.winner));
@@ -81,9 +83,7 @@ export class TictactoeRoom extends Room {
 			this.#state !== null &&
 			this.game.endedSeat === null &&
 			this.#liveMetaStatus.status === "playing"
-			? this.#liveTurn === "X"
-				? 0
-				: 1
+			? playerIndexOf(this.#liveTurn)
 			: null
 	);
 

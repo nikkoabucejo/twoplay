@@ -1,6 +1,12 @@
 import type { Infer } from "convex/values";
 import type { GameEngine, GameStatus } from "../engine.js";
-import { hasOtherPlayableBoard, isBoardFinished, metaWinnerOf } from "./rules.js";
+import {
+	hasOtherPlayableBoard,
+	isBoardFinished,
+	markOf,
+	metaWinnerOf,
+	playerIndexOf
+} from "./rules.js";
 import { tictactoeMove, tictactoeState } from "./schema.js";
 
 export type TictactoeState = Infer<typeof tictactoeState>;
@@ -8,10 +14,6 @@ export type TictactoeMove = Infer<typeof tictactoeMove>;
 
 const BOARD_COUNT = 9;
 const CELLS_PER_BOARD = 9;
-
-function roleLabel(index: number): "X" | "O" {
-	return index === 0 ? "X" : "O";
-}
 
 function createInitialState(): TictactoeState {
 	return {
@@ -30,7 +32,7 @@ function status(state: TictactoeState): GameStatus {
 	const turnIndex = totalFilled % 2 === 0 ? 0 : 1;
 
 	const metaWinner = metaWinnerOf(state.boards);
-	if (metaWinner) return { turnIndex, winnerIndex: metaWinner === "X" ? 0 : 1, isOver: true };
+	if (metaWinner) return { turnIndex, winnerIndex: playerIndexOf(metaWinner), isOver: true };
 
 	const allBoardsFinished = state.boards.every(isBoardFinished);
 	return { turnIndex, winnerIndex: null, isOver: allBoardsFinished };
@@ -46,7 +48,7 @@ function applyMove(
 	playerIndex: number,
 	move: TictactoeMove
 ): TictactoeState {
-	const symbol = roleLabel(playerIndex);
+	const symbol = markOf(playerIndex);
 	const board = state.boards[move.boardIndex];
 	if (!board || isBoardFinished(board) || board[move.cellIndex] !== null) return state;
 

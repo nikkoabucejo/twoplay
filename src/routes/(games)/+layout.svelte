@@ -11,9 +11,9 @@
 	const auth = getClerkAuth();
 	const mood = setupMood();
 
-	// Seat 0 is always cyan and seat 1 is always pink, the fixed convention every
-	// game uses (see $lib/utils/style/accents) — so the background can key off the
-	// seat number alone without knowing which game (or symbol/color scheme) is live.
+	// Seat 0 is always player 1's accent and seat 1 is always player 2's, the fixed
+	// convention every game uses (see $lib/utils/style/accents) — so the background can key
+	// off the seat number alone without knowing which game (or symbol/color scheme) is live.
 	const activeSeat = $derived(mood.status?.type === "turn" ? mood.status.player : null);
 	const winnerSeat = $derived(mood.status?.type === "winner" ? mood.status.player : null);
 
