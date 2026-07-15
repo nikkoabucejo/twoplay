@@ -6,4 +6,6 @@ import { v } from "convex/values";
 export const ratingsTable = defineTable({
 	userId: v.id("users"),
 	rating: v.number()
-}).index("byUser", ["userId"]);
+})
+	.index("byUser", ["userId"])
+	.index("byRating", ["rating"]);

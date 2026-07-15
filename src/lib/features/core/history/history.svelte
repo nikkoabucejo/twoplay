@@ -58,7 +58,7 @@
 		{/if}
 
 		<Feed>
-			<ul class="flex flex-col gap-3 py-1">
+			<ul class="flex flex-col gap-2 py-1">
 				{#each history.data as room (room.code)}
 					{@const isActive = activeRoom.data?.code === room.code}
 					<Tile highlighted={isActive}>

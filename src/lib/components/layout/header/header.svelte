@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Gamepad2, History, House, LogOut, Users } from "@lucide/svelte";
+	import { Gamepad2, History, House, LogOut, Trophy, Users } from "@lucide/svelte";
 	import { Button } from "$lib/components/ui";
 	import { getClerkAuth } from "$lib/services/auth";
 
@@ -55,6 +55,14 @@
 				>
 					<History class="size-5 sm:size-4" />
 					<span class="hidden text-sm sm:inline">History</span>
+				</a>
+				<a
+					href="/leaderboard"
+					aria-label="Leaderboard"
+					class="flex items-center gap-1.5 rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:px-2.5 sm:py-1.5"
+				>
+					<Trophy class="size-5 sm:size-4" />
+					<span class="hidden text-sm sm:inline">Leaderboard</span>
 				</a>
 			</nav>
 		{/if}

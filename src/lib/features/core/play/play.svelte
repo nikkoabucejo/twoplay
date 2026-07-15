@@ -169,9 +169,9 @@
 	</div>
 {:else}
 	<div class="flex min-h-0 flex-1 flex-col items-center justify-center px-4 py-8 text-center">
-		<div class="relative w-full max-w-xs">
+		<div class="flex w-full max-w-md flex-col items-center">
 			<div
-				class="absolute bottom-full left-1/2 mb-4 flex h-36 w-full max-w-md -translate-x-1/2 items-center justify-center overflow-hidden mask-[linear-gradient(to_right,transparent,black_12%,black_88%,transparent)]"
+				class="relative mb-4 flex h-36 w-full items-center justify-center overflow-hidden mask-[linear-gradient(to_right,transparent,black_12%,black_88%,transparent)]"
 			>
 				{#each ENTRIES as entry, index (index)}
 					{@const offset = index - centerIndex}
@@ -216,7 +216,7 @@
 			</div>
 
 			{#if !auth.isSignedIn}
-				<div class="flex flex-col items-center gap-3">
+				<div class="flex w-full max-w-xs flex-col items-center gap-3">
 					<p class="text-muted-foreground">Sign in to create or join a room.</p>
 					<Button onclick={() => auth.signIn()}>Sign in</Button>
 				</div>

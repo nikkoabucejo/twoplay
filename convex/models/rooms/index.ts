@@ -1,6 +1,12 @@
 import { v } from "convex/values";
 import type { Doc, Id } from "../../_generated/dataModel";
-import { internalMutation, mutation, query, type MutationCtx } from "../../_generated/server";
+import {
+	internalMutation,
+	mutation,
+	query,
+	type MutationCtx,
+	type QueryCtx
+} from "../../_generated/server";
 import { clockByGameAndPlayer, clocksByGame } from "../clocks/index.js";
 import { otherPlayer } from "../games/engine.js";
 import {
@@ -504,6 +510,28 @@ export type RoomHistoryEntry = {
 	games: GameHistoryEntry[];
 };
 
+/** "win"/"loss"/"draw" once this round has ended for the player seated at `myIndex`, else "playing".
+ *  Takes the round's own `results` rows rather than fetching them itself, since every caller already
+ *  needs that same query for its own purposes (the settled MMR delta, in `history`'s case). Shared by
+ *  `history` (per-round display) and `stats` (aggregate win rate) so the two never classify the same
+ *  round differently. */
+function classifyGameResult(
+	room: Doc<"rooms">,
+	myIndex: number,
+	game: Doc<"games">,
+	results: Doc<"results">[]
+): GameHistoryEntry["result"] {
+	const endedResult = results.find((r) => r.state !== undefined);
+	const status = gameStatus(room.type, game.state);
+	const isOver = endedResult !== undefined || (status?.isOver ?? false);
+	if (!isOver) return "playing";
+
+	const winnerIndex = endedResult
+		? otherPlayer(room.players.indexOf(endedResult.playerId))
+		: roundWinner(room.type, game.state);
+	return winnerIndex === null ? "draw" : winnerIndex === myIndex ? "win" : "loss";
+}
+
 /** Every room the caller has ever played in, most recently active first, each with its own rounds
  *  most-recent-round-first — powers the signed-in-only history page. Walks rooms via the player's
  *  own rows rather than a single indexed scan since a round's outcome depends on that room's own
@@ -534,18 +562,7 @@ export const history = query({
 				const entries = await Promise.all(
 					games.map(async (game): Promise<GameHistoryEntry> => {
 						const results = await resultsByGame(ctx, game._id);
-						const endedResult = results.find((r) => r.state !== undefined);
-						const status = gameStatus(room.type, game.state);
-						const isOver = endedResult !== undefined || (status?.isOver ?? false);
-
-						let result: GameHistoryEntry["result"] = "playing";
-						if (isOver) {
-							const winnerIndex = endedResult
-								? otherPlayer(room.players.indexOf(endedResult.playerId))
-								: roundWinner(room.type, game.state);
-							result = winnerIndex === null ? "draw" : winnerIndex === myIndex ? "win" : "loss";
-						}
-
+						const result = classifyGameResult(room, myIndex, game, results);
 						const myResult = results.find((r) => r.playerId === player._id);
 
 						return {
@@ -571,6 +588,81 @@ export const history = query({
 		return rooms
 			.filter((room): room is RoomHistoryEntry => room !== null && room.games.length > 0)
 			.sort((a, b) => b.games[0]!.createdAt - a.games[0]!.createdAt);
+	}
+});
+
+export type PlayerStats = {
+	totalGames: number;
+	wins: number;
+	/** Whole-number percentage, 0 when `totalGames` is 0. */
+	winRate: number;
+};
+
+/** Aggregate win/loss/draw totals across every finished round a user has ever played — the shared
+ *  body behind `stats` (the caller's own line on the leaderboard hero) and `statsForUsers` (every
+ *  row's line in the leaderboard list). */
+async function computePlayerStats(ctx: QueryCtx, userId: Id<"users">): Promise<PlayerStats> {
+	const playerRows = await ctx.db
+		.query("players")
+		.withIndex("byUser", (q) => q.eq("userId", userId))
+		.collect();
+
+	let totalGames = 0;
+	let wins = 0;
+
+	await Promise.all(
+		playerRows.map(async (player) => {
+			const room = await ctx.db.get(player.roomId);
+			if (!room) return;
+
+			const myIndex = room.players.indexOf(player._id);
+			const games = await ctx.db
+				.query("games")
+				.withIndex("byRoom", (q) => q.eq("roomId", room._id))
+				.collect();
+
+			await Promise.all(
+				games.map(async (game) => {
+					const results = await resultsByGame(ctx, game._id);
+					const result = classifyGameResult(room, myIndex, game, results);
+					if (result === "playing") return;
+					totalGames++;
+					if (result === "win") wins++;
+				})
+			);
+		})
+	);
+
+	return {
+		totalGames,
+		wins,
+		winRate: totalGames === 0 ? 0 : Math.round((wins / totalGames) * 100)
+	};
+}
+
+/** Aggregate win/loss/draw totals across every finished round the caller has ever played — powers
+ *  the "Games" / "Win rate" stat line on the leaderboard's own-rating hero. */
+export const stats = query({
+	args: {},
+	async handler(ctx): Promise<PlayerStats> {
+		const user = await requireUser(ctx);
+		return computePlayerStats(ctx, user._id);
+	}
+});
+
+/** Same aggregate as `stats`, but for a batch of arbitrary users at once — powers the per-row
+ *  "Games"/"Win rate" line for every entry the leaderboard's `ratings.top` query returns. Keyed by
+ *  `userId` so the client can just index into the result rather than trusting response order. */
+export const statsForUsers = query({
+	args: { userIds: v.array(v.id("users")) },
+	async handler(ctx, { userIds }): Promise<Record<Id<"users">, PlayerStats>> {
+		const entries = await Promise.all(
+			userIds.map(async (userId): Promise<[Id<"users">, PlayerStats]> => [
+				userId,
+				await computePlayerStats(ctx, userId)
+			])
+		);
+		return Object.fromEntries(entries);
 	}
 });
 

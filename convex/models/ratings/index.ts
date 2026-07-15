@@ -8,6 +8,8 @@ export const DEFAULT_RATING = 400;
 export const MIN_RATING = 100;
 /** Flat MMR step — every decisive round is worth exactly this many points, win or lose. */
 const RATING_STEP = 8;
+/** How many rows the leaderboard shows — highest ratings first. */
+const TOP_LIMIT = 100;
 
 async function ratingRow(ctx: QueryCtx | MutationCtx, userId: Id<"users">) {
 	return await ctx.db
@@ -56,5 +58,36 @@ export const mine = query({
 		const user = await requireUser(ctx);
 		const row = await ratingRow(ctx, user._id);
 		return row?.rating ?? DEFAULT_RATING;
+	}
+});
+
+export type LeaderboardEntry = {
+	userId: Id<"users">;
+	name: string;
+	rating: number;
+	/** True for the row belonging to whoever's asking — lets the client highlight their own seat
+	 *  in the list the same way `rooms.lobbies`/`rooms.history` flag `isOwn`. */
+	isMe: boolean;
+};
+
+/** The top `TOP_LIMIT` users platform-wide by rating, highest first. */
+export const top = query({
+	args: {},
+	async handler(ctx): Promise<LeaderboardEntry[]> {
+		const user = await requireUser(ctx);
+
+		const rows = await ctx.db.query("ratings").withIndex("byRating").order("desc").take(TOP_LIMIT);
+
+		return await Promise.all(
+			rows.map(async (row): Promise<LeaderboardEntry> => {
+				const rowUser = await ctx.db.get(row.userId);
+				return {
+					userId: row.userId,
+					name: rowUser?.name ?? "Unknown",
+					rating: row.rating,
+					isMe: row.userId === user._id
+				};
+			})
+		);
 	}
 });
