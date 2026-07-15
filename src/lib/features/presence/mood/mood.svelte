@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { cn } from "$lib/utils/style";
-	import { setupMood } from "./mood.svelte.js";
+	import type { MoodPresence } from "./mood.svelte.js";
 
-	const mood = setupMood();
+	let { mood }: { mood: MoodPresence } = $props();
 
 	// Seat 0 is always player 1's accent and seat 1 is always player 2's, the fixed
 	// convention every game uses (see $lib/utils/style/accents) — so the background can key

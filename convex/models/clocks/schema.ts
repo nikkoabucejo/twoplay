@@ -10,11 +10,7 @@ export const clocksTable = defineTable({
 	remaining: v.number(),
 	// Epoch ms when this player's countdown began. Undefined while frozen — not their turn, waiting
 	// for both seats to be filled, or the round is over.
-	turnedAt: v.optional(v.number()),
-	// Set once this round has ended against this player — their clock hit zero, they resigned, or
-	// they abandoned the room outright. Blocks further moves in the round; distinguishes the causes
-	// for the client.
-	reason: v.optional(v.union(v.literal("timeout"), v.literal("resign"), v.literal("abandon")))
+	turnedAt: v.optional(v.number())
 })
 	.index("byGame", ["gameId"])
 	.index("byGameAndPlayer", ["gameId", "playerId"]);

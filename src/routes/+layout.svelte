@@ -6,12 +6,13 @@
 	import { setupConvex, setupAuth } from "convex-svelte";
 	import { PUBLIC_CONVEX_URL, PUBLIC_CLERK_PUBLISHABLE_KEY } from "$env/static/public";
 	import { Button } from "$lib/components/ui";
-	import { Mood } from "$lib/features/presence";
+	import { Mood, setupMood } from "$lib/features/presence";
 	import { setupClerkAuth } from "$lib/services/auth";
 	import type { LayoutProps } from "./$types";
 
 	let { data, children }: LayoutProps = $props();
 
+	const mood = setupMood();
 	const auth = setupClerkAuth();
 	// Seeded synchronously (not in an $effect, which never runs during SSR) so
 	// the server-verified auth state is already present in the SSR-rendered
@@ -35,7 +36,7 @@
 <svelte:head><link rel="icon" href={favicon} /></svelte:head>
 
 <div class="relative flex h-svh flex-col overflow-hidden">
-	<Mood />
+	<Mood {mood} />
 
 	<nav class="absolute inset-x-4 top-4 z-10 flex items-center justify-between">
 		<div class="flex items-center gap-4">

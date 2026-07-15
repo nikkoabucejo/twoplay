@@ -3,6 +3,7 @@ import type { Doc, Id } from "../../_generated/dataModel";
 import { mutation, query, type MutationCtx, type QueryCtx } from "../../_generated/server";
 import { clocksByGame } from "../clocks/index.js";
 import { getRoomByCode, isRoomActive, requirePlayer, requireUser } from "../rooms/auth.js";
+import { markEnded, resultsByGame } from "../results/index.js";
 import {
 	checkersEngine,
 	checkersMove,
@@ -155,8 +156,8 @@ export async function countMoves(
 	return moves.length;
 }
 
-/** Forfeits the caller's own current round in favor of their opponent — sets the same `reason`
- *  field a real clock timeout sets, tagged with the distinct "resign" cause, since both end a round
+/** Forfeits the caller's own current round in favor of their opponent — marks the same `results`
+ *  state a real clock timeout sets, tagged with the distinct "resign" cause, since both end a round
  *  identically from there on but the client still needs to tell them apart when displaying why. */
 export const resign = mutation({
 	args: { code: v.string() },
@@ -169,15 +170,17 @@ export const resign = mutation({
 		const game = await getCurrentGame(ctx, room._id);
 		if (!game) throw new Error("Game not found");
 
-		const clocks = await clocksByGame(ctx, game._id);
-		if (clocks.some((clock) => clock.reason !== undefined)) return;
+		const results = await resultsByGame(ctx, game._id);
+		if (results.some((result) => result.state !== undefined)) return;
 		const status = gameStatus(room.type, game.state);
 		if (!status || status.isOver) return;
 
+		const clocks = await clocksByGame(ctx, game._id);
 		const ownClock = clocks.find((clock) => clock.playerId === player._id);
 		if (!ownClock) throw new Error("You are not playing this round");
 
-		await ctx.db.patch(ownClock._id, { reason: "resign", turnedAt: undefined });
+		await ctx.db.patch(ownClock._id, { turnedAt: undefined });
+		await markEnded(ctx, game._id, player._id, "resign");
 	}
 });
 
@@ -195,12 +198,13 @@ export const timeout = mutation({
 		const game = await getCurrentGame(ctx, room._id);
 		if (!game) throw new Error("Game not found");
 
-		const clocks = await clocksByGame(ctx, game._id);
-		if (clocks.some((clock) => clock.reason !== undefined)) return;
+		const results = await resultsByGame(ctx, game._id);
+		if (results.some((result) => result.state !== undefined)) return;
 
 		const status = gameStatus(room.type, game.state);
 		if (!status || status.isOver) return;
 
+		const clocks = await clocksByGame(ctx, game._id);
 		const activeClock = clocks.find((clock) => clock.playerId === room.players[status.turnIndex]);
 		if (!activeClock || activeClock.turnedAt === undefined) return;
 
@@ -209,10 +213,10 @@ export const timeout = mutation({
 		if (remaining > 0) return;
 
 		await ctx.db.patch(activeClock._id, {
-			reason: "timeout",
 			remaining: 0,
 			turnedAt: undefined
 		});
+		await markEnded(ctx, game._id, activeClock.playerId, "timeout");
 	}
 });
 

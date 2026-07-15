@@ -20,6 +20,8 @@ import type * as models_games_tictactoe_engine from "../models/games/tictactoe/e
 import type * as models_games_tictactoe_index from "../models/games/tictactoe/index.js";
 import type * as models_games_tictactoe_rules from "../models/games/tictactoe/rules.js";
 import type * as models_players_index from "../models/players/index.js";
+import type * as models_ratings_index from "../models/ratings/index.js";
+import type * as models_results_index from "../models/results/index.js";
 import type * as models_rooms_auth from "../models/rooms/auth.js";
 import type * as models_rooms_index from "../models/rooms/index.js";
 import type * as models_users_index from "../models/users/index.js";
@@ -43,6 +45,8 @@ declare const fullApi: ApiFromModules<{
   "models/games/tictactoe/index": typeof models_games_tictactoe_index;
   "models/games/tictactoe/rules": typeof models_games_tictactoe_rules;
   "models/players/index": typeof models_players_index;
+  "models/ratings/index": typeof models_ratings_index;
+  "models/results/index": typeof models_results_index;
   "models/rooms/auth": typeof models_rooms_auth;
   "models/rooms/index": typeof models_rooms_index;
   "models/users/index": typeof models_users_index;

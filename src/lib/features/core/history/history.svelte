@@ -106,6 +106,16 @@
 									>
 										{RESULT_LABELS[game.result]}
 									</span>
+									{#if game.mmr !== null}
+										<span
+											class={cn(
+												"inline-block w-7 shrink-0 text-right font-mono text-[11px] font-semibold tabular-nums",
+												game.mmr > 0 ? "text-emerald-500" : "text-destructive"
+											)}
+										>
+											{game.mmr > 0 ? "+" : "-"}{Math.abs(game.mmr)}
+										</span>
+									{/if}
 									<Button href="/{room.type}/{room.code}/{game.round}" variant="outline" size="xs">
 										View
 									</Button>

@@ -17,6 +17,8 @@ import {
 	type GameType
 } from "../games/index.js";
 import { ensurePlayer, playerByUserAndRoom } from "../players/index.js";
+import { applyResult } from "../ratings/index.js";
+import { creditMmr, markEnded, resultsByGame } from "../results/index.js";
 import {
 	currentPlayer,
 	getActiveRoomForUser,
@@ -175,6 +177,8 @@ export const get = query({
 
 		const clocks = await clocksByGame(ctx, game._id);
 		const clockByPlayer = new Map(clocks.map((clock) => [clock.playerId, clock]));
+		const results = await resultsByGame(ctx, game._id);
+		const resultByPlayer = new Map(results.map((result) => [result.playerId, result]));
 
 		const seatIds = Array.from({ length: engine.playerCount }, (_, i) => room.players[i] ?? null);
 		const playerInfos = await Promise.all(
@@ -203,10 +207,10 @@ export const get = query({
 		);
 		const turnedAt = clocks.find((clock) => clock.turnedAt !== undefined)?.turnedAt;
 		const endedSeatIndex = seatIds.findIndex(
-			(id) => id !== null && clockByPlayer.get(id)?.reason !== undefined
+			(id) => id !== null && resultByPlayer.get(id)?.state !== undefined
 		);
 		const endedSeatId = endedSeatIndex >= 0 ? seatIds[endedSeatIndex] : null;
-		const reason = (endedSeatId && clockByPlayer.get(endedSeatId)?.reason) ?? null;
+		const reason = (endedSeatId && resultByPlayer.get(endedSeatId)?.state) ?? null;
 
 		return {
 			code: room.code,
@@ -249,11 +253,12 @@ export const play = mutation({
 		const game = await getCurrentGame(ctx, room._id);
 		if (!game) throw new Error("Game not found");
 
-		const clocks = await clocksByGame(ctx, game._id);
-		if (clocks.some((clock) => clock.reason !== undefined)) {
+		const results = await resultsByGame(ctx, game._id);
+		if (results.some((result) => result.state !== undefined)) {
 			throw new Error("This round is already over");
 		}
 
+		const clocks = await clocksByGame(ctx, game._id);
 		const beforeStatus = gameStatus(room.type, game.state);
 		const actingClock =
 			beforeStatus &&
@@ -317,20 +322,26 @@ export const rematch = mutation({
 		const game = await getCurrentGame(ctx, room._id);
 		if (!game) throw new Error("Game not found");
 
-		const clocks = await clocksByGame(ctx, game._id);
-		const endedClock = clocks.find((clock) => clock.reason !== undefined);
-		if (!endedClock && !gameStatus(room.type, game.state)?.isOver) {
+		const results = await resultsByGame(ctx, game._id);
+		const endedResult = results.find((result) => result.state !== undefined);
+		if (!endedResult && !gameStatus(room.type, game.state)?.isOver) {
 			throw new Error("This round isn't over yet");
 		}
-		const winnerIndex = endedClock
-			? room.players.indexOf(endedClock.playerId) === 0
-				? 1
-				: 0
+		const winnerIndex = endedResult
+			? otherPlayer(room.players.indexOf(endedResult.playerId))
 			: roundWinner(room.type, game.state);
 		if (winnerIndex !== null) {
 			const winnerId = room.players[winnerIndex];
-			const winner = await ctx.db.get(winnerId);
+			const loserId = room.players[otherPlayer(winnerIndex)];
+			const [winner, loser] = await Promise.all([ctx.db.get(winnerId), ctx.db.get(loserId)]);
 			if (winner) await ctx.db.patch(winnerId, { score: winner.score + 1 });
+			if (winner && loser) {
+				const { winnerMmr, loserMmr } = await applyResult(ctx, winner.userId, loser.userId);
+				await Promise.all([
+					creditMmr(ctx, game._id, winnerId, winnerMmr),
+					creditMmr(ctx, game._id, loserId, loserMmr)
+				]);
+			}
 		}
 
 		const timeControlMs = room.time ?? DEFAULT_TIME_CONTROL_MS;
@@ -349,23 +360,25 @@ async function forfeitRoom(ctx: MutationCtx, room: Doc<"rooms">, player: Doc<"pl
 	const hasOpponentSeat = room.players.length >= getEngine(room.type).playerCount;
 	const game = await getCurrentGame(ctx, room._id);
 	if (game) {
-		let clocks = await clocksByGame(ctx, game._id);
+		let results = await resultsByGame(ctx, game._id);
 		const status = gameStatus(room.type, game.state);
-		const alreadyEnded = clocks.some((clock) => clock.reason !== undefined);
+		const alreadyEnded = results.some((result) => result.state !== undefined);
 		if (!alreadyEnded && status && !status.isOver) {
+			const clocks = await clocksByGame(ctx, game._id);
 			const ownClock = clocks.find((clock) => clock.playerId === player._id);
 			if (ownClock) {
-				await ctx.db.patch(ownClock._id, { reason: "abandon", turnedAt: undefined });
-				clocks = await clocksByGame(ctx, game._id);
+				await ctx.db.patch(ownClock._id, { turnedAt: undefined });
+				await markEnded(ctx, game._id, player._id, "abandon");
+				results = await resultsByGame(ctx, game._id);
 			}
 		}
 
 		if (hasOpponentSeat) {
-			// Reflects either the clock just patched above, one an earlier resign/timeout already set
+			// Reflects either the result just marked above, one an earlier resign/timeout already set
 			// (nobody had called `rematch` yet to "cash it in"), or a round that finished naturally.
-			const endedClock = clocks.find((clock) => clock.reason !== undefined);
-			const winnerIndex = endedClock
-				? otherPlayer(room.players.indexOf(endedClock.playerId))
+			const endedResult = results.find((result) => result.state !== undefined);
+			const winnerIndex = endedResult
+				? otherPlayer(room.players.indexOf(endedResult.playerId))
 				: roundWinner(room.type, game.state);
 			if (winnerIndex !== null && winnerIndex !== room.players.indexOf(player._id)) {
 				const winnerId = room.players[winnerIndex];
@@ -374,6 +387,11 @@ async function forfeitRoom(ctx: MutationCtx, room: Doc<"rooms">, player: Doc<"pl
 				// mutual abandon is treated as no-contest, matching the "everyone went idle at once" case below.
 				if (winner && winner.leftAt === undefined) {
 					await ctx.db.patch(winnerId, { score: winner.score + 1 });
+					const { winnerMmr, loserMmr } = await applyResult(ctx, winner.userId, player.userId);
+					await Promise.all([
+						creditMmr(ctx, game._id, winnerId, winnerMmr),
+						creditMmr(ctx, game._id, player._id, loserMmr)
+					]);
 				}
 			}
 		}
@@ -427,10 +445,17 @@ export const sweep = internalMutation({
 					// "playing" in history forever — end its clock the same way an explicit abandon would.
 					const game = await getCurrentGame(ctx, room._id);
 					if (game) {
+						const results = await resultsByGame(ctx, game._id);
 						const clocks = await clocksByGame(ctx, game._id);
-						const ownClock = clocks.find((clock) => clock.reason === undefined);
+						const ownClock = clocks.find(
+							(clock) =>
+								!results.some(
+									(result) => result.playerId === clock.playerId && result.state !== undefined
+								)
+						);
 						if (ownClock) {
-							await ctx.db.patch(ownClock._id, { reason: "abandon", turnedAt: undefined });
+							await ctx.db.patch(ownClock._id, { turnedAt: undefined });
+							await markEnded(ctx, game._id, ownClock.playerId, "abandon");
 						}
 					}
 					await ctx.db.patch(room._id, { status: "closed", closedAt: now, reason: "empty" });
@@ -468,6 +493,7 @@ export type GameHistoryEntry = {
 	round: number;
 	createdAt: number;
 	result: "win" | "loss" | "draw" | "playing";
+	mmr: number | null;
 };
 
 export type RoomHistoryEntry = {
@@ -507,20 +533,27 @@ export const history = query({
 
 				const entries = await Promise.all(
 					games.map(async (game): Promise<GameHistoryEntry> => {
-						const clocks = await clocksByGame(ctx, game._id);
-						const endedClock = clocks.find((clock) => clock.reason !== undefined);
+						const results = await resultsByGame(ctx, game._id);
+						const endedResult = results.find((r) => r.state !== undefined);
 						const status = gameStatus(room.type, game.state);
-						const isOver = endedClock !== undefined || (status?.isOver ?? false);
+						const isOver = endedResult !== undefined || (status?.isOver ?? false);
 
 						let result: GameHistoryEntry["result"] = "playing";
 						if (isOver) {
-							const winnerIndex = endedClock
-								? otherPlayer(room.players.indexOf(endedClock.playerId))
+							const winnerIndex = endedResult
+								? otherPlayer(room.players.indexOf(endedResult.playerId))
 								: roundWinner(room.type, game.state);
 							result = winnerIndex === null ? "draw" : winnerIndex === myIndex ? "win" : "loss";
 						}
 
-						return { round: game.round, createdAt: game._creationTime, result };
+						const myResult = results.find((r) => r.playerId === player._id);
+
+						return {
+							round: game.round,
+							createdAt: game._creationTime,
+							result,
+							mmr: myResult?.mmr ?? null
+						};
 					})
 				);
 				entries.sort((a, b) => b.round - a.round);
