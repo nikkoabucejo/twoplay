@@ -3,11 +3,6 @@ export {
 	type BoardClock,
 	type BoardFooter,
 	type BoardPlayer,
-	type BoardStatus,
-	getMood,
-	setupMood,
-	Mood
+	type BoardStatus
 } from "./board/index.js";
-export { History } from "./history/index.js";
-export { Lobby } from "./lobby/index.js";
-export { Play } from "./play/index.js";
+export { Feed, type FeedProps } from "./feed/index.js";

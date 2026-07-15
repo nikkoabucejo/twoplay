@@ -82,18 +82,13 @@ export class TictactoeRoom extends Room {
 	winningLine = $derived(this.metaStatus.winningLine);
 	/** The room is over once a meta line is won, or every individual board has finished (won or drawn) —
 	 *  checking metaStatus alone would miss a draw, since drawn boards never fill the meta board. */
-	isOver = $derived(
-		this.winner !== null || this.statuses.every((s) => s.status !== "playing")
-	);
+	isOver = $derived(this.winner !== null || this.statuses.every((s) => s.status !== "playing"));
 
 	/** Whose mark lands next across the whole room, derived from total filled cells — no state to fall out of sync. */
 	turn = $derived(turnOf(this.boards));
 
 	override activeSeat = $derived<0 | 1 | null>(
-		this.game.isLive &&
-			this.#state !== null &&
-			this.game.endedSeat === null &&
-			!this.#liveIsOver
+		this.game.isLive && this.#state !== null && this.game.endedSeat === null && !this.#liveIsOver
 			? playerIndexOf(this.#liveTurn)
 			: null
 	);

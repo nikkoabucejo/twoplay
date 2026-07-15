@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { Button, Sparkle } from "$lib/components/ui";
-	import { Icon, GAMES, GAME_TYPES } from "$lib/features/play";
+	import { Button, Emblem, Sparkle } from "$lib/components/ui";
+	import { GAMES, GAME_TYPES } from "$lib/features/play";
 	import { getClerkAuth } from "$lib/services/auth";
 
 	const auth = getClerkAuth();
@@ -29,7 +29,7 @@
 					href="/play?game={type}"
 					class="flex flex-col items-center gap-1 text-foreground transition-opacity hover:opacity-70 active:opacity-50"
 				>
-					<Icon {type} class="size-14" />
+					<Emblem icon={GAMES[type].icon} colors={GAMES[type].colors} class="size-14" />
 					<span class="font-semibold">{GAMES[type].name}</span>
 				</a>
 			{/each}

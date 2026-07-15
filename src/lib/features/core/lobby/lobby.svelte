@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { useMutation, useQuery } from "convex-svelte";
 	import { goto } from "$app/navigation";
-	import { Button } from "$lib/components/ui";
-	import { GAMES, Icon, Playing } from "$lib/features/play";
+	import { Beacon, Button, Emblem, Playing, Tile } from "$lib/components/ui";
+	import { Feed } from "$lib/components/layout";
+	import { GAMES } from "$lib/features/play";
 	import { getClerkAuth } from "$lib/services/auth";
-	import { cn } from "$lib/utils/style";
 	import { api } from "../../../../../convex/_generated/api.js";
 
 	const auth = getClerkAuth();
@@ -48,65 +48,53 @@
 	{:else if !rooms.data?.length}
 		<p class="shrink-0 text-sm text-muted-foreground">No public rooms are waiting for a player.</p>
 	{:else}
-		<div class="no-scrollbar min-h-0 w-full max-w-md flex-1 overflow-y-auto">
+		<Feed>
 			<ul class="flex flex-col gap-2 py-1">
 				{#each rooms.data as room (room.code)}
-					<li
-						class={cn(
-							"flex items-center gap-3 rounded-xl border p-3 backdrop-blur-sm",
-							room.isOwn ? "border-emerald-500/40 bg-emerald-500/10" : "bg-muted/40"
-						)}
-					>
-						<Icon type={room.type} class="size-8 shrink-0" active={room.isOwn} sparkles={false} />
-						<div class="flex flex-1 flex-col">
+					<Tile highlighted={room.isOwn}>
+						{#snippet icon()}
+							<Emblem
+								icon={GAMES[room.type].icon}
+								colors={GAMES[room.type].colors}
+								class="size-8 shrink-0"
+								active={room.isOwn}
+								sparkles={false}
+							/>
+						{/snippet}
+						{#snippet title()}
 							<span class="flex items-center gap-1.5 text-xs font-semibold">
 								{GAMES[room.type].name}
 								{#if room.isOwn}
-									{@render liveDot()}
+									<Beacon />
 								{/if}
 							</span>
+						{/snippet}
+						{#snippet subtitle()}
 							<span class="text-[11px] text-muted-foreground">
 								Hosted by {room.isOwn ? "you" : (room.hostName ?? "someone")} · {room.timeControlMs /
 									60_000} min
 							</span>
-						</div>
-						{#if room.isOwn}
-							<Button href="/{room.type}/{room.code}" variant="outline" size="xs">View</Button>
-						{:else}
-							<Button
-								size="xs"
-								onclick={() => handleJoin(room.code, room.type)}
-								disabled={joiningCode === room.code}
-							>
-								Join
-							</Button>
-						{/if}
-					</li>
+						{/snippet}
+						{#snippet trailing()}
+							{#if room.isOwn}
+								<Button href="/{room.type}/{room.code}" variant="outline" size="xs">View</Button>
+							{:else}
+								<Button
+									size="xs"
+									onclick={() => handleJoin(room.code, room.type)}
+									disabled={joiningCode === room.code}
+								>
+									Join
+								</Button>
+							{/if}
+						{/snippet}
+					</Tile>
 				{/each}
 			</ul>
-		</div>
+		</Feed>
 	{/if}
 
 	{#if error}
 		<p class="shrink-0 text-sm text-destructive">{error}</p>
 	{/if}
 </div>
-
-{#snippet liveDot()}
-	<span class="relative flex size-1.5" aria-hidden="true">
-		<span class="absolute inline-flex size-full animate-ping rounded-full bg-emerald-500 opacity-75"
-		></span>
-		<span class="relative inline-flex size-1.5 rounded-full bg-emerald-500"></span>
-	</span>
-{/snippet}
-
-<style>
-	.no-scrollbar {
-		scrollbar-width: none;
-		-ms-overflow-style: none;
-	}
-
-	.no-scrollbar::-webkit-scrollbar {
-		display: none;
-	}
-</style>

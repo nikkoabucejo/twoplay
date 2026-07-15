@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { History } from "$lib/components/layout";
+	import { History } from "$lib/features/core";
 </script>
 
 <History />

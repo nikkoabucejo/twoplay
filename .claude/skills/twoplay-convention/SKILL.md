@@ -27,7 +27,7 @@ For the game-feature recipe see `twoplay-game`; for the Convex data model see `t
 ## Rune-backed class pattern
 
 State-holding logic lives in `.svelte.ts` files as a class, not a plain function/store. The
-`Room`/`*Room` and `Mood`/`CursorPresence` classes are the reference shape:
+`Room`/`*Room` and `MoodPresence`/`CursorPresence` classes are the reference shape:
 
 - **Private fields use `#`** (real JS private fields, not `_`-prefixed convention) for anything not
   part of the public surface — `#kind`, `#getCode`, `#room`, `#play`, `#newGame` in `Room`.
@@ -37,9 +37,9 @@ State-holding logic lives in `.svelte.ts` files as a class, not a plain function
   query result (`#room`), not separately maintained.
   - Use `$derived.by(() => ...)` when the expression needs a block body or multiple steps; plain
     `$derived(...)` for a single expression.
-- **`$effect` is for side effects only** — writing into a shared context (`mood.svelte.ts`'s
-  `Board` → `Mood` write), subscribing/disposing, imperative work. Not for computing a value other
-  code reads — that's what `$derived` is for.
+- **`$effect` is for side effects only** — writing into a shared context (`Board` → `MoodPresence`
+  write via `features/presence/mood`'s `getMood()`), subscribing/disposing, imperative work. Not for
+  computing a value other code reads — that's what `$derived` is for.
 - **Public getters over public fields** when the value is derived or needs to stay read-only from
   outside the class — `get isLoading()`, `get data()` in `Room` wrap the private query object rather
   than exposing it directly.

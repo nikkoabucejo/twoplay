@@ -1,5 +1,5 @@
 <script lang="ts" module>
-	import type { GameType } from "../../../../convex/models/games/index.js";
+	import type { GameType } from "../../../../../convex/models/games/index.js";
 
 	/** The viewer's one live game — shown on `/lobby` and `/history` only, wherever `rooms.index.active`
 	 *  resolves to something. That query already guarantees at most one result, and only ever for a
@@ -13,13 +13,12 @@
 </script>
 
 <script lang="ts">
-	import { Button, Emoji } from "$lib/components/ui";
+	import { CheckersRoom, GAMES, TictactoeRoom } from "$lib/features/play";
 	import { ACCENTS, cn } from "$lib/utils/style";
-	import { DEFAULT_EMOJI } from "../../../../convex/models/players/index.js";
-	import { CheckersRoom } from "./checkers/index.js";
-	import { GAMES } from "./games.js";
-	import Icon from "./icon.svelte";
-	import { TictactoeRoom } from "./tictactoe/index.js";
+	import { DEFAULT_EMOJI } from "../../../../../convex/models/players/index.js";
+	import { Button } from "../button/index.js";
+	import { Emblem } from "../emblem/index.js";
+	import { Emoji } from "../emoji/index.js";
 
 	let { code, type, class: className }: PlayingProps = $props();
 
@@ -84,7 +83,13 @@
 	<div class="flex items-center justify-between gap-2">
 		{@render seat(0)}
 		<div class="flex shrink-0 items-center px-1">
-			<Icon {type} class="size-10" active sparkles={false} />
+			<Emblem
+				icon={GAMES[type].icon}
+				colors={GAMES[type].colors}
+				class="size-10"
+				active
+				sparkles={false}
+			/>
 		</div>
 		{@render seat(1)}
 	</div>

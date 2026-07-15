@@ -94,7 +94,7 @@
 	} from "$lib/components/ui";
 	import { ACCENTS, cn } from "$lib/utils/style";
 	import type { Snippet } from "svelte";
-	import { getMood } from "./mood.svelte.js";
+	import { getMood } from "$lib/features/presence";
 
 	let {
 		players,

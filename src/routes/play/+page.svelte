@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from "$app/state";
-	import { Play } from "$lib/components/layout";
+	import { Play } from "$lib/features/core";
 	import { GAME_TYPES } from "$lib/features/play";
 
 	// Lets the home page's per-game icons land here with that game pre-selected, e.g. /play?game=checkers.

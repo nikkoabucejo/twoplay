@@ -37,13 +37,14 @@ src/
     types.d.ts        # shared ambient types (WithElementRef, WithoutChild, …)
     components/       # container of component categories — no barrel at this level
       ui/             # shadcn-svelte primitives (button, spinner, tooltip, …)
-      layout/         # app-specific structural components (board, lobby)
+      layout/         # app-specific structural components (board, feed)
     utils/            # container of util categories — no barrel at this level
       style/          # cn (class merge), ACCENTS (seat color identity)
       multiplayer/    # Room — the abstract multiplayer-room base class
     features/         # container of feature categories — no barrel at this level
       play/           # playable games (tictactoe, checkers, …)
-      presence/       # live multiplayer presence UI (cursor)
+      presence/       # live multiplayer presence UI (cursor, mood)
+      core/           # room lifecycle pages (lobby, play, history) — one per top-level route
     services/         # container of service categories — no barrel at this level
       auth/           # split into client/ and server/ — see below
   routes/
@@ -133,12 +134,27 @@ Only split a category when it actually has secret-holding code — don't split p
 
 ## Layout vs. ui components
 
-- **`components/ui/`** — shadcn-svelte primitives. Generated/adapted from the registry; don't
-  hand-restructure them.
-- **`components/layout/`** — app-specific structural components: `Board` (status bar + play-area
-  slot + round-nav footer, with an optional `mood.svelte.ts` ambient-background context) and
-  `Lobby` (create/join-room card). They define and export shared types features consume
-  (`BoardPlayer`, `BoardStatus`, `BoardFooter`).
+- **`components/ui/`** — shadcn-svelte primitives, plus generic presentational atoms
+  (`Emoji`, `Sparkle`, `Emblem`, `Tile`) that take their content via typed props/snippets rather than
+  reading domain state. Don't hand-restructure the shadcn-generated ones. `Emblem` is the
+  domain-agnostic icon+color badge (`icon: Component`, `colors: [string, string]`) a caller derives
+  from `GAMES[type]` — it never takes a `GameType` itself. `Tile` is the highlighted list-item card
+  (`highlighted`, `icon`/`title`/`subtitle`/`trailing`/`children` snippets) — no domain coupling at
+  all, even though its only current callers are `Lobby`/`History`. `Playing` is the one deliberate
+  exception: it's a stateful, connected component (constructs a live `TictactoeRoom`/`CheckersRoom`
+  from `$lib/features/play`) rather than a presentational atom, but lives here rather than
+  `components/layout/` because it composes `Emblem`/`Button`/`Emoji` directly as ui-tier building
+  blocks. Don't use it as precedent for putting other connected/stateful components in `ui/`.
+- **`components/layout/`** — app-specific structural components shared across multiple features:
+  `Board` (status bar + play-area slot + round-nav footer — reports its status into the ambient
+  background via `features/presence/mood`'s `getMood()`) and `Feed` (the scrollable list container,
+  shared by the `Lobby`/`History` features under `features/core/`). They define and export shared
+  types/props features consume (`BoardPlayer`, `BoardStatus`, `BoardFooter`, `FeedProps`) — a layout
+  component itself stays domain-agnostic, taking content only via snippets/typed props, the same way
+  `Board` never imports a `GameType`.
+- A component used by only **one** feature is not a layout component — it belongs inside that
+  feature's own folder (or, like `Lobby`/`History`/`Play`, as its own feature under
+  `features/core/`), not under `components/layout/`.
 
 ## When adding things
 
@@ -154,5 +170,5 @@ Only split a category when it actually has secret-holding code — don't split p
   first).
 
 When in doubt, mirror how `style/cn`, `style/accents`, `multiplayer/room`, `play/tictactoe`,
-`layout/board`, `layout/lobby`, `presence/cursor`, `services/auth`, `button`, and `tooltip` are
+`layout/board`, `core/lobby`, `presence/cursor`, `services/auth`, `button`, and `tooltip` are
 wired.

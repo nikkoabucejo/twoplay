@@ -1,14 +1,12 @@
 <script lang="ts">
 	import { useQuery } from "convex-svelte";
-	import { Button } from "$lib/components/ui";
-	import { GAMES, Icon, Playing } from "$lib/features/play";
+	import { Beacon, Button, Emblem, Playing, Tile } from "$lib/components/ui";
+	import { Feed } from "$lib/components/layout";
+	import { GAMES } from "$lib/features/play";
 	import { getClerkAuth } from "$lib/services/auth";
 	import { cn } from "$lib/utils/style";
 	import { api } from "../../../../../convex/_generated/api.js";
-	import type {
-		GameHistoryEntry,
-		RoomHistoryEntry
-	} from "../../../../../convex/models/rooms/index.js";
+	import type { GameHistoryEntry } from "../../../../../convex/models/rooms/index.js";
 
 	const RESULT_LABELS: Record<GameHistoryEntry["result"], string> = {
 		win: "Win",
@@ -59,33 +57,36 @@
 			<Playing code={activeRoom.data.code} type={activeRoom.data.type} class="max-w-md shrink-0" />
 		{/if}
 
-		<div class="no-scrollbar min-h-0 w-full max-w-md flex-1 overflow-y-auto">
+		<Feed>
 			<ul class="flex flex-col gap-3 py-1">
 				{#each history.data as room (room.code)}
 					{@const isActive = activeRoom.data?.code === room.code}
-					<li
-						class={cn(
-							"flex flex-col gap-2 rounded-xl border p-3 backdrop-blur-sm",
-							isActive ? "border-emerald-500/40 bg-emerald-500/10" : "bg-muted/40"
-						)}
-					>
-						<div class="flex items-center gap-2">
-							<Icon type={room.type} class="size-8 shrink-0" active={isActive} sparkles={false} />
-							<div class="flex flex-col">
-								<span class="flex items-center gap-1.5 text-xs font-semibold">
-									{GAMES[room.type].name}
-									{#if isActive}
-										{@render liveDot()}
-									{/if}
-								</span>
-								<span class="text-[11px] text-muted-foreground">
-									You vs {room.opponentName ?? "waiting for opponent"}
-								</span>
-							</div>
-							<span class="ml-auto font-mono text-[11px] text-muted-foreground">
-								{room.code}
+					<Tile highlighted={isActive}>
+						{#snippet icon()}
+							<Emblem
+								icon={GAMES[room.type].icon}
+								colors={GAMES[room.type].colors}
+								class="size-8 shrink-0"
+								active={isActive}
+								sparkles={false}
+							/>
+						{/snippet}
+						{#snippet title()}
+							<span class="flex items-center gap-1.5 text-xs font-semibold">
+								{GAMES[room.type].name}
+								{#if isActive}
+									<Beacon />
+								{/if}
 							</span>
-						</div>
+						{/snippet}
+						{#snippet subtitle()}
+							<span class="text-[11px] text-muted-foreground">
+								You vs {room.opponentName ?? "waiting for opponent"}
+							</span>
+						{/snippet}
+						{#snippet trailing()}
+							<span class="font-mono text-[11px] text-muted-foreground">{room.code}</span>
+						{/snippet}
 
 						<ul class="flex flex-col gap-1.5">
 							{#each room.games as game (game.round)}
@@ -111,28 +112,9 @@
 								</li>
 							{/each}
 						</ul>
-					</li>
+					</Tile>
 				{/each}
 			</ul>
-		</div>
+		</Feed>
 	{/if}
 </div>
-
-{#snippet liveDot()}
-	<span class="relative flex size-1.5" aria-hidden="true">
-		<span class="absolute inline-flex size-full animate-ping rounded-full bg-emerald-500 opacity-75"
-		></span>
-		<span class="relative inline-flex size-1.5 rounded-full bg-emerald-500"></span>
-	</span>
-{/snippet}
-
-<style>
-	.no-scrollbar {
-		scrollbar-width: none;
-		-ms-overflow-style: none;
-	}
-
-	.no-scrollbar::-webkit-scrollbar {
-		display: none;
-	}
-</style>

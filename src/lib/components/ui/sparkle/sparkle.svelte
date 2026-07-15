@@ -105,8 +105,24 @@
 		{ x: 34, y: 96, size: 4, shape: "circle", colorIndex: 1, peaks: [55, 138], peakOpacity: 0.74 },
 		{ x: 58, y: 14, size: 3.5, shape: "circle", colorIndex: 1, peaks: [35, 120], peakOpacity: 0.7 },
 		{ x: 72, y: 104, size: 5.5, shape: "star", colorIndex: 0, peaks: [78, 154], peakOpacity: 0.88 },
-		{ x: 98, y: 30, size: 4.5, shape: "star", colorIndex: 1, peaks: [5, 88, 168], peakOpacity: 0.9 },
-		{ x: 105, y: 76, size: 3.5, shape: "circle", colorIndex: 0, peaks: [62, 145], peakOpacity: 0.72 }
+		{
+			x: 98,
+			y: 30,
+			size: 4.5,
+			shape: "star",
+			colorIndex: 1,
+			peaks: [5, 88, 168],
+			peakOpacity: 0.9
+		},
+		{
+			x: 105,
+			y: 76,
+			size: 3.5,
+			shape: "circle",
+			colorIndex: 0,
+			peaks: [62, 145],
+			peakOpacity: 0.72
+		}
 	];
 
 	const SPARKLE_VARIANTS: Record<

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Lobby } from "$lib/components/layout";
+	import { Lobby } from "$lib/features/core";
 </script>
 
 <Lobby />

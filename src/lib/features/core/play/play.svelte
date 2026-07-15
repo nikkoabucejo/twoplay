@@ -2,8 +2,8 @@
 	import { Check, Link, LogIn, Plus } from "@lucide/svelte";
 	import { useMutation, useQuery } from "convex-svelte";
 	import { goto } from "$app/navigation";
-	import { Button, Spinner, Tabs, type TabItem } from "$lib/components/ui";
-	import { Icon, GAMES } from "$lib/features/play";
+	import { Button, Emblem, Spinner, Tabs, type TabItem } from "$lib/components/ui";
+	import { GAMES } from "$lib/features/play";
 	import { getClerkAuth } from "$lib/services/auth";
 	import { cn } from "$lib/utils/style";
 	import type { GameType } from "../../../../../convex/models/games/index.js";
@@ -156,8 +156,9 @@
 								isSelected ? "text-foreground" : "text-muted-foreground grayscale"
 							)}
 						>
-							<Icon
-								type={entry.type}
+							<Emblem
+								icon={GAMES[entry.type].icon}
+								colors={GAMES[entry.type].colors}
 								class="size-full"
 								selected={isSelected}
 								sparkles={isSelected}
