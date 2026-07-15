@@ -344,11 +344,10 @@ export const rematch = mutation({
  *  already left. */
 async function forfeitRoom(ctx: MutationCtx, room: Doc<"rooms">, player: Doc<"players">) {
 	// A room with an empty seat has no opponent to forfeit the round to or credit a win — e.g. the host
-	// abandoning before anyone else has joined. Skip straight to closing the room in that case.
-	const game =
-		room.players.length >= getEngine(room.type).playerCount
-			? await getCurrentGame(ctx, room._id)
-			: null;
+	// abandoning before anyone else has joined — but the round itself still needs to end, or it would
+	// keep reporting "playing" in history forever even after the room closes.
+	const hasOpponentSeat = room.players.length >= getEngine(room.type).playerCount;
+	const game = await getCurrentGame(ctx, room._id);
 	if (game) {
 		let clocks = await clocksByGame(ctx, game._id);
 		const status = gameStatus(room.type, game.state);
@@ -361,19 +360,21 @@ async function forfeitRoom(ctx: MutationCtx, room: Doc<"rooms">, player: Doc<"pl
 			}
 		}
 
-		// Reflects either the clock just patched above, one an earlier resign/timeout already set
-		// (nobody had called `rematch` yet to "cash it in"), or a round that finished naturally.
-		const endedClock = clocks.find((clock) => clock.reason !== undefined);
-		const winnerIndex = endedClock
-			? otherPlayer(room.players.indexOf(endedClock.playerId))
-			: roundWinner(room.type, game.state);
-		if (winnerIndex !== null && winnerIndex !== room.players.indexOf(player._id)) {
-			const winnerId = room.players[winnerIndex];
-			const winner = await ctx.db.get(winnerId);
-			// Skip crediting a score if the opponent has themselves already left — a near-simultaneous
-			// mutual abandon is treated as no-contest, matching the "everyone went idle at once" case below.
-			if (winner && winner.leftAt === undefined) {
-				await ctx.db.patch(winnerId, { score: winner.score + 1 });
+		if (hasOpponentSeat) {
+			// Reflects either the clock just patched above, one an earlier resign/timeout already set
+			// (nobody had called `rematch` yet to "cash it in"), or a round that finished naturally.
+			const endedClock = clocks.find((clock) => clock.reason !== undefined);
+			const winnerIndex = endedClock
+				? otherPlayer(room.players.indexOf(endedClock.playerId))
+				: roundWinner(room.type, game.state);
+			if (winnerIndex !== null && winnerIndex !== room.players.indexOf(player._id)) {
+				const winnerId = room.players[winnerIndex];
+				const winner = await ctx.db.get(winnerId);
+				// Skip crediting a score if the opponent has themselves already left — a near-simultaneous
+				// mutual abandon is treated as no-contest, matching the "everyone went idle at once" case below.
+				if (winner && winner.leftAt === undefined) {
+					await ctx.db.patch(winnerId, { score: winner.score + 1 });
+				}
 			}
 		}
 	}
@@ -422,6 +423,16 @@ export const sweep = internalMutation({
 
 			if (room.players.length < engine.playerCount) {
 				if (now - room._creationTime > EMPTY_ROOM_TIMEOUT_MS) {
+					// Nobody ever took the other seat, so the lone seat's round would otherwise stay
+					// "playing" in history forever — end its clock the same way an explicit abandon would.
+					const game = await getCurrentGame(ctx, room._id);
+					if (game) {
+						const clocks = await clocksByGame(ctx, game._id);
+						const ownClock = clocks.find((clock) => clock.reason === undefined);
+						if (ownClock) {
+							await ctx.db.patch(ownClock._id, { reason: "abandon", turnedAt: undefined });
+						}
+					}
 					await ctx.db.patch(room._id, { status: "closed", closedAt: now, reason: "empty" });
 				}
 				continue;

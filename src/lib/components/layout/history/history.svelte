@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { useQuery } from "convex-svelte";
 	import { Button } from "$lib/components/ui";
-	import { GAMES } from "$lib/features/play";
+	import { GAMES, Icon, Playing } from "$lib/features/play";
 	import { getClerkAuth } from "$lib/services/auth";
 	import { cn } from "$lib/utils/style";
 	import { api } from "../../../../../convex/_generated/api.js";
@@ -29,6 +29,9 @@
 
 	const auth = getClerkAuth();
 	const history = useQuery(api.models.rooms.index.history, () => (auth.isSignedIn ? {} : "skip"));
+	// The single room (if any) this browser is still seated in and hasn't abandoned — same query
+	// `play.svelte` uses to bounce back into it, so "active" here always means the same thing there.
+	const activeRoom = useQuery(api.models.rooms.index.active, () => (auth.isSignedIn ? {} : "skip"));
 
 	function formatDate(createdAt: number) {
 		return new Date(createdAt).toLocaleDateString(undefined, {
@@ -52,15 +55,29 @@
 	{:else if !history.data?.length}
 		<p class="shrink-0 text-sm text-muted-foreground">You haven't played any games yet.</p>
 	{:else}
+		{#if activeRoom.data}
+			<Playing code={activeRoom.data.code} type={activeRoom.data.type} class="max-w-md shrink-0" />
+		{/if}
+
 		<div class="no-scrollbar min-h-0 w-full max-w-md flex-1 overflow-y-auto">
 			<ul class="flex flex-col gap-3 py-1">
 				{#each history.data as room (room.code)}
-					{@const Icon = GAMES[room.type].icon}
-					<li class="flex flex-col gap-2 rounded-xl border bg-muted/40 p-3 backdrop-blur-sm">
+					{@const isActive = activeRoom.data?.code === room.code}
+					<li
+						class={cn(
+							"flex flex-col gap-2 rounded-xl border p-3 backdrop-blur-sm",
+							isActive ? "border-emerald-500/40 bg-emerald-500/10" : "bg-muted/40"
+						)}
+					>
 						<div class="flex items-center gap-2">
-							<Icon class="size-8 shrink-0" />
+							<Icon type={room.type} class="size-8 shrink-0" active={isActive} sparkles={false} />
 							<div class="flex flex-col">
-								<span class="text-xs font-semibold">{GAMES[room.type].name}</span>
+								<span class="flex items-center gap-1.5 text-xs font-semibold">
+									{GAMES[room.type].name}
+									{#if isActive}
+										{@render liveDot()}
+									{/if}
+								</span>
 								<span class="text-[11px] text-muted-foreground">
 									You vs {room.opponentName ?? "waiting for opponent"}
 								</span>
@@ -82,6 +99,7 @@
 									<span
 										class={cn(
 											"text-[11px] font-semibold uppercase tracking-wide",
+											game.result === "playing" && "animate-pulse",
 											RESULT_CLASSES[game.result]
 										)}
 									>
@@ -99,6 +117,14 @@
 		</div>
 	{/if}
 </div>
+
+{#snippet liveDot()}
+	<span class="relative flex size-1.5" aria-hidden="true">
+		<span class="absolute inline-flex size-full animate-ping rounded-full bg-emerald-500 opacity-75"
+		></span>
+		<span class="relative inline-flex size-1.5 rounded-full bg-emerald-500"></span>
+	</span>
+{/snippet}
 
 <style>
 	.no-scrollbar {
