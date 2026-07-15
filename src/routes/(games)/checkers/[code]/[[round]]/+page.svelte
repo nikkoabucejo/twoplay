@@ -10,6 +10,6 @@
 	);
 </script>
 
-<div class="flex flex-1 flex-col items-center justify-center gap-8 px-4 py-8 text-center">
+<div class="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 px-3 py-4 text-center">
 	<Checkers roomCode={params.code} {round} />
 </div>

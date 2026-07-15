@@ -6,7 +6,9 @@
 	const auth = getClerkAuth();
 </script>
 
-<div class="flex flex-1 flex-col items-center justify-center gap-10 px-4 py-8 text-center">
+<div
+	class="flex min-h-0 flex-1 flex-col items-center justify-center gap-6 px-4 py-6 text-center sm:gap-10 sm:py-8"
+>
 	<div class="flex flex-col items-center gap-2">
 		<div class="relative">
 			<Sparkle colors={["#06b6d4", "#ec4899"]} class="-inset-x-8 -inset-y-4 -z-10" />
@@ -23,7 +25,7 @@
 			<Button onclick={() => auth.signIn()}>Sign in</Button>
 		</div>
 	{:else}
-		<div class="flex items-center justify-center gap-12">
+		<div class="flex items-center justify-center gap-8 sm:gap-12">
 			{#each GAME_TYPES as type (type)}
 				<a
 					href="/play?game={type}"

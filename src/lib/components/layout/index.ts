@@ -6,3 +6,4 @@ export {
 	type BoardStatus
 } from "./board/index.js";
 export { Feed, type FeedProps } from "./feed/index.js";
+export { Header } from "./header/index.js";

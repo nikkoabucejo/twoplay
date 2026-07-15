@@ -31,7 +31,7 @@
 	}
 </script>
 
-<div class="flex w-full flex-1 flex-col items-center gap-3 overflow-hidden px-4 pt-20 pb-6">
+<div class="flex w-full min-h-0 flex-1 flex-col items-center gap-3 overflow-hidden px-4 py-6">
 	{#if auth.isSignedIn && activeRoom.data}
 		<Playing code={activeRoom.data.code} type={activeRoom.data.type} class="max-w-md shrink-0" />
 	{/if}

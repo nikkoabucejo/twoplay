@@ -29,7 +29,11 @@ async function ensureRating(ctx: MutationCtx, userId: Id<"users">) {
  *  for a draw; a draw leaves both ratings untouched. Returns the signed change actually applied to
  *  each side, post-floor, so the caller can attach it to that round for display (e.g. "+8" / "-8"
  *  in history). */
-export async function applyResult(ctx: MutationCtx, winnerUserId: Id<"users">, loserUserId: Id<"users">) {
+export async function applyResult(
+	ctx: MutationCtx,
+	winnerUserId: Id<"users">,
+	loserUserId: Id<"users">
+) {
 	const winner = await ensureRating(ctx, winnerUserId);
 	const loser = await ensureRating(ctx, loserUserId);
 

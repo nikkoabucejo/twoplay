@@ -10,8 +10,7 @@ import { generateRoomCode, resolveTimeControlMs } from "../rooms/index.js";
 const QUEUE_ENTRY_TIMEOUT_MS = 5 * 60_000;
 
 export type PairingResult =
-	| { status: "waiting" }
-	| { status: "matched"; code: string; type: GameType };
+	{ status: "waiting" } | { status: "matched"; code: string; type: GameType };
 
 /** Joins the pairing queue for `type`, or immediately pairs with the longest-waiting opponent
  *  already queued for it. The room this creates adopts that opponent's chosen time control — they

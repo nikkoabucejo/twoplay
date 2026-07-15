@@ -101,7 +101,7 @@
 		status,
 		footer,
 		clock,
-		size = "34rem",
+		size = "min(calc(100vw - 9rem), calc(100dvh - 16.5rem), 34rem)",
 		class: className,
 		myIndex = null,
 		opponentDisconnected = false,
@@ -192,7 +192,7 @@
 
 {#snippet emojiBox(seat: 0 | 1)}
 	<div
-		class="relative flex size-12 shrink-0 items-center justify-center rounded-lg border bg-muted/40 backdrop-blur-sm"
+		class="relative flex size-10 shrink-0 items-center justify-center rounded-lg border bg-muted/40 backdrop-blur-sm sm:size-12"
 	>
 		{#if myIndex === seat}
 			{@render emojiPicker(seat)}
@@ -219,7 +219,7 @@
 	{@const low = active && ms <= LOW_TIME_MS}
 	<div
 		class={cn(
-			"flex h-12 w-20 shrink-0 items-center justify-center rounded-lg",
+			"flex h-12 w-14 shrink-0 items-center justify-center rounded-lg sm:w-20",
 			ACCENTS[seat].tintBg
 		)}
 	>
@@ -253,11 +253,11 @@
 >
 	<div class="flex flex-col items-center gap-6">
 		{#if status}
-			<div class="flex items-center gap-2">
+			<div class="flex items-center gap-1.5 sm:gap-2">
 				{@render emojiBox(0)}
 
 				<div
-					class="grid h-12 w-(--board-size) grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-lg border bg-muted/40 px-4 text-sm backdrop-blur-sm"
+					class="grid h-12 w-(--board-size) grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-lg border bg-muted/40 px-2.5 text-sm backdrop-blur-sm sm:px-4"
 				>
 					<div class="flex items-center gap-2">
 						<span class={cn("font-semibold", players[0].accent)}>{players[0].label}</span>
@@ -319,7 +319,7 @@
 						{@render clockBox(0)}
 					{/if}
 
-					<div class="flex items-center gap-2">
+					<div class="flex items-center gap-1.5 sm:gap-2">
 						<span class={cn(prevDisabled && "cursor-not-allowed")}>
 							<Button
 								variant="outline"
@@ -337,7 +337,7 @@
 								<Button
 									variant="outline"
 									size="sm"
-									class="w-32 uppercase"
+									class="px-3 uppercase sm:w-32"
 									onclick={footer.onGoLive}
 								>
 									Go live
@@ -346,7 +346,7 @@
 								<Button
 									variant="outline"
 									size="sm"
-									class="w-32 uppercase"
+									class="px-3 uppercase sm:w-32"
 									onclick={footer.onPlayAgain}
 								>
 									Play again
@@ -355,7 +355,7 @@
 								<Button
 									variant="outline"
 									size="sm"
-									class="w-32 uppercase"
+									class="px-3 uppercase sm:w-32"
 									onclick={footer.onAbandon}
 									disabled={isSpectator}
 								>
@@ -366,12 +366,12 @@
 									<DropdownTrigger
 										variant="outline"
 										size="sm"
-										class="w-32 uppercase"
+										class="px-3 uppercase sm:w-32"
 										disabled={isSpectator}
 									>
 										Resign
 									</DropdownTrigger>
-									<DropdownContent side="bottom" sideOffset={8} class="w-32">
+									<DropdownContent side="bottom" sideOffset={8} class="w-24 sm:w-32">
 										<DropdownItem onSelect={footer.onResign}>Resign</DropdownItem>
 										<DropdownSeparator />
 										<DropdownItem variant="destructive" onSelect={footer.onAbandon}>
@@ -384,12 +384,12 @@
 									<DropdownTrigger
 										variant="outline"
 										size="sm"
-										class="w-32 uppercase"
+										class="px-3 uppercase sm:w-32"
 										disabled={isSpectator}
 									>
 										Rematch
 									</DropdownTrigger>
-									<DropdownContent side="bottom" sideOffset={8} class="w-32">
+									<DropdownContent side="bottom" sideOffset={8} class="w-24 sm:w-32">
 										<DropdownItem onSelect={footer.onRematch}>Rematch</DropdownItem>
 										<DropdownSeparator />
 										<DropdownItem variant="destructive" onSelect={footer.onAbandon}>

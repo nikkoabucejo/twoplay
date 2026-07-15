@@ -164,11 +164,11 @@
 {#if auth.isSignedIn && activeRoom.isLoading}
 	<!-- Holds off on the picker entirely while we check for an already-active room — avoids flashing
 	     the create/join UI for a beat before bouncing into that room. -->
-	<div class="flex flex-1 items-center justify-center">
+	<div class="flex min-h-0 flex-1 items-center justify-center">
 		<Spinner size="lg" />
 	</div>
 {:else}
-	<div class="flex flex-1 flex-col items-center justify-center px-4 py-8 text-center">
+	<div class="flex min-h-0 flex-1 flex-col items-center justify-center px-4 py-8 text-center">
 		<div class="relative w-full max-w-xs">
 			<div
 				class="absolute bottom-full left-1/2 mb-4 flex h-36 w-full max-w-md -translate-x-1/2 items-center justify-center overflow-hidden mask-[linear-gradient(to_right,transparent,black_12%,black_88%,transparent)]"
