@@ -479,9 +479,9 @@ export type RoomHistoryEntry = {
 };
 
 /** Every room the caller has ever played in, most recently active first, each with its own rounds
- *  oldest-round-first — powers the signed-in-only history page. Walks rooms via the player's own
- *  rows rather than a single indexed scan since a round's outcome depends on that room's own player
- *  order and game engine. */
+ *  most-recent-round-first — powers the signed-in-only history page. Walks rooms via the player's
+ *  own rows rather than a single indexed scan since a round's outcome depends on that room's own
+ *  player order and game engine. */
 export const history = query({
 	args: {},
 	async handler(ctx): Promise<RoomHistoryEntry[]> {
@@ -523,7 +523,7 @@ export const history = query({
 						return { round: game.round, createdAt: game._creationTime, result };
 					})
 				);
-				entries.sort((a, b) => a.round - b.round);
+				entries.sort((a, b) => b.round - a.round);
 
 				return {
 					code: room.code,
@@ -537,7 +537,7 @@ export const history = query({
 
 		return rooms
 			.filter((room): room is RoomHistoryEntry => room !== null && room.games.length > 0)
-			.sort((a, b) => b.games.at(-1)!.createdAt - a.games.at(-1)!.createdAt);
+			.sort((a, b) => b.games[0]!.createdAt - a.games[0]!.createdAt);
 	}
 });
 
