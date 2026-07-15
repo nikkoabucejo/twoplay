@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import type { Doc, Id } from "../../_generated/dataModel";
 import { mutation, query, type MutationCtx, type QueryCtx } from "../../_generated/server";
 import { clocksByGame } from "../clocks/index.js";
-import { getRoomByCode, requirePlayer, requireUser } from "../rooms/auth.js";
+import { getRoomByCode, isRoomActive, requirePlayer, requireUser } from "../rooms/auth.js";
 import {
 	checkersEngine,
 	checkersMove,
@@ -155,7 +155,7 @@ export async function countMoves(
 	return moves.length;
 }
 
-/** Forfeits the caller's own current round in favor of their opponent — sets the same `endReason`
+/** Forfeits the caller's own current round in favor of their opponent — sets the same `reason`
  *  field a real clock timeout sets, tagged with the distinct "resign" cause, since both end a round
  *  identically from there on but the client still needs to tell them apart when displaying why. */
 export const resign = mutation({
@@ -163,20 +163,21 @@ export const resign = mutation({
 	async handler(ctx, { code }) {
 		const room = await getRoomByCode(ctx, code);
 		if (!room) throw new Error("Room not found");
+		if (!isRoomActive(room)) throw new Error("This room is no longer active");
 		const player = await requirePlayer(ctx, room._id);
 
 		const game = await getCurrentGame(ctx, room._id);
 		if (!game) throw new Error("Game not found");
 
 		const clocks = await clocksByGame(ctx, game._id);
-		if (clocks.some((clock) => clock.endReason !== undefined)) return;
+		if (clocks.some((clock) => clock.reason !== undefined)) return;
 		const status = gameStatus(room.type, game.state);
 		if (!status || status.isOver) return;
 
 		const ownClock = clocks.find((clock) => clock.playerId === player._id);
 		if (!ownClock) throw new Error("You are not playing this round");
 
-		await ctx.db.patch(ownClock._id, { endReason: "resign", turnedAt: undefined });
+		await ctx.db.patch(ownClock._id, { reason: "resign", turnedAt: undefined });
 	}
 });
 
@@ -189,12 +190,13 @@ export const timeout = mutation({
 		await requireUser(ctx);
 		const room = await getRoomByCode(ctx, code);
 		if (!room) throw new Error("Room not found");
+		if (!isRoomActive(room)) return;
 
 		const game = await getCurrentGame(ctx, room._id);
 		if (!game) throw new Error("Game not found");
 
 		const clocks = await clocksByGame(ctx, game._id);
-		if (clocks.some((clock) => clock.endReason !== undefined)) return;
+		if (clocks.some((clock) => clock.reason !== undefined)) return;
 
 		const status = gameStatus(room.type, game.state);
 		if (!status || status.isOver) return;
@@ -207,7 +209,7 @@ export const timeout = mutation({
 		if (remaining > 0) return;
 
 		await ctx.db.patch(activeClock._id, {
-			endReason: "timeout",
+			reason: "timeout",
 			remaining: 0,
 			turnedAt: undefined
 		});

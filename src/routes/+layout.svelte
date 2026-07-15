@@ -170,10 +170,16 @@
 			</a>
 			{#if auth.isSignedIn}
 				<a
-					href="/rooms"
+					href="/play"
 					class="text-sm text-muted-foreground transition-colors hover:text-foreground"
 				>
 					Play
+				</a>
+				<a
+					href="/lobby"
+					class="text-sm text-muted-foreground transition-colors hover:text-foreground"
+				>
+					Lobby
 				</a>
 				<a
 					href="/history"

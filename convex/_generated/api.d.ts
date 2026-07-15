@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as crons from "../crons.js";
 import type * as models_clocks_index from "../models/clocks/index.js";
 import type * as models_cursors_index from "../models/cursors/index.js";
 import type * as models_games_checkers_engine from "../models/games/checkers/engine.js";
@@ -30,6 +31,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  crons: typeof crons;
   "models/clocks/index": typeof models_clocks_index;
   "models/cursors/index": typeof models_cursors_index;
   "models/games/checkers/engine": typeof models_games_checkers_engine;

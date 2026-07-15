@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { useQuery } from "convex-svelte";
-	import { CheckersIcon, TictactoeIcon } from "$lib/assets/icons/games";
 	import { Button } from "$lib/components/ui";
+	import { GAMES } from "$lib/features/play";
 	import { getClerkAuth } from "$lib/services/auth";
 	import { cn } from "$lib/utils/style";
 	import { api } from "../../../../../convex/_generated/api.js";
@@ -10,21 +10,12 @@
 		RoomHistoryEntry
 	} from "../../../../../convex/models/rooms/index.js";
 
-	const GAME_ICONS = {
-		tictactoe: TictactoeIcon,
-		checkers: CheckersIcon
-	} as const;
-
-	const GAME_NAMES = {
-		tictactoe: "Tic-Tac-Toe",
-		checkers: "Checkers"
-	} as const;
-
 	const RESULT_LABELS: Record<GameHistoryEntry["result"], string> = {
 		win: "Win",
 		loss: "Loss",
 		draw: "Draw",
-		"in-progress": "Playing"
+		"in-progress": "Playing",
+		abandoned: "Abandoned"
 	};
 
 	// Distinct from the seat-accent cyan/pink pair (see $lib/utils/style/accents) — this reads as a
@@ -34,13 +25,12 @@
 		win: "text-emerald-500",
 		loss: "text-destructive",
 		draw: "text-muted-foreground",
-		"in-progress": "text-amber-500"
+		"in-progress": "text-amber-500",
+		abandoned: "text-muted-foreground"
 	};
 
 	const auth = getClerkAuth();
-	const history = useQuery(api.models.rooms.index.listForUser, () =>
-		auth.isSignedIn ? {} : "skip"
-	);
+	const history = useQuery(api.models.rooms.index.history, () => (auth.isSignedIn ? {} : "skip"));
 
 	function formatDate(createdAt: number) {
 		return new Date(createdAt).toLocaleDateString(undefined, {
@@ -67,12 +57,12 @@
 		<div class="no-scrollbar min-h-0 w-full max-w-md flex-1 overflow-y-auto">
 			<ul class="flex flex-col gap-3 py-1">
 				{#each history.data as room (room.code)}
-					{@const Icon = GAME_ICONS[room.type]}
+					{@const Icon = GAMES[room.type].icon}
 					<li class="flex flex-col gap-2 rounded-xl border bg-muted/40 p-3 backdrop-blur-sm">
 						<div class="flex items-center gap-2">
 							<Icon class="size-8 shrink-0" />
 							<div class="flex flex-col">
-								<span class="text-xs font-semibold">{GAME_NAMES[room.type]}</span>
+								<span class="text-xs font-semibold">{GAMES[room.type].name}</span>
 								<span class="text-[11px] text-muted-foreground">
 									You vs {room.opponentName ?? "waiting for opponent"}
 								</span>

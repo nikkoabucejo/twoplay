@@ -1,4 +1,4 @@
-import type { Id } from "../../_generated/dataModel";
+import type { Doc, Id } from "../../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../../_generated/server";
 import { playerByUserAndRoom } from "../players/index.js";
 import { userByClerkUserId } from "../users/index.js";
@@ -41,4 +41,30 @@ export async function getRoomByCode(ctx: QueryCtx | MutationCtx, code: string) {
 		.query("rooms")
 		.withIndex("byCode", (q) => q.eq("code", code))
 		.unique();
+}
+
+/** Undefined `status` means active — only rooms created before this field existed lack it. */
+export function isRoomActive(room: Pick<Doc<"rooms">, "status">): boolean {
+	return room.status !== "closed";
+}
+
+/** The caller's currently active room, if any — the room from an unabandoned player row of theirs
+ *  that hasn't itself closed. A user can have many player rows (one per room ever joined) but at
+ *  most one should ever satisfy both conditions at once, since `create`/`join` funnel through this
+ *  check before ever letting a second one exist. */
+export async function getActiveRoomForUser(
+	ctx: QueryCtx | MutationCtx,
+	userId: Id<"users">
+): Promise<Doc<"rooms"> | null> {
+	const playerRows = await ctx.db
+		.query("players")
+		.withIndex("byUser", (q) => q.eq("userId", userId))
+		.collect();
+
+	for (const player of playerRows) {
+		if (player.leftAt !== undefined) continue;
+		const room = await ctx.db.get(player.roomId);
+		if (room && isRoomActive(room)) return room;
+	}
+	return null;
 }

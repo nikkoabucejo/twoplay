@@ -1,6 +1,6 @@
 import { v } from "convex/values";
-import type { Id } from "../../_generated/dataModel";
-import { mutation, query, type MutationCtx } from "../../_generated/server";
+import type { Doc, Id } from "../../_generated/dataModel";
+import { internalMutation, mutation, query, type MutationCtx } from "../../_generated/server";
 import { clockByGameAndPlayer, clocksByGame } from "../clocks/index.js";
 import { otherPlayer } from "../games/engine.js";
 import {
@@ -17,10 +17,22 @@ import {
 	type GameType
 } from "../games/index.js";
 import { ensurePlayer, playerByUserAndRoom } from "../players/index.js";
-import { currentPlayer, getRoomByCode, requirePlayer, requireUser } from "./auth.js";
+import {
+	currentPlayer,
+	getActiveRoomForUser,
+	getRoomByCode,
+	isRoomActive,
+	requirePlayer,
+	requireUser
+} from "./auth.js";
 import { roomVisibilityValidator } from "./schema.js";
 
-export { currentPlayer, getRoomByCode, requirePlayer, requireUser };
+export { currentPlayer, getRoomByCode, isRoomActive, requirePlayer, requireUser };
+
+/** A room with no opponent ever joining gets swept after this long. */
+const EMPTY_ROOM_TIMEOUT_MS = 45 * 60_000;
+/** A single silent seat gets auto-abandoned in the other seat's favor after this long. */
+const AUTO_ABANDON_MS = 4 * 60_000;
 
 const CODE_LENGTH = 6;
 // No 0/O/1/I/L — avoids ambiguous shared-code typos.
@@ -39,12 +51,6 @@ function resolveTimeControlMs(timeControlMs: number | undefined): number {
 	return Math.min(MAX_TIME_CONTROL_MS, Math.max(MIN_TIME_CONTROL_MS, timeControlMs));
 }
 
-/** Gets or creates the visitor's player row for `roomId` — mutation-only since it may insert. */
-async function ensurePlayerForCurrentUser(ctx: MutationCtx, roomId: Id<"rooms">) {
-	const user = await requireUser(ctx);
-	return await ensurePlayer(ctx, user._id, roomId, user.name);
-}
-
 async function generateRoomCode(ctx: MutationCtx): Promise<string> {
 	for (let attempt = 0; attempt < 10; attempt++) {
 		let code = "";
@@ -56,13 +62,19 @@ async function generateRoomCode(ctx: MutationCtx): Promise<string> {
 	throw new Error("Could not generate a unique room code, please try again");
 }
 
+export type RoomEntryResult = { code: string; type: GameType; redirected: boolean };
+
 export const create = mutation({
 	args: {
 		type: gameTypeValidator,
 		timeControlMs: v.optional(v.number()),
 		visibility: v.optional(roomVisibilityValidator)
 	},
-	async handler(ctx, { type, timeControlMs, visibility }) {
+	async handler(ctx, { type, timeControlMs, visibility }): Promise<RoomEntryResult> {
+		const user = await requireUser(ctx);
+		const activeRoom = await getActiveRoomForUser(ctx, user._id);
+		if (activeRoom) return { code: activeRoom.code, type: activeRoom.type, redirected: true };
+
 		const code = await generateRoomCode(ctx);
 		const resolvedTimeControlMs = resolveTimeControlMs(timeControlMs);
 		const roomId = await ctx.db.insert("rooms", {
@@ -70,9 +82,10 @@ export const create = mutation({
 			type,
 			players: [],
 			time: resolvedTimeControlMs,
-			visibility: visibility ?? "private"
+			visibility: visibility ?? "private",
+			status: "active"
 		});
-		const player = await ensurePlayerForCurrentUser(ctx, roomId);
+		const player = await ensurePlayer(ctx, user._id, roomId, user.name);
 		await ctx.db.patch(roomId, { players: [player._id] });
 		await createGame(
 			ctx,
@@ -80,19 +93,28 @@ export const create = mutation({
 			resolvedTimeControlMs,
 			false
 		);
-		return code;
+		return { code, type, redirected: false };
 	}
 });
 
 export const join = mutation({
 	args: { code: v.string() },
-	async handler(ctx, { code }) {
+	async handler(ctx, { code }): Promise<RoomEntryResult> {
 		const room = await getRoomByCode(ctx, code);
 		if (!room) throw new Error("Room not found");
 
 		const user = await requireUser(ctx);
 		const existing = await playerByUserAndRoom(ctx, user._id, room._id);
-		if (existing) return;
+		if (existing) {
+			if (existing.leftAt !== undefined) throw new Error("You left this room");
+			return { code: room.code, type: room.type, redirected: false };
+		}
+
+		if (!isRoomActive(room)) throw new Error("This room is no longer active");
+		const activeRoom = await getActiveRoomForUser(ctx, user._id);
+		if (activeRoom && activeRoom._id !== room._id) {
+			return { code: activeRoom.code, type: activeRoom.type, redirected: true };
+		}
 
 		const engine = getEngine(room.type);
 		if (room.players.length >= engine.playerCount) throw new Error("Room is full");
@@ -122,6 +144,19 @@ export const join = mutation({
 				}
 			}
 		}
+
+		return { code: room.code, type: room.type, redirected: false };
+	}
+});
+
+/** The caller's currently active room, if any — lets the lobby redirect before Create/Join is even
+ *  clicked, rather than only once a mutation call bounces back a redirect. */
+export const active = query({
+	args: {},
+	async handler(ctx): Promise<{ code: string; type: GameType } | null> {
+		const user = await requireUser(ctx);
+		const room = await getActiveRoomForUser(ctx, user._id);
+		return room ? { code: room.code, type: room.type } : null;
 	}
 });
 
@@ -145,7 +180,14 @@ export const get = query({
 		const playerInfos = await Promise.all(
 			seatIds.map(async (id) => {
 				const player = id ? await ctx.db.get(id) : null;
-				return player ? { name: player.name, emoji: player.emoji, score: player.score } : null;
+				return player
+					? {
+							name: player.name,
+							emoji: player.emoji,
+							score: player.score,
+							seenAt: player.seenAt ?? null
+						}
+					: null;
 			})
 		);
 
@@ -161,14 +203,15 @@ export const get = query({
 		);
 		const turnedAt = clocks.find((clock) => clock.turnedAt !== undefined)?.turnedAt;
 		const endedSeatIndex = seatIds.findIndex(
-			(id) => id !== null && clockByPlayer.get(id)?.endReason !== undefined
+			(id) => id !== null && clockByPlayer.get(id)?.reason !== undefined
 		);
 		const endedSeatId = endedSeatIndex >= 0 ? seatIds[endedSeatIndex] : null;
-		const endReason = (endedSeatId && clockByPlayer.get(endedSeatId)?.endReason) ?? null;
+		const reason = (endedSeatId && clockByPlayer.get(endedSeatId)?.reason) ?? null;
 
 		return {
 			code: room.code,
 			type: room.type,
+			status: room.status ?? "active",
 			players: playerInfos,
 			myIndex: myIndex >= 0 ? myIndex : null,
 			game: {
@@ -179,10 +222,10 @@ export const get = query({
 				// (e.g. disabling "next" past the latest one) without a separate query.
 				latestRound: currentGame?.round ?? game.round,
 				isLive,
-				// The seat whose round has ended against them, and why — a real clock timeout or a
-				// resignation. Distinct causes so the client doesn't mislabel a resignation as a timeout.
+				// The seat whose round has ended against them, and why — a real clock timeout, a
+				// resignation, or an abandonment. Distinct causes so the client doesn't mislabel one as another.
 				endedSeat: endedSeatIndex >= 0 ? (endedSeatIndex as 0 | 1) : null,
-				endReason
+				reason
 			},
 			clock: {
 				remaining,
@@ -197,6 +240,7 @@ export const play = mutation({
 	async handler(ctx, { code, move }) {
 		const room = await getRoomByCode(ctx, code);
 		if (!room) throw new Error("Room not found");
+		if (!isRoomActive(room)) throw new Error("This room is no longer active");
 
 		const player = await requirePlayer(ctx, room._id);
 		const playerIndex = room.players.indexOf(player._id);
@@ -206,7 +250,7 @@ export const play = mutation({
 		if (!game) throw new Error("Game not found");
 
 		const clocks = await clocksByGame(ctx, game._id);
-		if (clocks.some((clock) => clock.endReason !== undefined)) {
+		if (clocks.some((clock) => clock.reason !== undefined)) {
 			throw new Error("This round is already over");
 		}
 
@@ -267,13 +311,14 @@ export const rematch = mutation({
 	async handler(ctx, { code }) {
 		const room = await getRoomByCode(ctx, code);
 		if (!room) throw new Error("Room not found");
+		if (!isRoomActive(room)) throw new Error("This room is no longer active");
 		await requirePlayer(ctx, room._id);
 
 		const game = await getCurrentGame(ctx, room._id);
 		if (!game) throw new Error("Game not found");
 
 		const clocks = await clocksByGame(ctx, game._id);
-		const endedClock = clocks.find((clock) => clock.endReason !== undefined);
+		const endedClock = clocks.find((clock) => clock.reason !== undefined);
 		if (!endedClock && !gameStatus(room.type, game.state)?.isOver) {
 			throw new Error("This round isn't over yet");
 		}
@@ -293,15 +338,126 @@ export const rematch = mutation({
 	}
 });
 
+/** Shared by the `abandon` mutation and `sweep`: forfeits any round still in progress
+ *  in `player`'s opponent's favor, marks `player`'s own membership over, and closes the room once no
+ *  active seat remains. Assumes the caller already verified the room is active and `player` hasn't
+ *  already left. */
+async function forfeitRoom(ctx: MutationCtx, room: Doc<"rooms">, player: Doc<"players">) {
+	const game = await getCurrentGame(ctx, room._id);
+	if (game) {
+		let clocks = await clocksByGame(ctx, game._id);
+		const status = gameStatus(room.type, game.state);
+		const alreadyEnded = clocks.some((clock) => clock.reason !== undefined);
+		if (!alreadyEnded && status && !status.isOver) {
+			const ownClock = clocks.find((clock) => clock.playerId === player._id);
+			if (ownClock) {
+				await ctx.db.patch(ownClock._id, { reason: "abandon", turnedAt: undefined });
+				clocks = await clocksByGame(ctx, game._id);
+			}
+		}
+
+		// Reflects either the clock just patched above, one an earlier resign/timeout already set
+		// (nobody had called `rematch` yet to "cash it in"), or a round that finished naturally.
+		const endedClock = clocks.find((clock) => clock.reason !== undefined);
+		const winnerIndex = endedClock
+			? otherPlayer(room.players.indexOf(endedClock.playerId))
+			: roundWinner(room.type, game.state);
+		if (winnerIndex !== null && winnerIndex !== room.players.indexOf(player._id)) {
+			const winnerId = room.players[winnerIndex];
+			const winner = await ctx.db.get(winnerId);
+			// Skip crediting a score if the opponent has themselves already left — a near-simultaneous
+			// mutual abandon is treated as no-contest, matching the "everyone went idle at once" case below.
+			if (winner && winner.leftAt === undefined) {
+				await ctx.db.patch(winnerId, { score: winner.score + 1 });
+			}
+		}
+	}
+
+	await ctx.db.patch(player._id, { leftAt: Date.now() });
+
+	const seatedPlayers = await Promise.all(room.players.map((id) => ctx.db.get(id)));
+	const remainingActive = seatedPlayers.filter((p) => p && p.leftAt === undefined).length;
+	if (remainingActive < getEngine(room.type).playerCount) {
+		await ctx.db.patch(room._id, { status: "closed", closedAt: Date.now(), reason: "abandoned" });
+	}
+}
+
+/** Abandons the room entirely — distinct from `resign`, which only forfeits the current round. Any
+ *  round still in progress is forfeited in the opponent's favor, the caller's own membership is
+ *  marked over, and the room closes for good once no active seat remains. Closed rooms are never
+ *  rejoinable but stay fully visible in history. Idempotent — calling it again once already
+ *  left/closed is a no-op, matching `resign`'s own idempotent style. */
+export const abandon = mutation({
+	args: { code: v.string() },
+	async handler(ctx, { code }) {
+		const room = await getRoomByCode(ctx, code);
+		if (!room) throw new Error("Room not found");
+
+		const player = await requirePlayer(ctx, room._id);
+		if (!isRoomActive(room) || player.leftAt !== undefined) return;
+
+		await forfeitRoom(ctx, room, player);
+	}
+});
+
+/** Sweeps every active room for two kinds of dead weight: a second seat that never filled, and
+ *  seats that have gone silent (no heartbeat). Runs on a schedule (see `convex/crons.ts`) — never
+ *  called directly by a client. */
+export const sweep = internalMutation({
+	args: {},
+	async handler(ctx) {
+		const now = Date.now();
+		const rooms = await ctx.db
+			.query("rooms")
+			.withIndex("byStatus", (q) => q.eq("status", "active"))
+			.collect();
+
+		for (const room of rooms) {
+			const engine = getEngine(room.type);
+
+			if (room.players.length < engine.playerCount) {
+				if (now - room._creationTime > EMPTY_ROOM_TIMEOUT_MS) {
+					await ctx.db.patch(room._id, { status: "closed", closedAt: now, reason: "empty" });
+				}
+				continue;
+			}
+
+			// A full room's seats are guaranteed still active here — `forfeitRoom` always closes the
+			// room the moment any seat's player leaves, so an "active" full room can't have a departed one.
+			const players = await Promise.all(room.players.map((id) => ctx.db.get(id)));
+			const stale = players.map(
+				(p) => p !== null && now - (p.seenAt ?? p._creationTime) > AUTO_ABANDON_MS
+			);
+			const staleCount = stale.filter(Boolean).length;
+			if (staleCount === 0) continue;
+
+			if (staleCount === players.length) {
+				// Every seat went silent at once — close it, but credit nobody.
+				await Promise.all(
+					players.map((player) => player && ctx.db.patch(player._id, { leftAt: now }))
+				);
+				await ctx.db.patch(room._id, { status: "closed", closedAt: now, reason: "inactive" });
+				continue;
+			}
+
+			for (let i = 0; i < players.length; i++) {
+				const player = players[i];
+				if (player && stale[i]) await forfeitRoom(ctx, room, player);
+			}
+		}
+	}
+});
+
 export type GameHistoryEntry = {
 	round: number;
 	createdAt: number;
-	result: "win" | "loss" | "draw" | "in-progress";
+	result: "win" | "loss" | "draw" | "in-progress" | "abandoned";
 };
 
 export type RoomHistoryEntry = {
 	code: string;
 	type: GameType;
+	status: "active" | "closed";
 	opponentName: string | null;
 	games: GameHistoryEntry[];
 };
@@ -310,7 +466,7 @@ export type RoomHistoryEntry = {
  *  oldest-round-first — powers the signed-in-only history page. Walks rooms via the player's own
  *  rows rather than a single indexed scan since a round's outcome depends on that room's own player
  *  order and game engine. */
-export const listForUser = query({
+export const history = query({
 	args: {},
 	async handler(ctx): Promise<RoomHistoryEntry[]> {
 		const user = await requireUser(ctx);
@@ -336,7 +492,7 @@ export const listForUser = query({
 				const entries = await Promise.all(
 					games.map(async (game): Promise<GameHistoryEntry> => {
 						const clocks = await clocksByGame(ctx, game._id);
-						const endedClock = clocks.find((clock) => clock.endReason !== undefined);
+						const endedClock = clocks.find((clock) => clock.reason !== undefined);
 						const status = gameStatus(room.type, game.state);
 						const isOver = endedClock !== undefined || (status?.isOver ?? false);
 
@@ -346,6 +502,9 @@ export const listForUser = query({
 								? otherPlayer(room.players.indexOf(endedClock.playerId))
 								: roundWinner(room.type, game.state);
 							result = winnerIndex === null ? "draw" : winnerIndex === myIndex ? "win" : "loss";
+						} else if (!isRoomActive(room)) {
+							// The room closed (e.g. both seats went idle) without this round ever resolving.
+							result = "abandoned";
 						}
 
 						return { round: game.round, createdAt: game._creationTime, result };
@@ -356,6 +515,7 @@ export const listForUser = query({
 				return {
 					code: room.code,
 					type: room.type,
+					status: room.status ?? "active",
 					opponentName: opponent?.name ?? null,
 					games: entries
 				};
@@ -381,7 +541,7 @@ export type OpenRoomEntry = {
 
 /** Public rooms still waiting for an opponent, newest first — powers the room browser. A room drops
  *  off this list the moment its last seat fills, since it's no longer "waiting to be opened". */
-export const listOpenPublicRooms = query({
+export const lobbies = query({
 	args: {},
 	async handler(ctx): Promise<OpenRoomEntry[]> {
 		const user = await requireUser(ctx);
@@ -400,7 +560,7 @@ export const listOpenPublicRooms = query({
 		const entries = await Promise.all(
 			rooms.map(async (room): Promise<OpenRoomEntry | null> => {
 				const engine = getEngine(room.type);
-				if (room.players.length >= engine.playerCount) return null;
+				if (!isRoomActive(room) || room.players.length >= engine.playerCount) return null;
 
 				const hostId = room.players[0] ?? null;
 				const host = hostId ? await ctx.db.get(hostId) : null;

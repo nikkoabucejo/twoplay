@@ -22,10 +22,19 @@ export abstract class Room {
 	#resign = useMutation(api.models.games.index.resign);
 	#trashtalk = useMutation(api.models.players.index.trashtalk);
 	#timeout = useMutation(api.models.games.index.timeout);
+	#abandonRoom = useMutation(api.models.rooms.index.abandon);
+	#heartbeat = useMutation(api.models.players.index.heartbeat);
+
+	/** How long an opponent's seat can go without a heartbeat before this browser shows them as
+	 *  disconnected. Purely a display threshold — the server's own idle sweep is what actually
+	 *  forfeits an abandoned room, on a longer timer. */
+	static #DISCONNECTED_AFTER_MS = 30_000;
+	static #HEARTBEAT_INTERVAL_MS = 15_000;
 
 	/** Ticks once a second so `now`-derived clock displays update without a server round-trip. */
 	#now = $state(Date.now());
 	#tick: ReturnType<typeof setInterval>;
+	#heartbeatTick: ReturnType<typeof setInterval>;
 
 	#isClaimingTimeout = $state(false);
 	#frozenRemaining = $state<[number, number] | null>(null);
@@ -53,6 +62,12 @@ export abstract class Room {
 		}));
 		this.#tick = setInterval(() => (this.#now = Date.now()), 1000);
 
+		// Records that this browser is still here, for the opponent's "disconnected" indicator and the
+		// server's idle-room sweep. Fired once immediately rather than waiting out the first interval.
+		const sendHeartbeat = () => void this.#heartbeat({ code: this.#getCode() }).catch(() => {});
+		sendHeartbeat();
+		this.#heartbeatTick = setInterval(sendHeartbeat, Room.#HEARTBEAT_INTERVAL_MS);
+
 		$effect(() => {
 			if (this.isClockDisplayFrozen) {
 				if (this.#frozenRemaining === null) this.#frozenRemaining = this.#liveRemaining;
@@ -77,9 +92,10 @@ export abstract class Room {
 		});
 	}
 
-	/** Call on component teardown to stop the clock tick. */
+	/** Call on component teardown to stop the clock tick and heartbeat. */
 	dispose(): void {
 		clearInterval(this.#tick);
+		clearInterval(this.#heartbeatTick);
 	}
 
 	get isLoading() {
@@ -101,6 +117,21 @@ export abstract class Room {
 	 *  so the query's `number | null` is narrowed here once instead of at every call site. */
 	myIndex = $derived((this.data?.myIndex ?? null) as 0 | 1 | null);
 
+	/** True once the room has closed for good — a player abandoned it, it never filled, or every seat
+	 *  went idle. Closed rooms are permanently un-joinable; only Rematch/Play are gated on this, since
+	 *  the room stays viewable for history. */
+	isRoomClosed = $derived(this.data?.status === "closed");
+
+	/** True while the seat opposite the viewer has gone quiet for longer than the display threshold —
+	 *  purely a UI hint; the server's own idle sweep (on a longer timer) is what actually forfeits the
+	 *  room. Null while spectating (no "opponent" to speak of) or before that seat has ever heartbeated. */
+	opponentDisconnected = $derived.by(() => {
+		const seat = this.myIndex === null ? null : this.myIndex === 0 ? 1 : 0;
+		const seenAt = seat === null ? null : (this.players[seat]?.seenAt ?? null);
+		if (seenAt === null) return false;
+		return this.now - seenAt > Room.#DISCONNECTED_AFTER_MS;
+	});
+
 	/** The round currently displayed, whether it's still live, and how it ended, if it has. */
 	game = $derived.by(() => ({
 		/** The round currently displayed — for round-by-round navigation. */
@@ -109,11 +140,12 @@ export abstract class Room {
 		latestRound: this.data?.game.latestRound ?? this.data?.game.round ?? 1,
 		/** False when `getRound` has pinned this to a past round rather than the one still being played. */
 		isLive: this.data?.game.isLive ?? true,
-		/** The seat whose round has ended against them — a real clock timeout or a resignation — or null. */
+		/** The seat whose round has ended against them — a real clock timeout, a resignation, or an
+		 *  abandonment — or null. */
 		endedSeat: (this.data?.game.endedSeat ?? null) as 0 | 1 | null,
-		/** Why `endedSeat`'s round ended, or null. Distinct from `"timeout"` always being assumed, since a
-		 *  resignation sets the same end-of-round state as a timeout does. */
-		endReason: this.data?.game.endReason ?? null
+		/** Why `endedSeat`'s round ended, or null. Distinct causes so the client doesn't mislabel one
+		 *  as another. */
+		reason: this.data?.game.reason ?? null
 	}));
 
 	/** Banked remaining clock per seat, in ms, as of `#turnedAt` — frozen until the next server
@@ -233,6 +265,17 @@ export abstract class Room {
 		this.error = null;
 		try {
 			await this.#resign({ code: this.#getCode() });
+		} catch (err) {
+			this.error = err instanceof Error ? err.message : "Something went wrong";
+		}
+	}
+
+	/** Abandons the room entirely — distinct from `resign`, which only forfeits the current round.
+	 *  Forfeits the match to the opponent and closes the room for good. */
+	async abandon(): Promise<void> {
+		this.error = null;
+		try {
+			await this.#abandonRoom({ code: this.#getCode() });
 		} catch (err) {
 			this.error = err instanceof Error ? err.message : "Something went wrong";
 		}

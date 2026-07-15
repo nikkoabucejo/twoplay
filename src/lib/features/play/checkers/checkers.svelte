@@ -53,9 +53,14 @@
 		if (!auth.isSignedIn) return;
 
 		joinError = null;
-		joinRoom({ code }).catch((err) => {
-			joinError = err instanceof Error ? err.message : "Could not join this room";
-		});
+		joinRoom({ code })
+			.then((result) => {
+				if (result.redirected)
+					goto(resolve(`/${result.type}/${result.code}`), { replaceState: true });
+			})
+			.catch((err) => {
+				joinError = err instanceof Error ? err.message : "Could not join this room";
+			});
 	});
 
 	$effect(() => {
@@ -71,6 +76,10 @@
 
 	function goToRound(round: number) {
 		goto(resolve(`/checkers/${roomCode}/${round}`));
+	}
+
+	function playAgain() {
+		goto(resolve("/play?game=checkers"));
 	}
 
 	function firstName(name: string) {
@@ -139,7 +148,7 @@
 			? {
 					type: "winner",
 					player: room.game.endedSeat === 0 ? 1 : 0,
-					reason: room.game.endReason ?? undefined
+					reason: room.game.reason ?? undefined
 				}
 			: room.winner
 				? { type: "winner", player: playerIndexOf(room.winner) }
@@ -186,14 +195,14 @@
 	{:else if data === null}
 		<div class="flex flex-col items-center gap-3">
 			<p class="text-muted-foreground">Room "{roomCode}" doesn't exist.</p>
-			<Button variant="outline" href="/checkers">Back to lobby</Button>
+			<Button variant="outline" href="/play?game=checkers">Back to play</Button>
 		</div>
 	{:else if room.wrongGameType}
 		<Spinner size="lg" />
 	{:else if joinError}
 		<div class="flex flex-col items-center gap-3">
 			<p class="text-muted-foreground">{joinError}</p>
-			<Button variant="outline" href="/checkers">Back to lobby</Button>
+			<Button variant="outline" href="/play?game=checkers">Back to play</Button>
 		</div>
 	{:else if data}
 		<div class="relative">
@@ -236,6 +245,7 @@
 				{status}
 				clock={room.clock}
 				myIndex={room.myIndex}
+				opponentDisconnected={room.opponentDisconnected}
 				onTrashtalk={(emoji) => room.trashtalk(emoji)}
 				footer={{
 					isLive: room.game.isLive,
@@ -243,6 +253,9 @@
 					latestRound: room.game.latestRound,
 					onResign: () => room.resign(),
 					onRematch: () => room.rematch(),
+					onAbandon: () => room.abandon(),
+					onPlayAgain: playAgain,
+					roomClosed: room.isRoomClosed,
 					onGoLive: goLive,
 					onGoToRound: goToRound,
 					error: room.error

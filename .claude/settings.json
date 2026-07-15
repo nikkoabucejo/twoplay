@@ -78,7 +78,9 @@
       "Bash(find /Users/nikkoabucejo/Workspaces/twoplay/node_modules/.pnpm/@clerk+shared@4.25.2_react@19.2.7 -iname *.d.ts)",
       "Bash(npm view *)",
       "Bash(npm pack *)",
-      "Read(//private/tmp/clerk-ui-extract/package/dist/**)"
+      "Read(//private/tmp/clerk-ui-extract/package/dist/**)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(xargs -I{} sh -c 'echo \"=== {} ===\"; cat {}')"
     ]
   }
 }

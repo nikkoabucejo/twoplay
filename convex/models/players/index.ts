@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import type { Id } from "../../_generated/dataModel";
 import { mutation, type MutationCtx, type QueryCtx } from "../../_generated/server";
-import { getRoomByCode, requirePlayer } from "../rooms/auth.js";
+import { currentPlayer, getRoomByCode, requirePlayer } from "../rooms/auth.js";
 
 export const DEFAULT_EMOJI = "1f600";
 
@@ -47,5 +47,22 @@ export const trashtalk = mutation({
 
 		const player = await requirePlayer(ctx, room._id);
 		await ctx.db.patch(player._id, { emoji });
+	}
+});
+
+/** Records that the caller is still present in this room — a cheap patch on their existing row,
+ *  called periodically while the room's tab is open. Powers the opponent "disconnected" indicator
+ *  and the idle-room sweep. Silently does nothing for a spectator (no player row yet) or a player
+ *  who has already abandoned — never throws, since it's a fire-and-forget background call. */
+export const heartbeat = mutation({
+	args: { code: v.string() },
+	async handler(ctx, { code }) {
+		const room = await getRoomByCode(ctx, code);
+		if (!room) return;
+
+		const player = await currentPlayer(ctx, room._id);
+		if (!player || player.leftAt !== undefined) return;
+
+		await ctx.db.patch(player._id, { seenAt: Date.now() });
 	}
 });

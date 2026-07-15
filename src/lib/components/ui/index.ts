@@ -1,4 +1,11 @@
-export { Button, buttonVariants } from "./button/index.js";
+export { Button, buttonVariants, type ButtonSize, type ButtonVariant } from "./button/index.js";
+export {
+	Dropdown,
+	DropdownContent,
+	DropdownItem,
+	DropdownSeparator,
+	DropdownTrigger
+} from "./dropdown/index.js";
 export { Emoji } from "./emoji/index.js";
 export { Popover, PopoverContent, PopoverTrigger } from "./popover/index.js";
 export { Sparkle } from "./sparkle/index.js";

@@ -27,7 +27,7 @@
 	/** Drives the status bar's center content — whose turn it is, or how the game ended. */
 	export type BoardStatus =
 		| { type: "turn"; player: 0 | 1 }
-		| { type: "winner"; player: 0 | 1; reason?: "timeout" | "resign" }
+		| { type: "winner"; player: 0 | 1; reason?: "timeout" | "resign" | "abandon" }
 		| { type: "draw" };
 
 	/** Server-derived clock display — `board.svelte` only renders these numbers, it never ticks its own. */
@@ -46,15 +46,25 @@
 		round: number;
 		/** The room's most recent round — 1-indexed. */
 		latestRound: number;
-		/** Forfeits the round in progress in favor of the opponent. Only called while `isLive` and the
-		 *  round is still running. */
+		/** Forfeits the round in progress in favor of the opponent. Offered as one of two choices in the
+		 *  Resign button's dropdown, alongside `onAbandon`. Only called while `isLive`, the round is
+		 *  still running, and `!roomClosed`. */
 		onResign: () => void;
 		/** Starts the room's next round. Only called while `isLive` and the round is over. */
 		onRematch: () => void;
+		/** Abandons the room entirely, forfeiting the match and closing the room for good — distinct
+		 *  from `onResign`, which only ends the current round. The other of the Resign button's two
+		 *  dropdown choices. Only called while `!roomClosed`. */
+		onAbandon: () => void;
+		/** Leaves this closed room for a fresh one. Replaces Resign/Rematch once `roomClosed`. */
+		onPlayAgain: () => void;
 		/** Navigates to the room's current live round. Only called while `!isLive`. */
 		onGoLive: () => void;
 		/** Navigates to a specific past or present round. */
 		onGoToRound: (round: number) => void;
+		/** True once the room has closed for good — the action button becomes Play Again instead of
+		 *  Resign/Rematch. */
+		roomClosed?: boolean;
 		error?: string | null;
 	};
 </script>
@@ -62,7 +72,18 @@
 <script lang="ts">
 	import { ChevronLeft, ChevronRight } from "@lucide/svelte";
 	import { fade } from "svelte/transition";
-	import { Button, Emoji, Popover, PopoverContent, PopoverTrigger } from "$lib/components/ui";
+	import {
+		Button,
+		Dropdown,
+		DropdownContent,
+		DropdownItem,
+		DropdownSeparator,
+		DropdownTrigger,
+		Emoji,
+		Popover,
+		PopoverContent,
+		PopoverTrigger
+	} from "$lib/components/ui";
 	import { ACCENTS, cn } from "$lib/utils/style";
 	import type { Snippet } from "svelte";
 	import { getMood } from "./mood.svelte.js";
@@ -75,6 +96,7 @@
 		size = "34rem",
 		class: className,
 		myIndex = null,
+		opponentDisconnected = false,
 		onTrashtalk,
 		children
 	}: {
@@ -92,6 +114,8 @@
 		/** Which seat the viewer occupies — that seat's emoji becomes clickable. Null/omitted (e.g.
 		 *  spectating) keeps both emoji purely decorative. */
 		myIndex?: 0 | 1 | null;
+		/** True while the opponent's seat has gone quiet — shows a small indicator on their emoji. */
+		opponentDisconnected?: boolean;
 		/** Called with the chosen codepoint when the viewer picks a new emoji for their own seat. */
 		onTrashtalk?: (emoji: string) => void;
 		/** The game itself. Fills the square board area — use `size-full`. */
@@ -160,7 +184,7 @@
 
 {#snippet emojiBox(seat: 0 | 1)}
 	<div
-		class="flex size-12 shrink-0 items-center justify-center rounded-lg border bg-muted/40 backdrop-blur-sm"
+		class="relative flex size-12 shrink-0 items-center justify-center rounded-lg border bg-muted/40 backdrop-blur-sm"
 	>
 		{#if myIndex === seat}
 			{@render emojiPicker(seat)}
@@ -170,6 +194,13 @@
 				label={emojiLabel(players[seat].emoji)}
 				class="size-6"
 			/>
+		{/if}
+		{#if myIndex !== null && myIndex !== seat && opponentDisconnected}
+			<span
+				class="absolute -top-1 -right-1 size-3 rounded-full bg-destructive ring-2 ring-background"
+				aria-label="Opponent disconnected"
+				title="Opponent disconnected"
+			></span>
 		{/if}
 	</div>
 {/snippet}
@@ -296,16 +327,33 @@
 								>
 									Go live
 								</Button>
-							{:else if !roundOver}
+							{:else if footer.roomClosed}
 								<Button
 									variant="outline"
 									size="sm"
 									class="w-32 uppercase"
-									onclick={footer.onResign}
-									disabled={isSpectator}
+									onclick={footer.onPlayAgain}
 								>
-									Resign
+									Play again
 								</Button>
+							{:else if !roundOver}
+								<Dropdown>
+									<DropdownTrigger
+										variant="outline"
+										size="sm"
+										class="w-32 uppercase"
+										disabled={isSpectator}
+									>
+										Resign
+									</DropdownTrigger>
+									<DropdownContent side="bottom" sideOffset={8} class="w-32">
+										<DropdownItem onSelect={footer.onResign}>Resign</DropdownItem>
+										<DropdownSeparator />
+										<DropdownItem variant="destructive" onSelect={footer.onAbandon}>
+											Abandon
+										</DropdownItem>
+									</DropdownContent>
+								</Dropdown>
 							{:else}
 								<Button
 									variant="outline"

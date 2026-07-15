@@ -14,7 +14,13 @@ export const playersTable = defineTable({
 	score: v.number(),
 	// Status-bar emoji — scoped to this room's player row, not the user's identity, so the same
 	// person can pick differently in a different room.
-	emoji: v.string()
+	emoji: v.string(),
+	// Epoch ms when this player abandoned the room, or undefined while still an active member. The
+	// row itself is never deleted — history reads it — this just marks the membership as over.
+	leftAt: v.optional(v.number()),
+	// Epoch ms of this player's last heartbeat, for opponent "disconnected" detection and the idle
+	// sweep. Undefined before their first heartbeat.
+	seenAt: v.optional(v.number())
 })
 	.index("byUserAndRoom", ["userId", "roomId"])
 	.index("byUser", ["userId"]);

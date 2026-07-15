@@ -1,14 +1,9 @@
 <script lang="ts">
-	import { CheckersIcon, TictactoeIcon } from "$lib/assets/icons/games";
 	import { Button, Sparkle } from "$lib/components/ui";
+	import { GAMES, GAME_TYPES } from "$lib/features/play";
 	import { getClerkAuth } from "$lib/services/auth";
 
 	const auth = getClerkAuth();
-
-	const games = [
-		{ href: "/tictactoe", name: "Tic-Tac-Toe", icon: TictactoeIcon },
-		{ href: "/checkers", name: "Checkers", icon: CheckersIcon }
-	];
 </script>
 
 <div class="flex flex-1 flex-col items-center justify-center gap-10 px-4 py-8 text-center">
@@ -29,14 +24,14 @@
 		</div>
 	{:else}
 		<div class="flex items-center justify-center gap-12">
-			{#each games as game (game.href)}
-				{@const Icon = game.icon}
+			{#each GAME_TYPES as type (type)}
+				{@const Icon = GAMES[type].icon}
 				<a
-					href={game.href}
+					href="/play?game={type}"
 					class="flex flex-col items-center gap-2 text-foreground transition-opacity hover:opacity-70 active:opacity-50"
 				>
 					<Icon class="size-10" />
-					<span class="font-semibold">{game.name}</span>
+					<span class="font-semibold">{GAMES[type].name}</span>
 				</a>
 			{/each}
 		</div>

@@ -104,9 +104,11 @@ typically wrapping it in `Cursor` (from `$lib/features/presence`) for peer-curso
 ## Icon registration (`src/lib/assets/icons/games/`)
 
 Flat barrel, one file per game: `export { default as <Game>Icon } from "./<game>.svelte"` in
-`index.ts`, alongside a standalone inline-SVG component (`{ class? }` prop only). Consumed by the
-home page's game-picker list and passed into `<Lobby gameType="<game>" icon={<Game>Icon} />` on the
-per-game lobby route.
+`index.ts`, alongside a standalone inline-SVG component (`{ class? }` prop only). Registered once in
+the `GAMES` record (`src/lib/features/play/games.ts`, keyed by `GameType`) alongside the game's display
+name — that single record is what drives the home page's game-picker, the `Play` component's game-type
+selector (`/play`), the `Lobby` rooms browser (`/lobby`), and `History`, so a new game's icon/name never
+needs registering more than once.
 
 ## Full recipe: adding a new game (example: "connectfour")
 
@@ -133,10 +135,13 @@ Then client:
 9. `src/lib/features/play/connectfour/index.ts` — barrel.
 10. Edit `src/lib/features/play/index.ts` — add the re-export line.
 11. `src/lib/assets/icons/games/connectfour.svelte` + edit its `index.ts` barrel.
-12. Routes: `src/routes/(games)/connectfour/+page.svelte` (uses `<Lobby>`) and
-    `src/routes/(games)/connectfour/[code]/[[round]]/+page.svelte` (renders `<Connectfour
-    roomCode={params.code} {round} />`) — copy the tictactoe route files, swap names.
-13. Edit `src/routes/(games)/+page.svelte` — add the new game to the picker's `games` array.
+12. Edit `src/lib/features/play/games.ts` — add a `connectfour` entry to the `GAMES` record (name +
+    icon). This alone is what surfaces the new game in the home page picker, `/play`'s game-type
+    selector, and the `/lobby` rooms browser — none of those files need editing directly.
+13. Routes: only `src/routes/(games)/connectfour/[code]/[[round]]/+page.svelte` (renders
+    `<Connectfour roomCode={params.code} {round} />`) — copy the tictactoe per-round route file, swap
+    names. There is no per-game lobby route to add; `/play` (game-agnostic, reads `GAMES`) is the sole
+    create/join entry point for every game.
 
 Nothing else needs editing — `convex/models/rooms/*`, the shared `Room`, and `Board` are fully
 game-agnostic, written against `GameType`/`gameEngines`.
