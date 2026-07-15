@@ -53,7 +53,7 @@
 		/>
 		<div class={cn("flex flex-col", index === 1 && "items-end")}>
 			<span class={cn("text-xs font-semibold", ACCENTS[index].text)}>
-				{player ? firstName(player.name) : "Waiting…"}
+				{player ? firstName(player.name) : "----------"}
 			</span>
 			<span class="font-mono text-sm tabular-nums text-muted-foreground">
 				{formatClock(ms)}
@@ -70,14 +70,8 @@
 >
 	<div class="flex items-center justify-between gap-2">
 		<span class="flex items-center gap-1.5 text-xs font-semibold">
-			<span class="relative flex size-1.5" aria-hidden="true">
-				<span
-					class="absolute inline-flex size-full animate-ping rounded-full bg-emerald-500 opacity-75"
-				></span>
-				<span class="relative inline-flex size-1.5 rounded-full bg-emerald-500"></span>
-			</span>
 			{GAMES[type].name}
-			<span class="text-muted-foreground">· {code}</span>
+			<span class="text-muted-foreground">{code}</span>
 		</span>
 		<div class="flex items-center gap-1.5">
 			<Button variant="outline" size="xs" class="text-destructive" onclick={() => room.abandon()}>
