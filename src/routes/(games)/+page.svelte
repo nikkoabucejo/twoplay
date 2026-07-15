@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Button, Sparkle } from "$lib/components/ui";
-	import { GAMES, GAME_TYPES } from "$lib/features/play";
+	import { Icon, GAMES, GAME_TYPES } from "$lib/features/play";
 	import { getClerkAuth } from "$lib/services/auth";
 
 	const auth = getClerkAuth();
@@ -25,12 +25,11 @@
 	{:else}
 		<div class="flex items-center justify-center gap-12">
 			{#each GAME_TYPES as type (type)}
-				{@const Icon = GAMES[type].icon}
 				<a
 					href="/play?game={type}"
-					class="flex flex-col items-center gap-2 text-foreground transition-opacity hover:opacity-70 active:opacity-50"
+					class="flex flex-col items-center gap-1 text-foreground transition-opacity hover:opacity-70 active:opacity-50"
 				>
-					<Icon class="size-10" />
+					<Icon {type} class="size-14" />
 					<span class="font-semibold">{GAMES[type].name}</span>
 				</a>
 			{/each}

@@ -104,11 +104,11 @@ export const join = mutation({
 		if (!room) throw new Error("Room not found");
 
 		const user = await requireUser(ctx);
+		// Re-navigating to a room you already have a seat in — whether still active or long since
+		// abandoned — is just viewing it, never a fresh join. Closed rooms stay fully visible in
+		// history (see `abandon`), so a former seat here is a no-op rather than an error.
 		const existing = await playerByUserAndRoom(ctx, user._id, room._id);
-		if (existing) {
-			if (existing.leftAt !== undefined) throw new Error("You left this room");
-			return { code: room.code, type: room.type, redirected: false };
-		}
+		if (existing) return { code: room.code, type: room.type, redirected: false };
 
 		if (!isRoomActive(room)) throw new Error("This room is no longer active");
 		const activeRoom = await getActiveRoomForUser(ctx, user._id);
@@ -343,7 +343,12 @@ export const rematch = mutation({
  *  active seat remains. Assumes the caller already verified the room is active and `player` hasn't
  *  already left. */
 async function forfeitRoom(ctx: MutationCtx, room: Doc<"rooms">, player: Doc<"players">) {
-	const game = await getCurrentGame(ctx, room._id);
+	// A room with an empty seat has no opponent to forfeit the round to or credit a win — e.g. the host
+	// abandoning before anyone else has joined. Skip straight to closing the room in that case.
+	const game =
+		room.players.length >= getEngine(room.type).playerCount
+			? await getCurrentGame(ctx, room._id)
+			: null;
 	if (game) {
 		let clocks = await clocksByGame(ctx, game._id);
 		const status = gameStatus(room.type, game.state);
@@ -451,7 +456,7 @@ export const sweep = internalMutation({
 export type GameHistoryEntry = {
 	round: number;
 	createdAt: number;
-	result: "win" | "loss" | "draw" | "in-progress" | "abandoned";
+	result: "win" | "loss" | "draw" | "playing";
 };
 
 export type RoomHistoryEntry = {
@@ -496,15 +501,12 @@ export const history = query({
 						const status = gameStatus(room.type, game.state);
 						const isOver = endedClock !== undefined || (status?.isOver ?? false);
 
-						let result: GameHistoryEntry["result"] = "in-progress";
+						let result: GameHistoryEntry["result"] = "playing";
 						if (isOver) {
 							const winnerIndex = endedClock
 								? otherPlayer(room.players.indexOf(endedClock.playerId))
 								: roundWinner(room.type, game.state);
 							result = winnerIndex === null ? "draw" : winnerIndex === myIndex ? "win" : "loss";
-						} else if (!isRoomActive(room)) {
-							// The room closed (e.g. both seats went idle) without this round ever resolving.
-							result = "abandoned";
 						}
 
 						return { round: game.round, createdAt: game._creationTime, result };

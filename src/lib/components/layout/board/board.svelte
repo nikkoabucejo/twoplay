@@ -24,11 +24,15 @@
 		{ codepoint: "1f37f", label: "Popcorn" }
 	];
 
-	/** Drives the status bar's center content — whose turn it is, or how the game ended. */
+	/** Drives the status bar's center content — whose turn it is, or how the game ended. `"waiting"`
+	 *  covers the room being short a seat — styled and moodboarded identically to `"draw"`. `closed`
+	 *  covers the room having been abandoned while still waiting — same empty seat, but there's no
+	 *  longer anything to wait for, so the center text goes blank rather than still reading "Waiting". */
 	export type BoardStatus =
 		| { type: "turn"; player: 0 | 1 }
 		| { type: "winner"; player: 0 | 1; reason?: "timeout" | "resign" | "abandon" }
-		| { type: "draw" };
+		| { type: "draw" }
+		| { type: "waiting"; closed?: boolean };
 
 	/** Server-derived clock display — `board.svelte` only renders these numbers, it never ticks its own. */
 	export type BoardClock = {
@@ -50,11 +54,12 @@
 		 *  Resign button's dropdown, alongside `onAbandon`. Only called while `isLive`, the round is
 		 *  still running, and `!roomClosed`. */
 		onResign: () => void;
-		/** Starts the room's next round. Only called while `isLive` and the round is over. */
+		/** Starts the room's next round. Only called while `isLive` and the round is over. Offered as
+		 *  one of two choices in the Rematch button's dropdown, alongside `onAbandon`. */
 		onRematch: () => void;
 		/** Abandons the room entirely, forfeiting the match and closing the room for good — distinct
-		 *  from `onResign`, which only ends the current round. The other of the Resign button's two
-		 *  dropdown choices. Only called while `!roomClosed`. */
+		 *  from `onResign`, which only ends the current round. The other choice in both the Resign and
+		 *  Rematch buttons' dropdowns. Only called while `!roomClosed`. */
 		onAbandon: () => void;
 		/** Leaves this closed room for a fresh one. Replaces Resign/Rematch once `roomClosed`. */
 		onPlayAgain: () => void;
@@ -65,6 +70,9 @@
 		/** True once the room has closed for good — the action button becomes Play Again instead of
 		 *  Resign/Rematch. */
 		roomClosed?: boolean;
+		/** True while the room is short a seat — the action button becomes a plain Abandon (no Resign
+		 *  choice, no dropdown), since there's no opponent yet to resign a round against. */
+		waitingForOpponent?: boolean;
 		error?: string | null;
 	};
 </script>
@@ -207,19 +215,18 @@
 
 {#snippet clockBox(seat: 0 | 1)}
 	{@const ms = clock?.remaining[seat] ?? 0}
-	{@const timedOut = ms <= 0}
-	{@const low = ms <= LOW_TIME_MS}
-	{@const lost = status?.type === "winner" && status.player !== seat}
+	{@const active = clock?.activeSeat === seat && ms > 0}
+	{@const low = active && ms <= LOW_TIME_MS}
 	<div
 		class={cn(
 			"flex h-12 w-20 shrink-0 items-center justify-center rounded-lg",
-			lost ? "bg-muted/40" : ACCENTS[seat].tintBg
+			ACCENTS[seat].tintBg
 		)}
 	>
 		<span
 			class={cn(
 				"text-lg font-semibold tabular-nums",
-				timedOut || lost ? "text-muted-foreground" : low ? "text-destructive" : players[seat].accent
+				low ? "text-destructive" : players[seat].accent
 			)}
 			aria-label={`${players[seat].label}'s clock: ${formatClock(ms)} remaining`}
 		>
@@ -272,6 +279,14 @@
 							>
 								Draw
 							</span>
+						{:else if status.type === "waiting"}
+							{#if !status.closed}
+								<span
+									class="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase"
+								>
+									Waiting
+								</span>
+							{/if}
 						{:else}
 							{@render turnIndicator(status.player, "Turn", true, players[status.player].accent)}
 						{/if}
@@ -336,6 +351,16 @@
 								>
 									Play again
 								</Button>
+							{:else if footer.waitingForOpponent}
+								<Button
+									variant="outline"
+									size="sm"
+									class="w-32 uppercase"
+									onclick={footer.onAbandon}
+									disabled={isSpectator}
+								>
+									Abandon
+								</Button>
 							{:else if !roundOver}
 								<Dropdown>
 									<DropdownTrigger
@@ -355,15 +380,23 @@
 									</DropdownContent>
 								</Dropdown>
 							{:else}
-								<Button
-									variant="outline"
-									size="sm"
-									class="w-32 uppercase"
-									onclick={footer.onRematch}
-									disabled={isSpectator}
-								>
-									Rematch
-								</Button>
+								<Dropdown>
+									<DropdownTrigger
+										variant="outline"
+										size="sm"
+										class="w-32 uppercase"
+										disabled={isSpectator}
+									>
+										Rematch
+									</DropdownTrigger>
+									<DropdownContent side="bottom" sideOffset={8} class="w-32">
+										<DropdownItem onSelect={footer.onRematch}>Rematch</DropdownItem>
+										<DropdownSeparator />
+										<DropdownItem variant="destructive" onSelect={footer.onAbandon}>
+											Abandon
+										</DropdownItem>
+									</DropdownContent>
+								</Dropdown>
 							{/if}
 						</span>
 

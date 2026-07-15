@@ -130,17 +130,19 @@
 	}
 
 	const status: BoardStatus = $derived(
-		room.game.endedSeat !== null
-			? {
-					type: "winner",
-					player: room.game.endedSeat === 0 ? 1 : 0,
-					reason: room.game.reason ?? undefined
-				}
-			: room.winner
-				? { type: "winner", player: playerIndexOf(room.winner) }
-				: room.isOver
-					? { type: "draw" }
-					: { type: "turn", player: playerIndexOf(room.turn) }
+		room.isWaitingForOpponent
+			? { type: "waiting", closed: room.isRoomClosed }
+			: room.game.endedSeat !== null
+				? {
+						type: "winner",
+						player: room.game.endedSeat === 0 ? 1 : 0,
+						reason: room.game.reason ?? undefined
+					}
+				: room.winner
+					? { type: "winner", player: playerIndexOf(room.winner) }
+					: room.isOver
+						? { type: "draw" }
+						: { type: "turn", player: playerIndexOf(room.turn) }
 	);
 </script>
 
@@ -321,6 +323,7 @@
 					onAbandon: () => room.abandon(),
 					onPlayAgain: playAgain,
 					roomClosed: room.isRoomClosed,
+					waitingForOpponent: room.isWaitingForOpponent,
 					onGoLive: goLive,
 					onGoToRound: goToRound,
 					error: room.error

@@ -39,7 +39,8 @@
 	// off the seat number alone without knowing which game (or symbol/color scheme) is live.
 	const activeSeat = $derived(mood.status?.type === "turn" ? mood.status.player : null);
 	const winnerSeat = $derived(mood.status?.type === "winner" ? mood.status.player : null);
-	const isDraw = $derived(mood.status?.type === "draw");
+	// "waiting" (short a seat) gets the exact same treatment as "draw" — a neutral, no-one's-turn mood.
+	const isDraw = $derived(mood.status?.type === "draw" || mood.status?.type === "waiting");
 
 	function moodScale(seat: 0 | 1) {
 		if (isDraw) return 1;

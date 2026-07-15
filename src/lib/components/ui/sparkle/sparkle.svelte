@@ -5,13 +5,15 @@
 	export type SparkleProps = {
 		/** Two hex colors, one per sparkle group — e.g. the app's player 1/player 2 seat accents. */
 		colors: [string, string];
+		/** Title is wide for the wordmark; icon is compact for square game marks. */
+		variant?: SparkleVariant;
 		class?: string;
 	};
 
+	export type SparkleVariant = "title" | "icon";
+
 	const FRAME_RATE = 30;
 	const TOTAL_FRAMES = 180;
-	const WIDTH = 440;
-	const HEIGHT = 140;
 	const HUMP_HALF_WIDTH = 12;
 
 	type Sparkle = {
@@ -27,7 +29,7 @@
 
 	// Loosely scattered around a wide title-shaped canvas, left half keyed to colors[0], right
 	// half to colors[1], each with its own peak timing so the twinkle reads as organic, not synced.
-	const SPARKLES: Sparkle[] = [
+	const TITLE_SPARKLES: Sparkle[] = [
 		{ x: 40, y: 30, size: 8, shape: "star", colorIndex: 0, peaks: [20, 100], peakOpacity: 0.95 },
 		{ x: 90, y: 105, size: 6, shape: "circle", colorIndex: 0, peaks: [55, 140], peakOpacity: 0.82 },
 		{
@@ -97,6 +99,23 @@
 			peakOpacity: 0.67
 		}
 	];
+
+	const ICON_SPARKLES: Sparkle[] = [
+		{ x: 18, y: 24, size: 5, shape: "star", colorIndex: 0, peaks: [15, 98], peakOpacity: 0.9 },
+		{ x: 34, y: 96, size: 4, shape: "circle", colorIndex: 1, peaks: [55, 138], peakOpacity: 0.74 },
+		{ x: 58, y: 14, size: 3.5, shape: "circle", colorIndex: 1, peaks: [35, 120], peakOpacity: 0.7 },
+		{ x: 72, y: 104, size: 5.5, shape: "star", colorIndex: 0, peaks: [78, 154], peakOpacity: 0.88 },
+		{ x: 98, y: 30, size: 4.5, shape: "star", colorIndex: 1, peaks: [5, 88, 168], peakOpacity: 0.9 },
+		{ x: 105, y: 76, size: 3.5, shape: "circle", colorIndex: 0, peaks: [62, 145], peakOpacity: 0.72 }
+	];
+
+	const SPARKLE_VARIANTS: Record<
+		SparkleVariant,
+		{ width: number; height: number; sparkles: Sparkle[] }
+	> = {
+		title: { width: 440, height: 140, sparkles: TITLE_SPARKLES },
+		icon: { width: 120, height: 120, sparkles: ICON_SPARKLES }
+	};
 
 	function hexToRgba(hex: string): [number, number, number, number] {
 		const value = hex.replace("#", "");
@@ -201,24 +220,26 @@
 
 	// Hand-authored Lottie composition (no fetched asset) so the two accent colors can be baked
 	// straight into each shape's fill rather than post-processing a generic sparkle file.
-	function createAnimationData(colors: [string, string]) {
+	function createAnimationData(colors: [string, string], variant: SparkleVariant) {
+		const config = SPARKLE_VARIANTS[variant];
+
 		return {
 			v: "5.9.6",
 			fr: FRAME_RATE,
 			ip: 0,
 			op: TOTAL_FRAMES,
-			w: WIDTH,
-			h: HEIGHT,
+			w: config.width,
+			h: config.height,
 			nm: "sparkle",
 			ddd: 0,
 			assets: [],
-			layers: SPARKLES.map((sparkle, index) => buildLayer(sparkle, index, colors))
+			layers: config.sparkles.map((sparkle, index) => buildLayer(sparkle, index, colors))
 		};
 	}
 </script>
 
 <script lang="ts">
-	let { colors, class: className }: SparkleProps = $props();
+	let { colors, variant = "title", class: className }: SparkleProps = $props();
 
 	let container = $state<HTMLDivElement>();
 	let animation: AnimationItem | undefined;
@@ -235,7 +256,7 @@
 				renderer: "svg",
 				loop: true,
 				autoplay: true,
-				animationData: createAnimationData(colors),
+				animationData: createAnimationData(colors, variant),
 				rendererSettings: { preserveAspectRatio: "none" }
 			});
 		});

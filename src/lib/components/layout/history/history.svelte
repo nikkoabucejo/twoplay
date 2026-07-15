@@ -14,8 +14,7 @@
 		win: "Win",
 		loss: "Loss",
 		draw: "Draw",
-		"in-progress": "Playing",
-		abandoned: "Abandoned"
+		playing: "Playing"
 	};
 
 	// Distinct from the seat-accent cyan/pink pair (see $lib/utils/style/accents) — this reads as a
@@ -25,8 +24,7 @@
 		win: "text-emerald-500",
 		loss: "text-destructive",
 		draw: "text-muted-foreground",
-		"in-progress": "text-amber-500",
-		abandoned: "text-muted-foreground"
+		playing: "text-amber-500"
 	};
 
 	const auth = getClerkAuth();

@@ -144,15 +144,17 @@
 	);
 
 	const status: BoardStatus = $derived(
-		room.game.endedSeat !== null
-			? {
-					type: "winner",
-					player: room.game.endedSeat === 0 ? 1 : 0,
-					reason: room.game.reason ?? undefined
-				}
-			: room.winner
-				? { type: "winner", player: playerIndexOf(room.winner) }
-				: { type: "turn", player: playerIndexOf(room.turn) }
+		room.isWaitingForOpponent
+			? { type: "waiting", closed: room.isRoomClosed }
+			: room.game.endedSeat !== null
+				? {
+						type: "winner",
+						player: room.game.endedSeat === 0 ? 1 : 0,
+						reason: room.game.reason ?? undefined
+					}
+				: room.winner
+					? { type: "winner", player: playerIndexOf(room.winner) }
+					: { type: "turn", player: playerIndexOf(room.turn) }
 	);
 
 	/** Player 1's pieces start at the bottom of the raw board; flip it so player 2 sees their own
@@ -256,6 +258,7 @@
 					onAbandon: () => room.abandon(),
 					onPlayAgain: playAgain,
 					roomClosed: room.isRoomClosed,
+					waitingForOpponent: room.isWaitingForOpponent,
 					onGoLive: goLive,
 					onGoToRound: goToRound,
 					error: room.error

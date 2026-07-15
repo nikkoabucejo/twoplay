@@ -113,8 +113,10 @@ export class TictactoeRoom extends Room {
 		const status = this.statuses[boardIndex];
 		return (
 			this.game.isLive &&
+			this.game.endedSeat === null &&
 			!this.isViewingHistory &&
 			!this.isOver &&
+			!this.isWaitingForOpponent &&
 			status?.status === "playing" &&
 			this.mySymbol === this.turn &&
 			!this.isForbidden(boardIndex)

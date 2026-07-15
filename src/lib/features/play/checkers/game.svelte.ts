@@ -58,7 +58,9 @@ export class CheckersRoom extends Room {
 	myColor = $derived<PieceColor | null>(this.myIndex === null ? null : colorOfPlayer(this.myIndex));
 	isMyTurn = $derived(
 		this.game.isLive &&
+			this.game.endedSeat === null &&
 			!this.isViewingHistory &&
+			!this.isWaitingForOpponent &&
 			this.myColor !== null &&
 			this.myColor === this.#liveTurn
 	);
