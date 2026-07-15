@@ -47,13 +47,13 @@ const MAX_TIME_CONTROL_MS = 60 * 60_000;
 
 /** Clamps a client-supplied time control into a sane range — a raw client value could otherwise be
  *  zero/negative (instant loss for whoever moves first) or `NaN` (silently disables timeouts). */
-function resolveTimeControlMs(timeControlMs: number | undefined): number {
+export function resolveTimeControlMs(timeControlMs: number | undefined): number {
 	if (timeControlMs === undefined || !Number.isFinite(timeControlMs))
 		return DEFAULT_TIME_CONTROL_MS;
 	return Math.min(MAX_TIME_CONTROL_MS, Math.max(MIN_TIME_CONTROL_MS, timeControlMs));
 }
 
-async function generateRoomCode(ctx: MutationCtx): Promise<string> {
+export async function generateRoomCode(ctx: MutationCtx): Promise<string> {
 	for (let attempt = 0; attempt < 10; attempt++) {
 		let code = "";
 		for (let i = 0; i < CODE_LENGTH; i++) {

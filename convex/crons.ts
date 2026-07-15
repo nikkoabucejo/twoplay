@@ -7,4 +7,7 @@ const crons = cronJobs();
 // `sweep` (convex/models/rooms/index.ts) for the thresholds and per-case logic.
 crons.interval("sweep inactive rooms", { minutes: 2 }, internal.models.rooms.index.sweep);
 
+// Clears pairing queue entries nobody ever claimed — see `sweep` (convex/models/pairings/index.ts).
+crons.interval("sweep stale pairing entries", { minutes: 2 }, internal.models.pairings.index.sweep);
+
 export default crons;

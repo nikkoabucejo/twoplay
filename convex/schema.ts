@@ -3,6 +3,7 @@ import { clocksTable } from "./models/clocks/schema.js";
 import { cursorsTable } from "./models/cursors/schema.js";
 import { gamesTable } from "./models/games/schema.js";
 import { movesTable } from "./models/moves/schema.js";
+import { pairingsTable } from "./models/pairings/schema.js";
 import { playersTable } from "./models/players/schema.js";
 import { ratingsTable } from "./models/ratings/schema.js";
 import { resultsTable } from "./models/results/schema.js";
@@ -20,5 +21,6 @@ export default defineSchema({
 	moves: movesTable,
 	cursors: cursorsTable,
 	ratings: ratingsTable,
-	results: resultsTable
+	results: resultsTable,
+	pairings: pairingsTable
 });
