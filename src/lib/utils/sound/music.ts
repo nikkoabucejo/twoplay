@@ -1,87 +1,115 @@
 import { getGraph, type SoundGraph } from "./graph.js";
 
-export type Note = { voice: "pad" | "bass" | "lead"; frequency: number; duration: number };
+export type Note = { voice: "pad" | "arp" | "bass" | "lead"; frequency: number; duration: number };
 
 const BPM = 76;
 const STEPS_PER_BAR = 16;
 const STEP_SECONDS = 60 / BPM / 4;
 
-/** Fmaj7, Em7, Dm7, Cmaj7, voiced root-up from the third octave. The form plays them twice. */
+/**
+ * Fmaj7, G6, Em7, Am7 (IV-V-iii-vi in C) as close-voiced MIDI notes, played twice. The loop
+ * never lands on C major, and Am7 shares A, C, and E with the Fmaj7 that follows it.
+ */
 const CHORDS = [
-	[174.61, 220, 261.63, 329.63],
-	[164.81, 196, 246.94, 293.66],
-	[146.83, 174.61, 220, 261.63],
-	[130.81, 164.81, 196, 246.94]
+	[53, 57, 60, 64],
+	[55, 59, 62, 64],
+	[52, 55, 59, 62],
+	[52, 55, 57, 60]
 ] as const;
 const BARS = CHORDS.length * 2;
 
-type Entry = readonly [step: number, value: number, length: number];
+/** Pad tone indexes for the eight 8th notes of a bar, an octave above the pad. */
+const ARPEGGIO = [0, 1, 2, 3, 1, 2, 3, 2] as const;
 
-/** Per bar: [step, chord tone index, length in steps], an octave below the pad. */
-const BASS_LINE: readonly Entry[] = [
-	[0, 0, 7],
-	[8, 0, 7]
-];
-/** The last bar walks C, G, E into the F that restarts the loop. */
-const BASS_TURNAROUND: readonly Entry[] = [
-	[0, 0, 7],
-	[8, 0, 3],
-	[11, 2, 3],
-	[14, 1, 2]
+type Entry = readonly [step: number, note: number, length: number];
+
+/** Per chord: [step, MIDI note, length in steps]. The root, its fifth, then a step into the next root. */
+const BASS_LINES: readonly Entry[][] = [
+	[
+		[0, 41, 7],
+		[8, 41, 4],
+		[12, 48, 2],
+		[14, 45, 2]
+	],
+	[
+		[0, 43, 7],
+		[8, 43, 4],
+		[12, 50, 2],
+		[14, 41, 2]
+	],
+	[
+		[0, 40, 7],
+		[8, 40, 4],
+		[12, 47, 2],
+		[14, 43, 2]
+	],
+	[
+		[0, 45, 7],
+		[8, 45, 4],
+		[12, 40, 2],
+		[14, 43, 2]
+	]
 ];
 
-/** Per bar: [step, MIDI note, length in steps]. Bars 4-7 add passing tones and offbeat entries. */
+/**
+ * Per bar: [step, MIDI note, length in steps]. Bars 0-6 end on a note tied over the bar line, and
+ * bar 7 rises E, G into the A that opens bar 0.
+ */
 const MELODY: readonly Entry[][] = [
 	[
-		[2, 76, 3],
-		[6, 72, 2],
-		[10, 69, 5]
+		[0, 69, 3],
+		[4, 72, 2],
+		[6, 76, 4],
+		[12, 74, 2],
+		[14, 76, 4]
 	],
 	[
-		[2, 71, 2],
+		[4, 74, 2],
+		[6, 71, 4],
+		[12, 67, 2],
+		[14, 71, 4]
+	],
+	[
+		[4, 67, 2],
+		[6, 64, 4],
+		[11, 67, 2],
+		[14, 74, 4]
+	],
+	[
+		[2, 72, 2],
+		[4, 69, 4],
+		[10, 67, 2],
+		[12, 69, 2],
+		[14, 72, 4]
+	],
+	[
+		[2, 76, 2],
+		[4, 77, 2],
+		[6, 76, 3],
+		[10, 72, 2],
+		[13, 74, 1],
+		[14, 76, 4]
+	],
+	[
+		[3, 79, 2],
+		[5, 76, 1],
 		[6, 74, 4],
-		[12, 67, 4]
+		[11, 71, 2],
+		[13, 72, 1],
+		[14, 74, 4]
 	],
 	[
-		[2, 69, 2],
-		[6, 72, 2],
-		[8, 69, 2],
-		[12, 65, 4]
-	],
-	[
-		[2, 67, 2],
-		[6, 71, 5],
-		[13, 64, 3]
+		[3, 71, 2],
+		[6, 67, 4],
+		[10, 71, 2],
+		[12, 74, 2],
+		[14, 76, 4]
 	],
 	[
 		[3, 72, 2],
-		[5, 74, 1],
-		[6, 76, 3],
-		[11, 77, 2],
-		[13, 76, 3]
-	],
-	[
-		[2, 74, 2],
-		[5, 72, 1],
-		[6, 71, 4],
-		[11, 67, 2],
-		[13, 69, 1]
-	],
-	[
-		[2, 69, 3],
-		[7, 72, 2],
-		[9, 74, 1],
-		[10, 72, 2],
-		[13, 69, 3]
-	],
-	[
-		[2, 67, 3],
-		[5, 69, 1],
-		[6, 71, 2],
-		[9, 67, 3],
+		[6, 69, 4],
 		[12, 64, 2],
-		// A pickup into the E that opens bar 0, so the loop leans forward instead of ending.
-		[14, 74, 2]
+		[14, 67, 2]
 	]
 ];
 
@@ -94,24 +122,17 @@ export function notesForStep(step: number): Note[] {
 	const beat = step % STEPS_PER_BAR;
 	const chord = CHORDS[bar % CHORDS.length];
 	const notes: Note[] = [];
+	const add = (voice: Note["voice"], note: number, length: number) =>
+		notes.push({ voice, frequency: midiToFrequency(note), duration: length * STEP_SECONDS });
 	if (beat === 0) {
-		for (const frequency of chord) {
-			notes.push({ voice: "pad", frequency, duration: STEPS_PER_BAR * STEP_SECONDS });
-		}
+		for (const note of chord) add("pad", note, STEPS_PER_BAR);
 	}
-	for (const [at, tone, length] of bar === BARS - 1 ? BASS_TURNAROUND : BASS_LINE) {
-		if (at === beat) {
-			notes.push({ voice: "bass", frequency: chord[tone] / 2, duration: length * STEP_SECONDS });
-		}
+	if (beat % 2 === 0) add("arp", chord[ARPEGGIO[beat / 2]] + 12, 2);
+	for (const [at, note, length] of BASS_LINES[bar % CHORDS.length]) {
+		if (at === beat) add("bass", note, length);
 	}
 	for (const [at, note, length] of MELODY[bar]) {
-		if (at === beat) {
-			notes.push({
-				voice: "lead",
-				frequency: midiToFrequency(note),
-				duration: length * STEP_SECONDS
-			});
-		}
+		if (at === beat) add("lead", note, length);
 	}
 	return notes;
 }
@@ -125,7 +146,8 @@ type Voice = {
 };
 
 const VOICES = {
-	pad: { type: "triangle", peak: 0.05, attack: 0.06, sustain: 1, release: 0.04 },
+	pad: { type: "triangle", peak: 0.05, attack: 0.2, sustain: 1, release: 0.15 },
+	arp: { type: "triangle", peak: 0.03, attack: 0.01, sustain: 0.4, release: 0.08 },
 	bass: { type: "triangle", peak: 0.15, attack: 0.03, sustain: 0.7, release: 0.15 },
 	lead: { type: "triangle", peak: 0.1, attack: 0.03, sustain: 0.5, release: 0.25 }
 } satisfies Record<Note["voice"], Voice>;

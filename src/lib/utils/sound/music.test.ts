@@ -5,19 +5,24 @@ import { bindMusicLifecycle, MusicPlayer, notesForStep, type Note } from "./musi
 const STEPS_PER_BAR = 16;
 const STEP_SECONDS = 60 / 76 / 4;
 const BAR_SECONDS = STEPS_PER_BAR * STEP_SECONDS;
+const LOOP_STEPS = 8 * STEPS_PER_BAR;
 const CHORDS = {
 	Fmaj7: ["F", "A", "C", "E"],
+	G6: ["G", "B", "D", "E"],
 	Em7: ["E", "G", "B", "D"],
-	Dm7: ["D", "F", "A", "C"],
-	Cmaj7: ["C", "E", "G", "B"]
+	Am7: ["A", "C", "E", "G"]
 };
-const ROOTS = ["F", "E", "D", "C"];
+const ROOTS = ["F", "G", "E", "A"];
 const C_MAJOR = ["C", "D", "E", "F", "G", "A", "B"];
 const PITCH_CLASSES = ["A", "A#", "B", "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#"];
 
 function pitchClass(frequency: number): string {
 	const semitones = Math.round(12 * Math.log2(frequency / 440));
 	return PITCH_CLASSES[((semitones % 12) + 12) % 12];
+}
+
+function steps(note: Note): number {
+	return Math.round(note.duration / STEP_SECONDS);
 }
 
 function barNotes(bar: number): Note[][] {
@@ -29,21 +34,29 @@ function barNotes(bar: number): Note[][] {
 function padChord(bar: number): string[] {
 	return notesForStep(bar * STEPS_PER_BAR)
 		.filter((note) => note.voice === "pad")
-		.map((note) => pitchClass(note.frequency));
+		.map((note) => pitchClass(note.frequency))
+		.sort();
+}
+
+/** A voice's notes still sounding at `step`, including ones started in an earlier bar or loop. */
+function soundingAt(step: number, voice: Note["voice"]): Note[] {
+	return Array.from({ length: STEPS_PER_BAR }, (_, back) =>
+		notesForStep(LOOP_STEPS + step - back).filter(
+			(note) => note.voice === voice && steps(note) > back
+		)
+	).flat();
 }
 
 /** The steps a voice's notes in this bar run to, counted from the bar's first step. */
 function noteEnds(bar: number, voice: Note["voice"]): number[] {
 	return barNotes(bar).flatMap((notes, step) =>
-		notes
-			.filter((note) => note.voice === voice)
-			.map((note) => step + Math.round(note.duration / STEP_SECONDS))
+		notes.filter((note) => note.voice === voice).map((note) => step + steps(note))
 	);
 }
 
 describe("notesForStep", () => {
-	test("Chord loop: bars 0-7 are Fmaj7, Em7, Dm7, Cmaj7 twice, and bar 8 repeats bar 0", () => {
-		const chords = Object.values(CHORDS);
+	test("Chord loop: bars 0-7 are Fmaj7, G6, Em7, Am7 twice, and bar 8 repeats bar 0", () => {
+		const chords = Object.values(CHORDS).map((chord) => [...chord].sort());
 		expect([0, 1, 2, 3, 4, 5, 6, 7].map(padChord)).toEqual([...chords, ...chords]);
 		expect(barNotes(8)).toEqual(barNotes(0));
 	});
@@ -82,9 +95,39 @@ describe("notesForStep", () => {
 		expect(oddEntries.length).toBeGreaterThan(0);
 	});
 
+	test("Phrases cross bar lines: the lead is sounding on the first step of every bar", () => {
+		for (let bar = 0; bar < 8; bar++) {
+			expect(soundingAt(bar * STEPS_PER_BAR, "lead")).not.toHaveLength(0);
+		}
+	});
+
 	test("Loop seam: the last bar's lead and bass run up to the loop's restart", () => {
 		expect(Math.max(...noteEnds(7, "lead"))).toBeGreaterThanOrEqual(STEPS_PER_BAR);
 		expect(Math.max(...noteEnds(7, "bass"))).toBeGreaterThanOrEqual(STEPS_PER_BAR);
+	});
+
+	test("No cadence at the seam: the last bar is not the tonic, and its last step is off C", () => {
+		expect(padChord(7)).not.toEqual(["C", "E", "G"]);
+		expect(padChord(7)).not.toEqual(["B", "C", "E", "G"]);
+		const lastStep = LOOP_STEPS - 1;
+		for (const voice of ["bass", "lead"] as const) {
+			const notes = soundingAt(lastStep, voice);
+			expect(notes).not.toHaveLength(0);
+			for (const note of notes) expect(pitchClass(note.frequency)).not.toBe("C");
+		}
+	});
+
+	test("Continuous arpeggio: a chord tone starts on every 8th and lasts to the next one", () => {
+		for (let step = 0; step <= LOOP_STEPS; step += 2) {
+			const chord = Object.values(CHORDS)[Math.floor(step / STEPS_PER_BAR) % 4];
+			const arps = notesForStep(step).filter((note) => note.voice === "arp");
+			expect(arps).toHaveLength(1);
+			expect(steps(arps[0])).toBe(2);
+			expect(chord).toContain(pitchClass(arps[0].frequency));
+		}
+		for (let step = 0; step < LOOP_STEPS; step++) {
+			expect(soundingAt(step, "arp")).toHaveLength(1);
+		}
 	});
 
 	test("every note has a positive frequency and duration", () => {
@@ -351,11 +394,15 @@ describe("MusicPlayer", () => {
 		player.setHidden(false);
 		advance(4);
 
-		const bassRoots = ctx.oscillators
+		const played = ctx.oscillators
 			.map((node) => node.frequency.events[0].value)
-			.filter((frequency) => frequency < 110)
-			.filter((frequency, index, all) => frequency !== all[index - 1]);
-		expect(bassRoots.slice(0, 3)).toEqual([87.305, 82.405, 73.415]);
+			.filter((frequency) => frequency < 160);
+		const pattern = Array.from({ length: LOOP_STEPS }, (_, step) => notesForStep(step))
+			.flat()
+			.filter((note) => note.voice === "bass")
+			.map((note) => note.frequency);
+		expect(played.length).toBeGreaterThan(8);
+		expect(played).toEqual(pattern.slice(0, played.length));
 	});
 
 	test("Music routing: every voice goes through a lowpass and the music gain into master", () => {
@@ -372,7 +419,7 @@ describe("MusicPlayer", () => {
 		expect(reaches(gain, master)).toBe(true);
 	});
 
-	test("Pad crossfade: each chord holds full level to its bar's end and hands over within 0.15s", () => {
+	test("Pad crossfade: each chord swells in within 0.25s, holds to its bar's end, and overlaps the next", () => {
 		const { ctx, player, advance } = setupPlayer();
 		player.unlock();
 		player.setWanted(true);
@@ -393,15 +440,17 @@ describe("MusicPlayer", () => {
 
 		for (const { start, events } of envelopes) {
 			const end = start + BAR_SECONDS;
-			expect(valueAt(events, start + 0.1)).toBeGreaterThan(0.95 * peak);
+			expect(valueAt(events, start + 0.1)).toBeLessThan(0.75 * peak);
+			expect(valueAt(events, start + 0.25)).toBeGreaterThan(0.95 * peak);
 			expect(valueAt(events, end - 0.005)).toBeGreaterThan(0.99 * peak);
-			expect(valueAt(events, end + 0.15)).toBeLessThan(0.05 * peak);
+			expect(valueAt(events, end + 0.1)).toBeGreaterThan(0.3 * peak);
+			expect(valueAt(events, end + 0.5)).toBeLessThan(0.05 * peak);
 		}
 
 		const sounding = (time: number) =>
 			envelopes.reduce((sum, { events }) => sum + valueAt(events, time), 0);
 		const full = sounding(barStarts[0] + BAR_SECONDS / 2);
-		for (let time = barStarts[0] + 0.1; time < barStarts[barStarts.length - 1]; time += 0.005) {
+		for (let time = barStarts[0] + 0.25; time < barStarts[barStarts.length - 1]; time += 0.005) {
 			expect(sounding(time)).toBeGreaterThan(0.85 * full);
 		}
 	});

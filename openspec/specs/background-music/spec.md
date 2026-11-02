@@ -1,6 +1,7 @@
 # background-music Specification
 
 ## Purpose
+
 An optional, quiet, procedurally generated retro loop that plays under the game sounds and follows the user's sound settings.
 
 ## Requirements
@@ -110,12 +111,12 @@ Navigating between pages SHALL NOT restart or interrupt the music.
 
 ### Requirement: Chill retro loop
 
-The music SHALL be an 8-bar loop of Fmaj7, Em7, Dm7, Cmaj7 played twice at about 76 BPM, with a bass note on each bar's root and a sparse melody in C major that differs between the two halves, and notes SHALL be scheduled ahead on the audio clock rather than timed by the page timer. The loop SHALL have no audible seam: the pad holds full level through each bar and crossfades into the next chord without a dip, and the last bar keeps its melody and bass going up to the restart.
+The music SHALL be an 8-bar loop of Fmaj7, G6, Em7, Am7 played twice at about 76 BPM, with a root bass, an 8th-note arpeggio of each chord, and a sparse melody in C major that differs between the halves, scheduled ahead on the audio clock. The loop SHALL never resolve to the C major tonic and SHALL keep pad, arpeggio, melody, and bass moving across every bar line, including the seam.
 
 #### Scenario: Chord loop
 
 - **WHEN** the note pattern for bars 0 to 8 is generated
-- **THEN** bars 0–7 use Fmaj7, Em7, Dm7, Cmaj7 twice, bars 4–7 carry a different melody from bars 0–3, and bar 8 repeats bar 0
+- **THEN** bars 0–7 use Fmaj7, G6, Em7, Am7 twice, bars 4–7 carry a different melody from bars 0–3, and bar 8 repeats bar 0
 
 #### Scenario: Bass on the root
 
@@ -127,15 +128,25 @@ The music SHALL be an 8-bar loop of Fmaj7, Em7, Dm7, Cmaj7 played twice at about
 - **WHEN** the notes for one bar are generated
 - **THEN** fewer than half of the steps carry a melody note, each melody pitch is in C major, and any pitch outside that bar's chord lasts at most two steps
 
+#### Scenario: Phrases cross bar lines
+
+- **WHEN** the note pattern for any bar is generated
+- **THEN** a melody note is sounding on its first step
+
+#### Scenario: Continuous arpeggio
+
+- **WHEN** the note pattern for the whole loop and the first step of the next is generated
+- **THEN** every 8th note starts one arpeggio note from that bar's chord lasting one 8th, so an arpeggio note is sounding on every step, including across the seam
+
 #### Scenario: Pad crossfade
 
 - **WHEN** the music plays across bar changes
-- **THEN** each chord is still at full level just before the next bar starts, the next chord is at full level within 0.1s, and the pad's total level stays above about 85% of its mid-bar level through the change
+- **THEN** each chord is still at full level just before the next bar starts, the next chord swells to full level within 0.25s while the previous one fades, and the pad's total level stays above about 85% of its mid-bar level through the change
 
 #### Scenario: No ending at the seam
 
 - **WHEN** the note pattern for the last bar is generated
-- **THEN** its melody and bass notes run up to the first step of the next loop
+- **THEN** its chord is not C major, its melody and bass notes run up to the first step of the next loop, and neither is on C at its last step
 
 ### Requirement: Music setting in Settings
 
