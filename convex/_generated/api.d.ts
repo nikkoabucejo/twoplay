@@ -24,10 +24,12 @@ import type * as models_games_tictactoe_index from "../models/games/tictactoe/in
 import type * as models_games_tictactoe_rules from "../models/games/tictactoe/rules.js";
 import type * as models_pairings_index from "../models/pairings/index.js";
 import type * as models_pairings_queue from "../models/pairings/queue.js";
+import type * as models_players_constants from "../models/players/constants.js";
 import type * as models_players_index from "../models/players/index.js";
 import type * as models_ratings_index from "../models/ratings/index.js";
 import type * as models_results_index from "../models/results/index.js";
 import type * as models_rooms_auth from "../models/rooms/auth.js";
+import type * as models_rooms_constants from "../models/rooms/constants.js";
 import type * as models_rooms_index from "../models/rooms/index.js";
 import type * as models_users_index from "../models/users/index.js";
 
@@ -54,10 +56,12 @@ declare const fullApi: ApiFromModules<{
   "models/games/tictactoe/rules": typeof models_games_tictactoe_rules;
   "models/pairings/index": typeof models_pairings_index;
   "models/pairings/queue": typeof models_pairings_queue;
+  "models/players/constants": typeof models_players_constants;
   "models/players/index": typeof models_players_index;
   "models/ratings/index": typeof models_ratings_index;
   "models/results/index": typeof models_results_index;
   "models/rooms/auth": typeof models_rooms_auth;
+  "models/rooms/constants": typeof models_rooms_constants;
   "models/rooms/index": typeof models_rooms_index;
   "models/users/index": typeof models_users_index;
 }>;

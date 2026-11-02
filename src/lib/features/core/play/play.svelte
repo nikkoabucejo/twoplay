@@ -24,7 +24,7 @@
 	import { formatElapsed } from "./elapsed.js";
 	import Choices from "./choices.svelte";
 	import type { GameType } from "../../../../../convex/models/games/index.js";
-	import { DEFAULT_TIME_CONTROL_MS } from "../../../../../convex/models/rooms/index.js";
+	import { DEFAULT_TIME_CONTROL_MS } from "../../../../../convex/models/rooms/constants.js";
 	import { api } from "../../../../../convex/_generated/api.js";
 
 	const OPPONENTS: Record<PlayOpponent, { label: string; hint: string }> = {

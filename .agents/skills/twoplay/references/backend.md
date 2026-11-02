@@ -10,6 +10,8 @@ Domain logic is in `convex/models/<name>/`:
 - `pairings/queue.ts` holds `pairingByUser` and `leaveQueue`, so `rooms` can use them without importing `pairings/index.ts`.
 - `rooms/auth.ts` holds auth and lookup helpers. It's split out to avoid circular imports, because
   `mutation({ args })` validators evaluate eagerly at module load.
+- Client code value-imports only `_generated/api`, `models/*/constants.ts`, and
+  `models/games/<game>/{index,rules}.ts`, enforced by `convex/client-boundary.test.ts`.
 
 ## Tables (`convex/schema.ts`)
 | Table | Shape (key fields) | Indexes |
@@ -52,7 +54,7 @@ Rules:
   moves in its own `computeLegalMoves`). The client move is only a proposal.
 - `play` rejects `move.kind !== room.type` before dispatch; registry switches throw on kind mismatch.
 - `play` and `resign` throw `"Waiting for opponent"` until the room has `getEngine(type).playerCount` seats.
-- `trashtalk` accepts only `TRASHTALK_EMOJIS` (`players/index.ts`), from a seated, unleft player in an active room.
+- `trashtalk` accepts only `TRASHTALK_EMOJIS` (`players/constants.ts`), from a seated, unleft player in an active room.
 - Round outcomes, scores, MMR, timeouts are re-derived server-side (`settleRound`, `timeout`, results).
 - Bound all input with the narrowest `v.*` validator; clamp numbers server-side
   (`resolveTimeControlMs` clamps to 10s–60min); trim and cap free text (`users.store` caps names at 100).

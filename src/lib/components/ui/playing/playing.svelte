@@ -15,7 +15,7 @@
 <script lang="ts">
 	import { CheckersRoom, ChessRoom, GAMES, TictactoeRoom } from "$lib/features/play";
 	import { ACCENTS, cn } from "$lib/utils/style";
-	import { DEFAULT_EMOJI } from "../../../../../convex/models/players/index.js";
+	import { DEFAULT_EMOJI } from "../../../../../convex/models/players/constants.js";
 	import { Button } from "../button/index.js";
 	import { Confirm } from "../confirm/index.js";
 	import { Emblem } from "../emblem/index.js";

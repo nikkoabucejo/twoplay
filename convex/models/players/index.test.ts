@@ -3,7 +3,8 @@ import { api } from "../../_generated/api.js";
 import { seatedRoom, setup, signIn, type TestConvex } from "../../test.setup.js";
 import { getRoomByCode } from "../rooms/auth.js";
 import { userByClerkUserId } from "../users/index.js";
-import { DEFAULT_EMOJI, ensurePlayer, playerByUserAndRoom } from "./index.js";
+import { DEFAULT_EMOJI } from "./constants.js";
+import { ensurePlayer, playerByUserAndRoom } from "./index.js";
 
 const { trashtalk, heartbeat } = api.models.players.index;
 

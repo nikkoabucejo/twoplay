@@ -26,7 +26,7 @@
 		squareIndex,
 		squareName
 	} from "../../../../../convex/models/games/chess/rules.js";
-	import { DEFAULT_EMOJI } from "../../../../../convex/models/players/index.js";
+	import { DEFAULT_EMOJI } from "../../../../../convex/models/players/constants.js";
 	import { GAMES } from "../games.js";
 	import { ChessRoom } from "./game.svelte.js";
 	import { squareLabel } from "./labels.js";

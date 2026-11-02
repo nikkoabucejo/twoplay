@@ -13,6 +13,15 @@ Template:
 **Follow-ups:** <existing code that now violates it, or "—">
 ```
 
+## 2026-11-03 — Client imports only function-free Convex modules
+**Decision:** Client code value-imports only `_generated/api`, `models/*/constants.ts`, and
+`models/games/<game>/{index,rules}.ts`, none of which reach a Convex function. Shared values live in a
+model's `constants.ts`. Enforced by `convex/client-boundary.test.ts`.
+**Why:** Convex warns when a function builder runs in the browser, and a value import loads the
+server function module and its import graph into the client bundle.
+**Supersedes:** —
+**Follow-ups:** —
+
 ## 2026-11-02 — Chess rules through chess.js, wrapper only
 **Decision:** chess.js, pinned to exactly 1.4.0, is imported only by
 `convex/models/games/chess/rules.ts`. State is FEN plus the position keys since the last capture or

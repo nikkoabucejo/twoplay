@@ -19,7 +19,7 @@
 	import { playCaptureSound, playMoveSound, prepareSound } from "$lib/utils/sound";
 	import { cn, ACCENTS } from "$lib/utils/style";
 	import { api } from "../../../../../convex/_generated/api.js";
-	import { DEFAULT_EMOJI } from "../../../../../convex/models/players/index.js";
+	import { DEFAULT_EMOJI } from "../../../../../convex/models/players/constants.js";
 	import { GAMES } from "../games.js";
 	import { CheckersRoom } from "./game.svelte.js";
 	import { squareLabel } from "./labels.js";

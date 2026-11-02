@@ -3,7 +3,8 @@ import { internalMutation, mutation, query } from "../../_generated/server";
 import { createGame, gameTypeValidator, type GameType } from "../games/index.js";
 import { ensurePlayer } from "../players/index.js";
 import { getActiveRoomForUser, requireUser } from "../rooms/auth.js";
-import { generateRoomCode, resolveTimeControlMs } from "../rooms/index.js";
+import { resolveTimeControlMs } from "../rooms/constants.js";
+import { generateRoomCode } from "../rooms/index.js";
 import { leaveQueue, pairingByUser } from "./queue.js";
 
 /** A queue entry with nobody left to claim it gets swept after this long — e.g. a tab closed while
