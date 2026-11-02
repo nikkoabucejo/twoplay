@@ -15,6 +15,8 @@
 	const FRAME_RATE = 30;
 	const TOTAL_FRAMES = 180;
 	const HUMP_HALF_WIDTH = 12;
+	/** Shown under reduced motion: several title sparkles are near their peak here. */
+	const STILL_FRAME = 20;
 
 	type Sparkle = {
 		x: number;
@@ -255,6 +257,8 @@
 </script>
 
 <script lang="ts">
+	import { prefersReducedMotion } from "svelte/motion";
+
 	let { colors, variant = "title", class: className }: SparkleProps = $props();
 
 	let container = $state<HTMLDivElement>();
@@ -265,16 +269,21 @@
 		if (!element) return;
 		let cancelled = false;
 
+		// The OS setting or the app's "Always reduce" setting (`.reduce-motion` on <html>).
+		const isReduced =
+			prefersReducedMotion.current || document.documentElement.classList.contains("reduce-motion");
+
 		import("lottie-web").then(({ default: lottie }) => {
 			if (cancelled) return;
 			animation = lottie.loadAnimation({
 				container: element,
 				renderer: "svg",
 				loop: true,
-				autoplay: true,
+				autoplay: !isReduced,
 				animationData: createAnimationData(colors, variant),
 				rendererSettings: { preserveAspectRatio: "none" }
 			});
+			if (isReduced) animation.goToAndStop(STILL_FRAME, true);
 		});
 
 		return () => {
