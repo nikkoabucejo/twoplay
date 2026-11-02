@@ -7,7 +7,6 @@
 		Beacon,
 		Button,
 		Emblem,
-		Playing,
 		Gate,
 		Skeleton,
 		Spinner,
@@ -108,11 +107,6 @@
 		if (view.redirect) goto(view.redirect);
 	});
 
-	// A waiting room or queue shown after a reload is still this player's own, so its match opens.
-	$effect(() => {
-		if (viewKind === "waiting" || viewKind === "queued") startedHere = true;
-	});
-
 	$effect(() => {
 		if (viewKind !== "queued") return;
 		const queuedAt = Date.now();
@@ -148,7 +142,6 @@
 		try {
 			await enqueuePairing({ type: game, timeControlMs: minutes * 60_000 });
 		} catch (err) {
-			startedHere = false;
 			error = err instanceof Error ? err.message : "Could not join the queue";
 		} finally {
 			isQueuing = false;
@@ -156,6 +149,7 @@
 	}
 
 	async function createOwnRoom() {
+		startedHere = true;
 		isCreating = true;
 		try {
 			await createRoom({
@@ -173,14 +167,12 @@
 
 	function start() {
 		error = null;
-		startedHere = true;
 		preferences.setLastPlay({ game, opponent, minutes });
 		return opponent === "anyone" ? findMatch() : createOwnRoom();
 	}
 
 	async function leaveQueue() {
 		error = null;
-		startedHere = false;
 		try {
 			await cancelPairing({});
 		} catch (err) {
@@ -196,9 +188,10 @@
 	async function cancelRoom() {
 		if (!room) return;
 		error = null;
-		startedHere = false;
 		try {
 			await abandonRoom({ code: room.code });
+			// Only after the abandon lands: while the room is still active, a reset would redirect into it.
+			startedHere = false;
 		} catch (err) {
 			error = err instanceof Error ? err.message : "Could not cancel the room";
 		}
@@ -518,10 +511,6 @@
 					<div class="col-start-1 row-start-1">{@render waiting(room.code)}</div>
 				{:else if viewKind === "queued"}
 					<div class="col-start-1 row-start-1">{@render queued()}</div>
-				{:else if room && viewKind === "playing"}
-					<div class="col-start-1 row-start-1 flex flex-col justify-center">
-						<Playing code={room.code} type={room.type} />
-					</div>
 				{/if}
 			</div>
 

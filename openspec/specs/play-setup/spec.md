@@ -40,7 +40,7 @@ While a Find match or Create room call is in flight, its button SHALL be disable
 
 ### Requirement: Waiting room
 
-After a room is created, /play SHALL show "Waiting for your opponent…" with the room code, Copy link, Cancel room, and Share where `navigator.share` exists. It SHALL stay until the second seat fills, then open the room. Cancel room SHALL abandon the room and return to setup. Reloading /play while the viewer's active room has only their seat SHALL show the waiting room again.
+After a room is created on /play, the page SHALL show "Waiting for your opponent…" with the room code, Copy link, Cancel room, and Share where `navigator.share` exists. It SHALL stay until the second seat fills, then open the room. Cancel room SHALL abandon the room and return to setup.
 
 #### Scenario: Share hidden without Web Share
 
@@ -76,20 +76,6 @@ While queued, /play SHALL show "Finding a match" with a Beacon, the game and clo
 - **WHEN** the user presses "Play a friend instead" while queued
 - **THEN** a queue cancel is requested and "A friend" is selected
 
-### Requirement: Active game card
-
-When /play loads and the viewer already has an active room that is not waiting for an opponent, the page SHALL show the shared Playing card for that room instead of navigating. The page SHALL navigate on its own only when this page's queue entry or created room produces the active room.
-
-#### Scenario: No silent redirect
-
-- **WHEN** /play loads and the viewer has an active room with two seats
-- **THEN** the page does not navigate and shows the Playing card for that room
-
-#### Scenario: Match found redirects
-
-- **WHEN** the viewer was queued on this page and an active room appears
-- **THEN** the page navigates to that room
-
 ### Requirement: Remembered setup
 
 Starting a match or room SHALL store the selected game, opponent, and clock. On the next visit /play SHALL preselect them, with a valid `?game=` taking precedence over the stored game.
@@ -101,7 +87,7 @@ Starting a match or room SHALL store the selected game, opponent, and clock. On 
 
 ### Requirement: Single card layout
 
-/play SHALL show its controls in one centered card at every width. The waiting, queued, and active views SHALL take the same area as the setup controls, centered in it, and the game and setup choices SHALL be hidden while they show. Switching between setup, pending, waiting, queued, and active views SHALL NOT change the card's height and SHALL record no layout-shift entries.
+/play SHALL show its controls in one centered card at every width. The waiting and queued views SHALL take the same area as the setup controls, centered in it, and the game and setup choices SHALL be hidden while they show. Switching between setup, pending, waiting, and queued views SHALL NOT change the card's height and SHALL record no layout-shift entries.
 
 #### Scenario: Game choices hidden while queued
 
@@ -121,3 +107,46 @@ When the visitor is signed out, /play SHALL show an in-page sign-in prompt with 
 
 - **WHEN** a signed-out visitor opens /play
 - **THEN** the page reads "Sign in to create or join a room." and shows an enabled Sign in button
+
+### Requirement: Active game redirect
+
+When a signed-in visitor requests /play, by direct load or client navigation, the server SHALL look up their active room with their session and SHALL redirect to `/<type>/<code>` when one exists, filled or waiting. A signed-out visitor, or a failed lookup, SHALL get the normal /play page.
+
+#### Scenario: Active room redirects on the server
+
+- **WHEN** a signed-in visitor whose active room is chess room `ABCD` requests /play
+- **THEN** the server responds with a 307 redirect to `/chess/ABCD`
+
+#### Scenario: Waiting room redirects on the server
+
+- **WHEN** a signed-in visitor whose active room has only their seat requests /play
+- **THEN** the server redirects to that room's route
+
+#### Scenario: No active room renders the page
+
+- **WHEN** a signed-in visitor with no active room requests /play
+- **THEN** the server load returns without redirecting
+
+#### Scenario: Signed out renders the page
+
+- **WHEN** a signed-out visitor requests /play
+- **THEN** the server load returns without calling Convex or redirecting
+
+#### Scenario: Lookup failure renders the page
+
+- **WHEN** the token or the `rooms.active` call throws
+- **THEN** the server load returns without redirecting
+
+### Requirement: Active game client fallback
+
+If /play renders and then finds an active room it did not queue or create, it SHALL show the loading skeleton and navigate to that room, never the Playing card. When this page's queue entry or created room produces a filled room, the page SHALL navigate to it.
+
+#### Scenario: Client fallback navigates to the room
+
+- **WHEN** /play renders and `rooms.active` returns a room this page did not start
+- **THEN** the loading skeleton shows, no Playing card renders, and the page navigates to the room
+
+#### Scenario: Match found redirects
+
+- **WHEN** the viewer was queued on this page and an active room appears
+- **THEN** the page navigates to that room

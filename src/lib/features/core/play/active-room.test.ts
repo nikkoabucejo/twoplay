@@ -13,22 +13,27 @@ describe("playView", () => {
 		expect(playView({ ...idle, room: null })).toEqual({ kind: "setup", redirect: null });
 	});
 
-	test("waits for an opponent when the active room has one seat", () => {
-		expect(playView({ ...idle, room, seatCount: 1 })).toEqual({ kind: "waiting", redirect: null });
+	test("waits for an opponent in a one-seat room this page started", () => {
+		expect(playView({ ...idle, room, seatCount: 1, startedHere: true })).toEqual({
+			kind: "waiting",
+			redirect: null
+		});
 	});
 
-	test("shows a two-seat room found on load without redirecting", () => {
-		expect(playView({ ...idle, room, seatCount: 2 })).toEqual({ kind: "playing", redirect: null });
-	});
+	test.each([undefined, 1, 2])(
+		"redirects into a room this page did not start, at seat count %s",
+		(seatCount) => {
+			expect(playView({ ...idle, room, seatCount })).toEqual({
+				kind: "checking",
+				redirect: "/tictactoe/ABCD"
+			});
+		}
+	);
 
 	test("redirects into a two-seat room this page started", () => {
 		expect(playView({ ...idle, room, seatCount: 2, startedHere: true }).redirect).toBe(
 			"/tictactoe/ABCD"
 		);
-	});
-
-	test("checks while the active room's seats load", () => {
-		expect(playView({ ...idle, room }).kind).toBe("checking");
 	});
 
 	test("stays pending while the seats of a room this page started load", () => {

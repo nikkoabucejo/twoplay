@@ -89,13 +89,18 @@ function showSetup(props: Parameters<typeof render<typeof Play>>[1] = {}) {
 	return render(Play, props);
 }
 
-function showWaitingRoom() {
+async function showWaitingRoom() {
+	showSetup();
+	await fireEvent.click(radio("A friend"));
+	await fireEvent.click(screen.getByRole("button", { name: "Create room" }));
 	setQueryResult(api.models.rooms.index.active, { code: "ABCD", type: "tictactoe" });
 	setQueryResult(
 		api.models.rooms.index.get,
 		roomSnapshot(tictactoeEngine.createInitialState(), { players: [ALICE, null] })
 	);
-	return render(Play);
+	await vi.waitFor(() =>
+		expect(screen.getByText("Waiting for your opponent…")).toBeInTheDocument()
+	);
 }
 
 function showQueue() {
@@ -269,43 +274,62 @@ describe("Play", () => {
 		expect(screen.getByRole("button", { name: "Finding…" })).toBeDisabled();
 	});
 
-	test("a one-seat active room shows the waiting room with its code", () => {
-		showWaitingRoom();
+	test("a created room shows the waiting room with its code", async () => {
+		await showWaitingRoom();
 		expect(screen.getByText("Waiting for your opponent…")).toBeInTheDocument();
 		expect(screen.getByText("ABCD")).toBeInTheDocument();
 		expect(screen.getByRole("button", { name: "Copy link" })).toBeInTheDocument();
 	});
 
-	test("the waiting room has no Share button without Web Share", () => {
-		showWaitingRoom();
+	test("the waiting room has no Share button without Web Share", async () => {
+		await showWaitingRoom();
 		expect(screen.queryByRole("button", { name: "Share" })).not.toBeInTheDocument();
 	});
 
-	test("the waiting room offers Share where Web Share exists", () => {
+	test("the waiting room offers Share where Web Share exists", async () => {
 		vi.stubGlobal("navigator", { ...navigator, share: vi.fn() });
-		showWaitingRoom();
+		await showWaitingRoom();
 		expect(screen.getByRole("button", { name: "Share" })).toBeInTheDocument();
 		vi.unstubAllGlobals();
 	});
 
 	test("Cancel room abandons the room", async () => {
-		showWaitingRoom();
+		await showWaitingRoom();
+		const abandon = deferred<unknown>();
+		abandonRoom().mockReturnValueOnce(abandon.promise);
 		await fireEvent.click(screen.getByRole("button", { name: "Cancel room" }));
 		expect(abandonRoom()).toHaveBeenCalledWith({ code: "ABCD" });
+		// Convex applies the query update before the mutation's promise resolves.
+		setQueryResult(api.models.rooms.index.active, null);
+		abandon.resolve(null);
+		await abandon.promise;
+		flushSync();
+		expect(screen.queryByText("Waiting for your opponent…")).toBeNull();
+		expect(radio("Tic-Tac-Toe").closest(".invisible")).toBeNull();
+		expect(goto).not.toHaveBeenCalled();
 	});
 
-	test("a waiting room shown on load opens the room when the second seat fills", async () => {
-		showWaitingRoom();
+	test("Cancel room stays on the page while the abandon call is pending", async () => {
+		await showWaitingRoom();
+		abandonRoom().mockReturnValueOnce(deferred<unknown>().promise);
+		await fireEvent.click(screen.getByRole("button", { name: "Cancel room" }));
+		flushSync();
+		expect(goto).not.toHaveBeenCalled();
+	});
+
+	test("the waiting room opens the room when the second seat fills", async () => {
+		await showWaitingRoom();
 		setQueryResult(api.models.rooms.index.get, roomSnapshot(tictactoeEngine.createInitialState()));
 		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith("/tictactoe/ABCD"));
 	});
 
-	test("an active two-seat room found on load shows the Playing card without navigating", () => {
+	test("an active room found on load shows the skeleton and navigates to the room", async () => {
 		setQueryResult(api.models.rooms.index.active, { code: "ABCD", type: "tictactoe" });
 		setQueryResult(api.models.rooms.index.get, roomSnapshot(tictactoeEngine.createInitialState()));
-		render(Play);
-		expect(screen.getByRole("button", { name: "Abandon" })).toBeInTheDocument();
-		expect(goto).not.toHaveBeenCalled();
+		const { container } = render(Play);
+		expect(container.querySelector("[data-loading='play']")).toBeInTheDocument();
+		expect(screen.queryByRole("button", { name: "Abandon" })).not.toBeInTheDocument();
+		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith("/tictactoe/ABCD"));
 	});
 
 	test("the queue view shows the game, clock, and an elapsed timer", async () => {
@@ -324,6 +348,14 @@ describe("Play", () => {
 			radio("A friend").closest(".invisible")
 		);
 		expect(radio("Tic-Tac-Toe").closest(".invisible")).not.toBeNull();
+	});
+
+	test("a match found while queued navigates to the room", async () => {
+		showQueue();
+		setQueryResult(api.models.pairings.index.status, false);
+		setQueryResult(api.models.rooms.index.active, { code: "ABCD", type: "tictactoe" });
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(tictactoeEngine.createInitialState()));
+		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith("/tictactoe/ABCD"));
 	});
 
 	test("Cancel leaves the queue", async () => {

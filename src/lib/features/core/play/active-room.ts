@@ -1,6 +1,6 @@
 import type { GameType } from "../../../../../convex/models/games/index.js";
 
-export type PlayViewKind = "checking" | "setup" | "pending" | "waiting" | "queued" | "playing";
+export type PlayViewKind = "checking" | "setup" | "pending" | "waiting" | "queued";
 export type PlayView = { kind: PlayViewKind; redirect: string | null };
 
 type PlayViewInput = {
@@ -9,7 +9,7 @@ type PlayViewInput = {
 	/** Seats in `room` from `rooms.get`: `undefined` while loading. */
 	seatCount: number | undefined;
 	isQueued: boolean;
-	/** This page queued or created the room, so a match opens it instead of showing the card. */
+	/** This page created the room, so it waits there for an opponent. Any other room redirects. */
 	startedHere: boolean;
 	isPending: boolean;
 };
@@ -26,11 +26,11 @@ export function playView({
 	if (room === undefined) return { kind: "checking", redirect: null };
 	if (isPending) return { kind: "pending", redirect: null };
 	if (room) {
-		if (seatCount === undefined)
-			return { kind: startedHere ? "pending" : "checking", redirect: null };
+		const redirect = `/${room.type}/${room.code}`;
+		if (!startedHere) return { kind: "checking", redirect };
+		if (seatCount === undefined) return { kind: "pending", redirect: null };
 		if (seatCount < 2) return { kind: "waiting", redirect: null };
-		if (startedHere) return { kind: "pending", redirect: `/${room.type}/${room.code}` };
-		return { kind: "playing", redirect: null };
+		return { kind: "pending", redirect };
 	}
 	return { kind: isQueued ? "queued" : "setup", redirect: null };
 }
