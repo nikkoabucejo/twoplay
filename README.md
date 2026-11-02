@@ -19,34 +19,44 @@
 
 ## Highlights
 
-|                                              |                                                                                                                                               |
-| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| 🤖 **A nine-agent dev team**                 | One command takes a request through triage, spec, build, tests, live QA, review, and commit. [→](#the-agentic-workflow)                       |
-| 🧭 **I stayed in control**                   | I approve every plan. Reviewers can't edit, builders can't approve themselves, and agents never push or deploy. [→](#the-team)                |
-| 🔀 **A new stack, shipped**                  | A React developer shipping SvelteKit, Svelte 5, and Convex. The stack isn't the limit, judgment is. [→](#a-react-developer-walks-into-svelte) |
-| 📜 **Spec-driven**                           | Every behavior is a written scenario first, and every scenario needs a test or code path before it ships. [→](#what-a-spec-looks-like)        |
-| 🧪 **860+ tests, plus live QA**              | Vitest across backend, logic, and UI, and an agent that plays the game against itself in two browsers. [→](#engineering-practices)            |
-| 🛡️ **The server decides**                    | Every move, clock, result, and rating is re-checked on the server. Every mutation checks auth and seat. [→](#design-principles)               |
-| ⚡ **Real-time, no socket code**             | Moves, clocks, cursors, and the lobby sync live through Convex queries. [→](#one-move-start-to-finish)                                        |
-| 📐 **Zero layout shift**                     | Measured by the QA agent on every route: a 0.1443 shift on room load, fixed to 0. [→](#case-study-one-real-change)                            |
-| 🔍 **SEO by default**                        | One server-rendered `Meta` component on every page, tested and checked live. [→](#seo-without-thinking-about-it)                              |
-| ♻️ **A process that improves itself**        | Every correction becomes a rule, and the workflow gets refactored like code. [→](#what-i-learned)                                             |
-| 🎛️ **Right-sized process**                   | Five planning routes from "trivial" to "large and risky", plus a light lane for UI polish. [→](#the-agentic-workflow)                         |
-| 🔎 **Skeptic-checked reviews**               | Every serious review finding is challenged by another agent before anyone fixes it. [→](#the-team)                                            |
-| 🗺️ **Impact before edits**                   | CodeGraph lists every caller of a shared symbol before an agent changes it. [→](#engineering-practices)                                       |
-| 🧹 **Anti-slop rules**                       | Agent code has no noise comments, no defensive clutter, no type escapes, and no AI-sounding copy. [→](#engineering-practices)                 |
-| 📚 **Decisions on record**                   | 11 architecture decisions logged with the reason and what each one replaced. [→](#by-the-numbers)                                             |
-| 🧠 **Knowledge that sticks**                 | After every change, an agent updates the project skills and docs so the next session starts smarter. [→](#the-team)                           |
-| 🧩 **Game-agnostic core**                    | A new game is one server engine and one client class. Rooms, clocks, ratings, and replay come free. [→](#adding-a-game)                       |
-| 🎲 **Games with a twist**                    | Nine-board tic-tac-toe where you can't replay your last board, and checkers with forced captures and multi-jumps. [→](#the-games)             |
-| 🔁 **Replay for free**                       | Every move stores the full state after it, so scrubbing through a round needs no extra logic. [→](#data-model)                                |
-| ⏱️ **A backend that cleans up after itself** | Crons close empty rooms, forfeit absent players, and clear the matchmaking queue every 2 minutes. [→](#the-system-takes-care-of-itself)       |
-| 🏆 **Ratings and matchmaking**               | Find Match pairs waiting players, and every decisive round moves the leaderboard. [→](#how-to-play)                                           |
-| ✨ **Live presence**                         | Opponent cursors, emoji trash talk, disconnect detection, and a background that reacts to the game. [→](#the-little-things)                   |
-| 🔔 **Turn alerts**                           | In a background tab, the title flashes "Your turn" and an optional chime plays. Spectators never get pinged. [→](#what-a-spec-looks-like)     |
-| ♿ **Accessible**                            | Focus rings at 3:1 contrast or better, full keyboard support, live regions, and reduced motion. [→](#engineering-practices)                   |
-| 🎨 **Design tokens that can't drift**        | Seat colors are defined once, and a test keeps CSS and TypeScript in sync. [→](#engineering-practices)                                        |
-| 🔐 **Secrets stay on the server**            | Clerk code is split into client and server, so secret-holding code never reaches the browser bundle. [→](#design-principles)                  |
+|                                              |                                                                                                                                                                         |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Agentic engineering**                      |                                                                                                                                                                         |
+| 🤖 **A nine-agent dev team**                 | One command takes a request through triage, spec, build, tests, live QA, review, and commit. [→](#the-agentic-workflow)                                                 |
+| 🧭 **I stayed in control**                   | I approve every plan. Reviewers can't edit, builders can't approve themselves, and agents never push or deploy. [→](#the-team)                                          |
+| 🔀 **A new stack, shipped**                  | A React developer shipping SvelteKit, Svelte 5, and Convex. The stack isn't the limit, judgment is. [→](#a-react-developer-walks-into-svelte)                           |
+| 🎛️ **Right-sized process**                   | Five planning routes from "trivial" to "large and risky", plus a light lane for UI polish. [→](#the-agentic-workflow)                                                   |
+| 🔎 **Skeptic-checked reviews**               | Every serious review finding is challenged by another agent before anyone fixes it. [→](#the-team)                                                                      |
+| 🧠 **Knowledge that sticks**                 | After every change, an agent updates the project skills and docs so the next session starts smarter. [→](#the-team)                                                     |
+| ♻️ **A process that improves itself**        | Every correction becomes a rule, and the workflow gets refactored like code. [→](#what-i-learned)                                                                       |
+| **Engineering discipline**                   |                                                                                                                                                                         |
+| 📜 **Spec-driven**                           | Every behavior is a written scenario first, and every scenario needs a test or code path before it ships. [→](#what-a-spec-looks-like)                                  |
+| 🧪 **860+ tests, plus live QA**              | Vitest across backend, logic, and UI, and an agent that plays the game against itself in two browsers. [→](#engineering-practices)                                      |
+| 🗺️ **Impact before edits**                   | CodeGraph lists every caller of a shared symbol before an agent changes it. [→](#engineering-practices)                                                                 |
+| 🧹 **Anti-slop rules**                       | Agent code has no noise comments, no defensive clutter, no type escapes, and no AI-sounding copy. [→](#engineering-practices)                                           |
+| 📚 **Decisions on record**                   | 11 architecture decisions logged with the reason and what each one replaced. [→](#by-the-numbers)                                                                       |
+| **Real-time and sync**                       |                                                                                                                                                                         |
+| ⚡ **Real-time, no socket code**             | Moves, clocks, cursors, and the lobby sync live through Convex queries. [→](#one-move-start-to-finish)                                                                  |
+| 🎯 **Optimistic moves**                      | Your move shows instantly, confirms when the server's board matches, and rolls back with a toast and a shake if rejected. [→](#optimistic-moves)                        |
+| 🧬 **One engine, two places**                | The browser predicts moves with the exact same engine file the server uses, so the two can't disagree on the rules. [→](#one-engine-two-places)                         |
+| ⏲️ **Server-timed clocks**                   | The server stores only banked time and a start time. The browser counts down locally and hands the clock to the opponent the moment you move. [→](#how-the-clocks-work) |
+| 🚫 **Timeouts nobody can fake**              | Any browser can claim a timeout, but the server recomputes the time itself. Late moves are rejected with "Time's up". [→](#timeouts-nobody-can-fake)                    |
+| ✨ **Live presence**                         | Opponent cursors, emoji trash talk, disconnect detection, and a background that reacts to the game. [→](#the-little-things)                                             |
+| **Backend and architecture**                 |                                                                                                                                                                         |
+| 🛡️ **The server decides**                    | Every move, clock, result, and rating is re-checked on the server. Every mutation checks auth and seat. [→](#design-principles)                                         |
+| 🔐 **Secrets stay on the server**            | Clerk code is split into client and server, so secret-holding code never reaches the browser bundle. [→](#design-principles)                                            |
+| 🧩 **Game-agnostic core**                    | A new game is one server engine and one client class. Rooms, clocks, ratings, and replay come free. [→](#adding-a-game)                                                 |
+| 🔁 **Replay for free**                       | Every move stores the full state after it, so scrubbing through a round needs no extra logic. [→](#data-model)                                                          |
+| ⏱️ **A backend that cleans up after itself** | Crons close empty rooms, forfeit absent players, and clear the matchmaking queue every 2 minutes. [→](#the-system-takes-care-of-itself)                                 |
+| **Product**                                  |                                                                                                                                                                         |
+| 🎲 **Games with a twist**                    | Nine-board tic-tac-toe where you can't replay your last board, and checkers with forced captures and multi-jumps. [→](#the-games)                                       |
+| 🏆 **Ratings and matchmaking**               | Find Match pairs waiting players, and every decisive round moves the leaderboard. [→](#how-to-play)                                                                     |
+| 🔔 **Turn alerts**                           | In a background tab, the title flashes "Your turn" and an optional chime plays. Spectators never get pinged. [→](#what-a-spec-looks-like)                               |
+| **Front-end quality**                        |                                                                                                                                                                         |
+| 📐 **Zero layout shift**                     | Measured by the QA agent on every route: a 0.1443 shift on room load, fixed to 0. [→](#case-study-one-real-change)                                                      |
+| ♿ **Accessible**                            | Focus rings at 3:1 contrast or better, full keyboard support, live regions, and reduced motion. [→](#engineering-practices)                                             |
+| 🎨 **Design tokens that can't drift**        | Seat colors are defined once, and a test keeps CSS and TypeScript in sync. [→](#engineering-practices)                                                                  |
+| 🔍 **SEO by default**                        | One server-rendered `Meta` component on every page, tested and checked live. [→](#seo-without-thinking-about-it)                                                        |
 
 ## Quick links
 
@@ -68,6 +78,7 @@
 | [The system takes care of itself](#the-system-takes-care-of-itself)                                                   | Cron cleanup jobs                                               |
 | [SEO without thinking about it](#seo-without-thinking-about-it)                                                       | Metadata, previews, manifest                                    |
 | [Adding a game](#adding-a-game)                                                                                       | The steps to plug in a new game                                 |
+| [Optimistic UI and clock sync](#optimistic-ui-and-clock-sync)                                                         | Instant moves, rollback, server-timed clocks, timeouts          |
 | [Code tour](#code-tour)                                                                                               | Real snippets from the codebase                                 |
 | **The rest**                                                                                                          |                                                                 |
 | [Engineering practices](#engineering-practices) · [Tech stack](#tech-stack) · [Skills on display](#skills-on-display) | How it's built and with what                                    |
@@ -296,14 +307,14 @@ sequenceDiagram
     participant C as Convex
     participant B as Player B (browser)
 
-    A->>A: Pre-check move locally for instant feedback
+    A->>A: Predict the move with the shared engine, show it at once
     A->>C: rooms.play(move) with Clerk JWT
     C->>C: ctx.auth → user → seated in this room?
-    C->>C: Engine re-checks turn and legality
-    C->>C: Write state, move history, clocks, result
-    C-->>A: Live query update
+    C->>C: Clock still running? Engine re-checks turn and legality
+    C->>C: Write state, move history, bank clock, start opponent's clock
+    C-->>A: Live query update (pending move confirmed)
     C-->>B: Live query update
-    Note over A,B: Both boards re-render from the same server state
+    Note over A,B: Both boards settle on the same server state
 ```
 
 ### Design principles
@@ -383,6 +394,131 @@ Client  types → Room subclass → component → barrel → icon → GAMES entr
 
 Rooms, clocks, results, ratings, history, matchmaking, and replay work for the new game without changes.
 
+## Optimistic UI and clock sync
+
+A real-time game has to feel instant and still be impossible to cheat. twoplay gets both by letting the browser **predict** and the server **decide**.
+
+### One engine, two places
+
+Each game's rules are written once, as a pure `GameEngine` in `convex/models/games/<game>/`. The server runs it to accept or reject moves. The browser imports **the same file** to predict them.
+
+```ts
+// src/lib/features/play/tictactoe/game.svelte.ts
+import { tictactoeEngine } from "../../../../../convex/models/games/tictactoe/index.js";
+
+const tictactoeClientEngine: ClientEngine = {
+	applyMove(state, seat, move) {
+		/* kind checks */
+		return tictactoeEngine.applyMove(state, seat, move);
+	},
+	status(state) {
+		return tictactoeEngine.status(state);
+	}
+};
+```
+
+The client's prediction can't drift from the server's rules, because there's only one copy of the rules.
+
+### Optimistic moves
+
+All of this lives in the shared `Room` base class (`src/lib/utils/multiplayer/room/room.svelte.ts`), so every game gets it for free.
+
+```mermaid
+stateDiagram-v2
+    direction TB
+    [*] --> Predicted: click
+    Predicted --> Pending: engine accepts, move queued
+    Predicted --> Unpredicted: engine can't apply it
+    Unpredicted --> [*]: sent anyway, shown only if the server accepts
+    Pending --> Confirmed: server state matches the prediction
+    Pending --> RolledBack: server rejects the move
+    Confirmed --> [*]: dropped from the queue
+    RolledBack --> [*]: this move and every later one removed, toast + board shake
+```
+
+1. **Predict.** On a click, `submitMove` runs the move through the client engine against the current live state. If the engine can't apply it, the move is still sent, but nothing changes on screen until the server answers, and a server error is shown as-is.
+2. **Queue.** An accepted move goes into a `#pending` queue with its predicted state, its round, and the time it was queued.
+3. **Fold.** The board shows the **server state with every unconfirmed pending move applied on top**, computed as a `$derived` value. If one pending move no longer applies, the fold stops there, because every later move was predicted on top of it.
+4. **Confirm.** When a server update arrives, the client finds the latest pending move whose predicted board matches the server board. That move and every move before it are confirmed and leave the queue. No IDs need to round-trip, because the board itself is the proof.
+5. **Roll back.** If the server rejects a move, that move and everything queued after it are dropped. The board snaps back to server truth, a "Move not accepted" toast appears, and the board shakes (skipped under reduced motion).
+6. **Stay scoped.** Pending moves are tagged with their round, so a rematch or a reset never folds stale moves into a new round.
+
+Two values are kept apart on purpose:
+
+| Value                  | Follows             | Used for                                         |
+| ---------------------- | ------------------- | ------------------------------------------------ |
+| `isMyTurn`             | Prediction included | What the UI lets you click                       |
+| `isMyTurnConfirmed`    | Server only         | Anything that must not act on a guess            |
+| `activeSeat`           | Prediction included | Which clock looks like it's running              |
+| `#confirmedActiveSeat` | Server only         | Which clock can actually be claimed as timed out |
+
+### How the clocks work
+
+The server never ticks a clock. It stores two numbers per player per round:
+
+| Field       | Meaning                                                                    |
+| ----------- | -------------------------------------------------------------------------- |
+| `remaining` | Milliseconds banked for that player                                        |
+| `turnedAt`  | Server time when that player's clock started, or unset if it isn't running |
+
+**On the server**, inside `rooms.play`:
+
+1. Work out the mover's real remaining time: `remaining - (now - turnedAt)`.
+2. If that's zero or less, reject the move with "Time's up". A late move can't sneak in.
+3. Apply the move, then bank the mover's time and stop their clock.
+4. If the round is still live, start the opponent's clock with `turnedAt = now`.
+
+**In the browser**, the clock is derived, not stored:
+
+```
+displayed = banked remaining − (now − turnedAt)     for the seat whose turn it is
+displayed = banked remaining                         for the other seat
+```
+
+`now` is a rune-backed value updated once a second, so the display ticks locally with no server traffic. Every server push replaces `remaining` and `turnedAt`, which re-anchors both clocks.
+
+**Clocks follow optimistic moves too.** When a pending move passes the turn, the client freezes your clock at the moment you moved and starts counting down your opponent's from there. You see the hand-off immediately instead of losing a fraction of a second while the request travels.
+
+**Scrubbing history freezes the display.** While you look back through earlier moves, the clocks show a frozen snapshot. The real clocks keep running on the server.
+
+### Timeouts nobody can fake
+
+```mermaid
+sequenceDiagram
+    participant Any as Any connected browser
+    participant C as Convex
+
+    Any->>Any: Server-confirmed clock for the active seat reaches 0
+    Any->>C: games.timeout()
+    C->>C: elapsed = now − turnedAt (server clock)
+    alt time really ran out
+        C->>C: remaining = 0, record "timeout", end the round
+    else still time left, or round already over
+        C->>C: do nothing
+    end
+```
+
+- Any connected browser, either player or a spectator, claims the timeout as soon as its countdown of the **server-confirmed** active clock hits zero. It never claims based on a predicted turn.
+- The claim carries no time data. The server recomputes elapsed time from its own clock and its own `turnedAt`, so a client can't end a round early.
+- Duplicate claims are harmless. If the round already ended or another client won the race, the mutation does nothing, and the client ignores the failure.
+- If both players close their tabs, the 2-minute cron sweep still forfeits the silent seat.
+
+### Presence
+
+Presence works the same way: send cheaply, derive on the client, and let the server clean up.
+
+| Signal       | Sent                              | Shown as                                                |
+| ------------ | --------------------------------- | ------------------------------------------------------- |
+| Cursor       | At most every 80 ms, position 0–1 | Hidden after 4 s with no update, or right away on leave |
+| Heartbeat    | Every 15 s while the room is open | "Disconnected" after 30 s of silence                    |
+| Server sweep | Every 2 min (cron)                | Forfeit after 4 min of silence                          |
+
+The "disconnected" badge is only a display hint. The server's sweep, on a longer timer, is what actually ends the game.
+
+### Known limit
+
+The browser counts down using its own clock against the server's `turnedAt`. If a device's clock is off, its **display** is off by the same amount. The result stays correct, because the server decides every move and every timeout from its own time. Correcting for clock skew is on the list below.
+
 ## Code tour
 
 <details>
@@ -446,17 +582,20 @@ if (
 ```ts
 export class TictactoeRoom extends Room {
 	constructor(getCode: () => string, getRound: () => number | undefined = () => undefined) {
-		super("tictactoe", getCode, getRound);
+		super("tictactoe", tictactoeClientEngine, getCode, getRound);
 	}
 
-	#state = $derived(
-		this.data && this.data.game.state.kind === "tictactoe" ? this.data.game.state : null
-	);
-	#liveBoards = $derived(this.#state?.boards ?? []);
+	#displayState = $derived(this.displayState?.kind === "tictactoe" ? this.displayState : null);
+
+	boards = $derived(this.#displayState?.boards ?? []);
+	statuses = $derived(this.boards.map(statusOf));
+	metaBoard = $derived<Board>(this.statuses.map((s) => s.winner));
+	metaStatus = $derived(statusOf(this.metaBoard));
+	winner = $derived(this.metaStatus.winner);
 }
 ```
 
-The base `Room` already owns the live query, seats, clocks, history scrubbing, and actions. A game subclass only adds views of its own state.
+The base `Room` already owns the live query, seats, clocks, optimistic moves, history scrubbing, and actions. A game subclass passes its engine and only adds views of its own state.
 
 </details>
 
@@ -532,6 +671,7 @@ openspec/                 specs and change proposals
 - Split the large rooms module into lifecycle, play, and history
 - More games on the same engine contract
 - A generated sitemap and canonical URLs
+- Clock-skew correction, so the countdown display matches the server on devices with a wrong clock
 
 ## Run it locally
 
