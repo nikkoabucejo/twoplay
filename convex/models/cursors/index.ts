@@ -1,6 +1,10 @@
 import { v } from "convex/values";
 import { mutation, query } from "../../_generated/server";
-import { currentPlayer, getRoomByCode, requirePlayer } from "../rooms/auth.js";
+import { currentPlayer, getRoomByCode, isRoomActive, requirePlayer } from "../rooms/auth.js";
+
+function clampToUnit(value: number) {
+	return Math.min(1, Math.max(0, value));
+}
 
 export const update = mutation({
 	args: { code: v.string(), x: v.number(), y: v.number() },
@@ -8,13 +12,16 @@ export const update = mutation({
 		const room = await getRoomByCode(ctx, code);
 		if (!room) throw new Error("Room not found");
 		const player = await requirePlayer(ctx, room._id);
+		if (!isRoomActive(room) || player.leftAt !== undefined) {
+			throw new Error("This room is no longer active");
+		}
 
 		const existing = await ctx.db
 			.query("cursors")
 			.withIndex("byRoomAndPlayer", (q) => q.eq("roomId", room._id).eq("playerId", player._id))
 			.unique();
 
-		const patch = { x, y, updatedAt: Date.now() };
+		const patch = { x: clampToUnit(x), y: clampToUnit(y), updatedAt: Date.now() };
 		if (existing) {
 			await ctx.db.patch(existing._id, patch);
 		} else {

@@ -8,5 +8,9 @@ import { gameStateValidator } from "./index.js";
 export const gamesTable = defineTable({
 	roomId: v.id("rooms"),
 	round: v.number(),
-	state: gameStateValidator
+	state: gameStateValidator,
+	// Set once the round's score and rating are credited, so a later mutation never credits it twice.
+	settledAt: v.optional(v.number()),
+	// The round ended with an empty seat or with every seat idle: it counts for nobody.
+	isNoContest: v.optional(v.boolean())
 }).index("byRoom", ["roomId", "round"]);

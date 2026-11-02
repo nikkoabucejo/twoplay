@@ -88,8 +88,7 @@ test("update accepts the 0 and 1 edges of the tracked area", async () => {
 	expect(await cursorsIn(t, code)).toMatchObject([{ x: 0, y: 1 }]);
 });
 
-test.fails("update clamps coordinates outside 0-1 into the tracked area", async () => {
-	// Stores client values as-is; the schema documents x/y as normalized 0-1 but nothing enforces it.
+test("update clamps coordinates outside 0-1 into the tracked area", async () => {
 	const t = setup();
 	const { a, code } = await seatedRoom(t, "tictactoe");
 	await a.mutation(update, { code, x: -3, y: 42 });
@@ -122,6 +121,17 @@ test("update rejects a signed-out caller", async () => {
 	const { code } = await seatedRoom(t, "tictactoe");
 
 	await expect(t.mutation(update, { code, x: 0.5, y: 0.5 })).rejects.toThrow("Sign in to play");
+});
+
+test("update rejects a player whose room has closed", async () => {
+	const t = setup();
+	const { a, b, code } = await seatedRoom(t, "tictactoe");
+	await b.mutation(api.models.rooms.index.abandon, { code });
+
+	await expect(a.mutation(update, { code, x: 0.5, y: 0.5 })).rejects.toThrow(
+		"This room is no longer active"
+	);
+	expect(await cursorsIn(t, code)).toEqual([]);
 });
 
 test("clear removes the caller's cursor", async () => {

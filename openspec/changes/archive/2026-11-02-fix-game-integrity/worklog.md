@@ -1,0 +1,4 @@
+- PLAN done
+- QA blocked: deployed Convex functions predate this change (rematch validator lacks `round`, lowercase join 'Room not found', resigned round absent from /history)
+- QA rerun: lowercase join, resign settles both strips + ±8 before Rematch, /history 'Resigned', simultaneous Rematch → one round no error, cancel-before-join leaves no Loss: pass. 9.3 left open (win-by-play, leaderboard stats, spectator cursor unverified)
+- 2026-11-02T09:26:09Z VERIFY done: convex+cursor tests pass, pnpm check 0/0, build ok, security pass-with-notes (all fixed), review approve-with-nits (all fixed). Live QA on new backend: lowercase join, settle on resign w/o rematch (±8, history reason), rematch race single round, abandon-before-join no-contest, checkers must-capture. Not verified live: spectator cursors, win-by-play settle (covered by convex-test).

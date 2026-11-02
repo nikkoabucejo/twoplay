@@ -2,8 +2,9 @@ import { v } from "convex/values";
 import type { Doc, Id } from "../../_generated/dataModel";
 import { mutation, query, type MutationCtx, type QueryCtx } from "../../_generated/server";
 import { clocksByGame } from "../clocks/index.js";
+import { applyResult } from "../ratings/index.js";
 import { getRoomByCode, isRoomActive, requirePlayer, requireUser } from "../rooms/auth.js";
-import { markEnded, resultsByGame } from "../results/index.js";
+import { creditMmr, markEnded, resultsByGame } from "../results/index.js";
 import {
 	checkersEngine,
 	checkersMove,
@@ -11,6 +12,7 @@ import {
 	type CheckersMove,
 	type CheckersState
 } from "./checkers/index.js";
+import { otherPlayer } from "./engine.js";
 export type { GameEngine, GameStatus } from "./engine.js";
 import {
 	tictactoeEngine,
@@ -102,13 +104,14 @@ export async function getCurrentGame(ctx: QueryCtx | MutationCtx, roomId: Id<"ro
 		.first();
 }
 
-/** A specific past or present round, or the live game when `round` is omitted. */
+/** A specific past or present round, or the live game when `round` is omitted or doesn't exist. */
 export async function getGame(ctx: QueryCtx | MutationCtx, roomId: Id<"rooms">, round?: number) {
 	if (round === undefined) return await getCurrentGame(ctx, roomId);
-	return await ctx.db
+	const game = await ctx.db
 		.query("games")
 		.withIndex("byRoom", (q) => q.eq("roomId", roomId).eq("round", round))
 		.unique();
+	return game ?? (await getCurrentGame(ctx, roomId));
 }
 
 /** `shouldStartClock` is false right after room creation (only one seat is filled yet) and true for
@@ -144,6 +147,89 @@ export async function createGame(
 	return gameId;
 }
 
+/** Ends a running round on timeout against the seat to move once its clock has run out on the
+ *  server. Called before anything else ends a round, so an expired seat can't dodge the loss by
+ *  outlasting its opponent's heartbeat. Returns whether it ended the round. */
+export async function claimExpiredClock(
+	ctx: MutationCtx,
+	room: Doc<"rooms">,
+	game: Doc<"games">
+): Promise<boolean> {
+	const results = await resultsByGame(ctx, game._id);
+	if (results.some((result) => result.state !== undefined)) return false;
+
+	const status = gameStatus(room.type, game.state);
+	if (status.isOver) return false;
+
+	const clocks = await clocksByGame(ctx, game._id);
+	const activeClock = clocks.find((clock) => clock.playerId === room.players[status.turnIndex]);
+	if (!activeClock || activeClock.turnedAt === undefined) return false;
+	if (activeClock.remaining - (Date.now() - activeClock.turnedAt) > 0) return false;
+
+	await ctx.db.patch(activeClock._id, { remaining: 0, turnedAt: undefined });
+	await markEnded(ctx, game._id, activeClock.playerId, "timeout");
+	return true;
+}
+
+/** The winning seat of an ended round: the opponent of a seat that ended it early (timeout, resign,
+ *  abandon), else the board's winner. Null for a draw. */
+export function roundWinnerIndex(
+	room: Pick<Doc<"rooms">, "type" | "players">,
+	game: Pick<Doc<"games">, "state">,
+	results: Doc<"results">[]
+): number | null {
+	const endedResult = results.find((result) => result.state !== undefined);
+	return endedResult
+		? otherPlayer(room.players.indexOf(endedResult.playerId))
+		: roundWinner(room.type, game.state);
+}
+
+/** Credits a round that has ended, exactly once: stops its clocks, then adds the winner's point and
+ *  both rating changes, or marks it no-contest when a seat is empty. An unfinished round is left
+ *  alone unless `shouldVoidIfUnfinished` is set, which makes it no-contest. Concurrent calls conflict
+ *  in Convex's serializable transactions, so the retry sees `settledAt` and stops. */
+export async function settleRound(
+	ctx: MutationCtx,
+	room: Doc<"rooms">,
+	game: Doc<"games">,
+	options: { shouldVoidIfUnfinished?: boolean } = {}
+) {
+	if (game.settledAt !== undefined) return;
+
+	const results = await resultsByGame(ctx, game._id);
+	const endedResult = results.find((result) => result.state !== undefined);
+	const isOver = endedResult !== undefined || gameStatus(room.type, game.state).isOver;
+	if (!isOver && !options.shouldVoidIfUnfinished) return;
+
+	const now = Date.now();
+	for (const clock of await clocksByGame(ctx, game._id)) {
+		if (clock.turnedAt === undefined) continue;
+		await ctx.db.patch(clock._id, {
+			remaining: Math.max(0, clock.remaining - (now - clock.turnedAt)),
+			turnedAt: undefined
+		});
+	}
+
+	if (!isOver || room.players.length < getEngine(room.type).playerCount) {
+		await ctx.db.patch(game._id, { settledAt: now, isNoContest: true });
+		return;
+	}
+
+	const winnerIndex = roundWinnerIndex(room, game, results);
+	if (winnerIndex !== null) {
+		const winnerId = room.players[winnerIndex];
+		const loserId = room.players[otherPlayer(winnerIndex)];
+		const [winner, loser] = await Promise.all([ctx.db.get(winnerId), ctx.db.get(loserId)]);
+		if (winner && loser) {
+			await ctx.db.patch(winnerId, { score: winner.score + 1 });
+			const { winnerMmr, loserMmr } = await applyResult(ctx, winner.userId, loser.userId);
+			await creditMmr(ctx, game._id, winnerId, winnerMmr);
+			await creditMmr(ctx, game._id, loserId, loserMmr);
+		}
+	}
+	await ctx.db.patch(game._id, { settledAt: now });
+}
+
 /** How many moves have been played in a game — also next move's `moves.turn`. */
 export async function countMoves(
 	ctx: QueryCtx | MutationCtx,
@@ -166,6 +252,9 @@ export const resign = mutation({
 		if (!room) throw new Error("Room not found");
 		if (!isRoomActive(room)) throw new Error("This room is no longer active");
 		const player = await requirePlayer(ctx, room._id);
+		if (room.players.length < getEngine(room.type).playerCount) {
+			throw new Error("Waiting for opponent");
+		}
 
 		const game = await getCurrentGame(ctx, room._id);
 		if (!game) throw new Error("Game not found");
@@ -181,6 +270,7 @@ export const resign = mutation({
 
 		await ctx.db.patch(ownClock._id, { turnedAt: undefined });
 		await markEnded(ctx, game._id, player._id, "resign");
+		await settleRound(ctx, room, game);
 	}
 });
 
@@ -198,25 +288,7 @@ export const timeout = mutation({
 		const game = await getCurrentGame(ctx, room._id);
 		if (!game) throw new Error("Game not found");
 
-		const results = await resultsByGame(ctx, game._id);
-		if (results.some((result) => result.state !== undefined)) return;
-
-		const status = gameStatus(room.type, game.state);
-		if (!status || status.isOver) return;
-
-		const clocks = await clocksByGame(ctx, game._id);
-		const activeClock = clocks.find((clock) => clock.playerId === room.players[status.turnIndex]);
-		if (!activeClock || activeClock.turnedAt === undefined) return;
-
-		const elapsed = Date.now() - activeClock.turnedAt;
-		const remaining = activeClock.remaining - elapsed;
-		if (remaining > 0) return;
-
-		await ctx.db.patch(activeClock._id, {
-			remaining: 0,
-			turnedAt: undefined
-		});
-		await markEnded(ctx, game._id, activeClock.playerId, "timeout");
+		if (await claimExpiredClock(ctx, room, game)) await settleRound(ctx, room, game);
 	}
 });
 

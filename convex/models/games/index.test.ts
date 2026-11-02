@@ -12,8 +12,10 @@ import {
 	gameStatus,
 	getCurrentGame,
 	getEngine,
+	claimExpiredClock,
 	getGame,
 	roundWinner,
+	settleRound,
 	type GameState
 } from "./index.js";
 import { tictactoeEngine } from "./tictactoe/index.js";
@@ -31,6 +33,12 @@ function decidedTictactoe(): GameState {
 	};
 }
 
+/** A tictactoe state where every small board is full with no line, so the round is a draw. */
+function drawnTictactoe(): GameState {
+	const drawn = ["X", "O", "X", "X", "O", "O", "O", "X", "X"] as const;
+	return { kind: "tictactoe", boards: Array.from({ length: 9 }, () => [...drawn]) };
+}
+
 async function roomAndGame(t: TestConvex, code: string) {
 	return await t.run(async (ctx) => {
 		const room = await getRoomByCode(ctx, code);
@@ -41,13 +49,15 @@ async function roomAndGame(t: TestConvex, code: string) {
 	});
 }
 
-async function resultsOf(t: TestConvex, gameId: Id<"games">) {
-	return await t.run((ctx) =>
+/** The rows that ended the round (a resign, timeout, or abandon), leaving out MMR-only rows. */
+async function endedResultsOf(t: TestConvex, gameId: Id<"games">) {
+	const results = await t.run((ctx) =>
 		ctx.db
 			.query("results")
 			.withIndex("byGame", (q) => q.eq("gameId", gameId))
 			.collect()
 	);
+	return results.filter((result) => result.state !== undefined);
 }
 
 async function clocksOf(t: TestConvex, gameId: Id<"games">) {
@@ -56,6 +66,27 @@ async function clocksOf(t: TestConvex, gameId: Id<"games">) {
 			.query("clocks")
 			.withIndex("byGame", (q) => q.eq("gameId", gameId))
 			.collect()
+	);
+}
+
+/** Each seat's room score, rating (null before any rated round), and MMR change for `gameId`. */
+async function standings(t: TestConvex, players: Id<"players">[], gameId: Id<"games">) {
+	return await t.run((ctx) =>
+		Promise.all(
+			players.map(async (id) => {
+				const player = await ctx.db.get(id);
+				if (!player) throw new Error(`no player ${id}`);
+				const rating = await ctx.db
+					.query("ratings")
+					.withIndex("byUser", (q) => q.eq("userId", player.userId))
+					.unique();
+				const result = await ctx.db
+					.query("results")
+					.withIndex("byGameAndPlayer", (q) => q.eq("gameId", gameId).eq("playerId", id))
+					.unique();
+				return { score: player.score, rating: rating?.rating ?? null, mmr: result?.mmr ?? null };
+			})
+		)
 	);
 }
 
@@ -179,11 +210,11 @@ describe("game rows", () => {
 		expect(past?._id).toBe(first._id);
 	});
 
-	test("getGame returns null for a round that never happened", async () => {
+	test("getGame falls back to the live round for a round that never happened", async () => {
 		const t = setup();
 		const { code } = await seatedRoom(t, "tictactoe");
-		const { room } = await roomAndGame(t, code);
-		expect(await t.run((ctx) => getGame(ctx, room._id, 7))).toBeNull();
+		const { room, game } = await roomAndGame(t, code);
+		expect((await t.run((ctx) => getGame(ctx, room._id, 7)))?._id).toBe(game._id);
 	});
 
 	test("createGame gives every seat a clock with the time control", async () => {
@@ -229,6 +260,148 @@ describe("game rows", () => {
 			move: { kind: "tictactoe", boardIndex: 1, cellIndex: 0 }
 		});
 		expect(await t.run((ctx) => countMoves(ctx, game._id))).toBe(2);
+	});
+});
+
+describe("claimExpiredClock", () => {
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	async function claim(t: TestConvex, code: string) {
+		const { room, game } = await roomAndGame(t, code);
+		await t.run((ctx) => claimExpiredClock(ctx, room, game));
+		return { room, game };
+	}
+
+	test("ends the round on timeout against the seat to move once its clock is out", async () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(1_000_000);
+		const t = setup();
+		const { code } = await seatedRoom(t, "tictactoe", 10_000);
+		vi.setSystemTime(1_010_000);
+		const { room, game } = await claim(t, code);
+		expect(await endedResultsOf(t, game._id)).toMatchObject([
+			{ playerId: room.players[0], state: "timeout" }
+		]);
+		const expired = (await clocksOf(t, game._id)).find((c) => c.playerId === room.players[0]);
+		expect(expired).toMatchObject({ remaining: 0 });
+		expect(expired).not.toHaveProperty("turnedAt");
+	});
+
+	test("leaves a seat with time left alone", async () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(1_000_000);
+		const t = setup();
+		const { code } = await seatedRoom(t, "tictactoe", 10_000);
+		vi.setSystemTime(1_009_999);
+		const { game } = await claim(t, code);
+		expect(await endedResultsOf(t, game._id)).toEqual([]);
+	});
+});
+
+describe("settleRound", () => {
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	async function settle(
+		t: TestConvex,
+		code: string,
+		options?: { shouldVoidIfUnfinished?: boolean }
+	) {
+		const { room, game } = await roomAndGame(t, code);
+		await t.run((ctx) => settleRound(ctx, room, game, options));
+		return await roomAndGame(t, code);
+	}
+
+	test("credits the board winner's score, both ratings, and both MMR changes", async () => {
+		const t = setup();
+		const { code } = await seatedRoom(t, "tictactoe");
+		const { game } = await roomAndGame(t, code);
+		await setGameState(t, game._id, decidedTictactoe());
+		const { room, game: settled } = await settle(t, code);
+		expect(settled.settledAt).toBeDefined();
+		expect(await standings(t, room.players, game._id)).toEqual([
+			{ score: 1, rating: 408, mmr: 8 },
+			{ score: 0, rating: 392, mmr: -8 }
+		]);
+	});
+
+	test("changes nothing when called again for a settled round", async () => {
+		const t = setup();
+		const { code } = await seatedRoom(t, "tictactoe");
+		const { game } = await roomAndGame(t, code);
+		await setGameState(t, game._id, decidedTictactoe());
+		await settle(t, code);
+		const { room } = await settle(t, code);
+		expect(await standings(t, room.players, game._id)).toEqual([
+			{ score: 1, rating: 408, mmr: 8 },
+			{ score: 0, rating: 392, mmr: -8 }
+		]);
+	});
+
+	test("credits nobody for a draw and marks it settled", async () => {
+		const t = setup();
+		const { code } = await seatedRoom(t, "tictactoe");
+		const { game } = await roomAndGame(t, code);
+		await setGameState(t, game._id, drawnTictactoe());
+		const { room, game: settled } = await settle(t, code);
+		expect(settled.settledAt).toBeDefined();
+		expect(settled.isNoContest).toBeUndefined();
+		expect(await standings(t, room.players, game._id)).toEqual([
+			{ score: 0, rating: null, mmr: null },
+			{ score: 0, rating: null, mmr: null }
+		]);
+	});
+
+	test("writes nothing for an unfinished round", async () => {
+		const t = setup();
+		const { code } = await seatedRoom(t, "tictactoe");
+		const { game: before } = await roomAndGame(t, code);
+		const clocksBefore = await clocksOf(t, before._id);
+		const { game } = await settle(t, code);
+		expect(game.settledAt).toBeUndefined();
+		expect(await clocksOf(t, game._id)).toEqual(clocksBefore);
+	});
+
+	test("voids an unfinished round when asked", async () => {
+		const t = setup();
+		const { code } = await seatedRoom(t, "tictactoe");
+		const { room, game } = await settle(t, code, { shouldVoidIfUnfinished: true });
+		expect(game).toMatchObject({ isNoContest: true, settledAt: expect.any(Number) });
+		expect(await standings(t, room.players, game._id)).toEqual([
+			{ score: 0, rating: null, mmr: null },
+			{ score: 0, rating: null, mmr: null }
+		]);
+	});
+
+	test("makes a round with an empty seat no-contest without rating anyone", async () => {
+		const t = setup();
+		const host = await signIn(t, "user_host", "Hal");
+		const { code } = await host.mutation(api.models.rooms.index.create, { type: "tictactoe" });
+		const { game } = await roomAndGame(t, code);
+		await setGameState(t, game._id, decidedTictactoe());
+		const { room, game: settled } = await settle(t, code);
+		expect(settled.isNoContest).toBe(true);
+		expect(await t.run((ctx) => ctx.db.query("ratings").collect())).toEqual([]);
+		expect(await standings(t, room.players, game._id)).toEqual([
+			{ score: 0, rating: null, mmr: null }
+		]);
+	});
+
+	test("stops every running clock and banks its remaining time", async () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(1_000_000);
+		const t = setup();
+		const { code } = await seatedRoom(t, "tictactoe", 60_000);
+		const { room, game } = await roomAndGame(t, code);
+		await setGameState(t, game._id, decidedTictactoe());
+		vi.setSystemTime(1_003_000);
+		await settle(t, code);
+		const clocks = await clocksOf(t, game._id);
+		expect(clocks.every((clock) => clock.turnedAt === undefined)).toBe(true);
+		expect(clocks.find((clock) => clock.playerId === room.players[0])?.remaining).toBe(57_000);
 	});
 });
 
@@ -300,9 +473,9 @@ describe("history", () => {
 		expect(await a.query(api.models.games.index.history, { code, round: 1 })).toHaveLength(2);
 	});
 
-	test("returns an empty list for a round that never happened", async () => {
+	test("returns the live round's moves for a round that doesn't exist yet", async () => {
 		const { a, code } = await playedRoom();
-		expect(await a.query(api.models.games.index.history, { code, round: 5 })).toEqual([]);
+		expect(await a.query(api.models.games.index.history, { code, round: 5 })).toHaveLength(2);
 	});
 });
 
@@ -357,7 +530,7 @@ describe("resign", () => {
 		const { b, code } = await seatedRoom(t, "tictactoe");
 		const { room, game } = await roomAndGame(t, code);
 		await b.mutation(api.models.games.index.resign, { code });
-		const results = await resultsOf(t, game._id);
+		const results = await endedResultsOf(t, game._id);
 		expect(results).toHaveLength(1);
 		expect(results[0]).toMatchObject({ playerId: room.players[1], state: "resign" });
 	});
@@ -379,7 +552,7 @@ describe("resign", () => {
 		const { room, game } = await roomAndGame(t, code);
 		await a.mutation(api.models.games.index.resign, { code });
 		await b.mutation(api.models.games.index.resign, { code });
-		const results = await resultsOf(t, game._id);
+		const results = await endedResultsOf(t, game._id);
 		expect(results.map((r) => r.playerId)).toEqual([room.players[0]]);
 	});
 
@@ -389,7 +562,7 @@ describe("resign", () => {
 		const { game } = await roomAndGame(t, code);
 		await setGameState(t, game._id, decidedTictactoe());
 		await b.mutation(api.models.games.index.resign, { code });
-		expect(await resultsOf(t, game._id)).toEqual([]);
+		expect(await endedResultsOf(t, game._id)).toEqual([]);
 	});
 
 	test("throws when the caller has no clock in the current round", async () => {
@@ -404,12 +577,22 @@ describe("resign", () => {
 		);
 	});
 
-	// Bug: resign ends a round with no opponent seat; rematch then crashes on `db.get(undefined)`.
-	test.fails("rejects a resign while the second seat is still empty", async () => {
+	test("credits the opponent at once, with no rematch", async () => {
+		const t = setup();
+		const { b, code } = await seatedRoom(t, "tictactoe");
+		const { room, game } = await roomAndGame(t, code);
+		await b.mutation(api.models.games.index.resign, { code });
+		const [ada] = await standings(t, room.players, game._id);
+		expect(ada).toMatchObject({ score: 1, rating: 408 });
+	});
+
+	test("rejects a resign while the second seat is still empty", async () => {
 		const t = setup();
 		const ada = await signIn(t, "user_a", "Ada");
 		const { code } = await ada.mutation(api.models.rooms.index.create, { type: "tictactoe" });
-		await expect(ada.mutation(api.models.games.index.resign, { code })).rejects.toThrow();
+		await expect(ada.mutation(api.models.games.index.resign, { code })).rejects.toThrow(
+			"Waiting for opponent"
+		);
 	});
 });
 
@@ -448,14 +631,14 @@ describe("timeout", () => {
 		const { t, b, code, game } = await timedRoom();
 		vi.setSystemTime(START + TIME_CONTROL_MS - 1);
 		await b.mutation(api.models.games.index.timeout, { code });
-		expect(await resultsOf(t, game._id)).toEqual([]);
+		expect(await endedResultsOf(t, game._id)).toEqual([]);
 	});
 
 	test("ends the round against the seat to move once its clock runs out", async () => {
 		const { t, b, code, room, game } = await timedRoom();
 		vi.setSystemTime(START + TIME_CONTROL_MS);
 		await b.mutation(api.models.games.index.timeout, { code });
-		const results = await resultsOf(t, game._id);
+		const results = await endedResultsOf(t, game._id);
 		expect(results).toHaveLength(1);
 		expect(results[0]).toMatchObject({ playerId: room.players[0], state: "timeout" });
 	});
@@ -474,7 +657,7 @@ describe("timeout", () => {
 		const spectator = await signIn(t, "user_spectator", "Spec");
 		vi.setSystemTime(START + TIME_CONTROL_MS);
 		await spectator.mutation(api.models.games.index.timeout, { code });
-		const results = await resultsOf(t, game._id);
+		const results = await endedResultsOf(t, game._id);
 		expect(results).toMatchObject([{ playerId: room.players[0], state: "timeout" }]);
 	});
 
@@ -483,7 +666,7 @@ describe("timeout", () => {
 		await closeRoom(t, room._id);
 		vi.setSystemTime(START + TIME_CONTROL_MS);
 		await a.mutation(api.models.games.index.timeout, { code });
-		expect(await resultsOf(t, game._id)).toEqual([]);
+		expect(await endedResultsOf(t, game._id)).toEqual([]);
 	});
 
 	test("does nothing once the round has already ended", async () => {
@@ -491,7 +674,7 @@ describe("timeout", () => {
 		await b.mutation(api.models.games.index.resign, { code });
 		vi.setSystemTime(START + TIME_CONTROL_MS);
 		await a.mutation(api.models.games.index.timeout, { code });
-		const results = await resultsOf(t, game._id);
+		const results = await endedResultsOf(t, game._id);
 		expect(results).toMatchObject([{ playerId: room.players[1], state: "resign" }]);
 	});
 
@@ -500,7 +683,7 @@ describe("timeout", () => {
 		await setGameState(t, game._id, decidedTictactoe());
 		vi.setSystemTime(START + TIME_CONTROL_MS);
 		await a.mutation(api.models.games.index.timeout, { code });
-		expect(await resultsOf(t, game._id)).toEqual([]);
+		expect(await endedResultsOf(t, game._id)).toEqual([]);
 	});
 
 	test("does nothing while the clock is frozen waiting for an opponent", async () => {
@@ -515,7 +698,7 @@ describe("timeout", () => {
 		const { game } = await roomAndGame(t, code);
 		vi.setSystemTime(START + TIME_CONTROL_MS * 10);
 		await host.mutation(api.models.games.index.timeout, { code });
-		expect(await resultsOf(t, game._id)).toEqual([]);
+		expect(await endedResultsOf(t, game._id)).toEqual([]);
 	});
 
 	test("charges the seat to move after the turn passes", async () => {
@@ -524,8 +707,16 @@ describe("timeout", () => {
 		await a.mutation(api.models.rooms.index.play, { code, move: tictactoeMove });
 		vi.setSystemTime(START + 1_000 + TIME_CONTROL_MS);
 		await a.mutation(api.models.games.index.timeout, { code });
-		const results = await resultsOf(t, game._id);
+		const results = await endedResultsOf(t, game._id);
 		expect(results).toMatchObject([{ playerId: room.players[1], state: "timeout" }]);
+	});
+
+	test("credits the opponent at once, with no rematch", async () => {
+		const { t, b, code, room, game } = await timedRoom();
+		vi.setSystemTime(START + TIME_CONTROL_MS);
+		await b.mutation(api.models.games.index.timeout, { code });
+		const [, bea] = await standings(t, room.players, game._id);
+		expect(bea).toMatchObject({ score: 1, rating: 408 });
 	});
 
 	test("gives the round to the timed-out seat's opponent on rematch", async () => {

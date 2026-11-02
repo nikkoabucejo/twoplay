@@ -101,6 +101,20 @@ describe("getRoomByCode", () => {
 		const t = setup();
 		expect(await t.run((ctx) => getRoomByCode(ctx, "ZZZZZZ"))).toBeNull();
 	});
+
+	test("finds a room by its lowercase code", async () => {
+		const t = setup();
+		const { code } = await seatedRoom(t, "checkers");
+		const room = await t.run((ctx) => getRoomByCode(ctx, code.toLowerCase()));
+		expect(room?.code).toBe(code);
+	});
+
+	test("finds a room by a code with surrounding whitespace", async () => {
+		const t = setup();
+		const { code } = await seatedRoom(t, "checkers");
+		const room = await t.run((ctx) => getRoomByCode(ctx, `  ${code}\n`));
+		expect(room?.code).toBe(code);
+	});
 });
 
 describe("isRoomActive", () => {

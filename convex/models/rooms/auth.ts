@@ -36,10 +36,11 @@ export async function requirePlayer(ctx: QueryCtx | MutationCtx, roomId: Id<"roo
 	return player;
 }
 
+/** Codes are stored uppercase, so a typed or lowercased code still resolves. */
 export async function getRoomByCode(ctx: QueryCtx | MutationCtx, code: string) {
 	return await ctx.db
 		.query("rooms")
-		.withIndex("byCode", (q) => q.eq("code", code))
+		.withIndex("byCode", (q) => q.eq("code", code.trim().toUpperCase()))
 		.unique();
 }
 

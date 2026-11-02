@@ -3,11 +3,22 @@ import { createRawSnippet } from "svelte";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { api } from "../../../../../convex/_generated/api.js";
 import type { Id } from "../../../../../convex/_generated/dataModel.js";
-import { resetConvex, setQueryResult } from "$lib/utils/multiplayer/room/fake-convex.svelte.js";
+import {
+	mutationFor,
+	resetConvex,
+	setQueryResult
+} from "$lib/utils/multiplayer/room/fake-convex.svelte.js";
 import Cursor from "./cursor.svelte";
 import { CursorPresence } from "./cursor.svelte.js";
 
 vi.mock("convex-svelte", () => import("$lib/utils/multiplayer/room/fake-convex.svelte.js"));
+
+vi.mock("$lib/services/auth", async (importOriginal) => {
+	const auth = await importOriginal<typeof import("$lib/services/auth")>();
+	const signedIn = new auth.ClerkAuth();
+	signedIn.hydrate({ id: "user-1", email: null, name: "Alice Archer", imageUrl: null });
+	return { ...auth, getClerkAuth: () => signedIn };
+});
 
 const NOW = 1_000_000;
 
@@ -69,6 +80,72 @@ describe("CursorPresence", () => {
 	test("has no peers while the cursor list is loading", () => {
 		presence = new CursorPresence(() => "ABCD");
 		expect(presence.peers).toEqual([]);
+	});
+
+	describe("sending", () => {
+		const update = api.models.cursors.index.update;
+		const clear = api.models.cursors.index.clear;
+
+		function seatedIn(code: string | null) {
+			setQueryResult(api.models.rooms.index.active, code ? { code, type: "tictactoe" } : null);
+		}
+
+		test("sends no update for a spectator", () => {
+			seatedIn(null);
+			presence = new CursorPresence(() => "ABCD");
+			presence.move(0.5, 0.5);
+			expect(mutationFor(update)).not.toHaveBeenCalled();
+		});
+
+		test("sends no update when the viewer's active room is a different one", () => {
+			seatedIn("WXYZ");
+			presence = new CursorPresence(() => "ABCD");
+			presence.move(0.5, 0.5);
+			expect(mutationFor(update)).not.toHaveBeenCalled();
+		});
+
+		test("sends one update for a viewer seated in the room, whatever the code's case", () => {
+			seatedIn("ABCD");
+			presence = new CursorPresence(() => "abcd");
+			presence.move(0.25, 0.75);
+			expect(mutationFor(update)).toHaveBeenCalledExactlyOnceWith({
+				code: "abcd",
+				x: 0.25,
+				y: 0.75
+			});
+		});
+
+		test("leave sends no clear when nothing was sent", () => {
+			seatedIn(null);
+			presence = new CursorPresence(() => "ABCD");
+			presence.move(0.5, 0.5);
+			presence.leave();
+			expect(mutationFor(clear)).not.toHaveBeenCalled();
+		});
+
+		test("leave sends one clear after an update", () => {
+			seatedIn("ABCD");
+			presence = new CursorPresence(() => "ABCD");
+			presence.move(0.5, 0.5);
+			presence.leave();
+			presence.leave();
+			expect(mutationFor(clear)).toHaveBeenCalledOnce();
+		});
+
+		test("dispose sends no clear when nothing was sent", () => {
+			seatedIn(null);
+			presence = new CursorPresence(() => "ABCD");
+			presence.dispose();
+			expect(mutationFor(clear)).not.toHaveBeenCalled();
+		});
+
+		test("dispose sends one clear after an update", () => {
+			seatedIn("ABCD");
+			presence = new CursorPresence(() => "ABCD");
+			presence.move(0.5, 0.5);
+			presence.dispose();
+			expect(mutationFor(clear)).toHaveBeenCalledOnce();
+		});
 	});
 });
 

@@ -5,6 +5,7 @@ import type { TictactoeState } from "../games/tictactoe/index.js";
 import { seatedRoom, setup, signIn, type TestConvex } from "../../test.setup.js";
 import { clockByGameAndPlayer, clocksByGame } from "../clocks/index.js";
 import { getCurrentGame, getGame } from "../games/index.js";
+import { markEnded } from "../results/index.js";
 import { getRoomByCode, requireUser } from "./auth.js";
 
 const {
@@ -30,6 +31,7 @@ const X_WON: Board = ["X", "X", "X", null, null, null, null, null, null];
 const O_WON: Board = ["O", "O", "O", null, null, null, null, null, null];
 const X_TWO: Board = ["X", "X", null, null, null, null, null, null, null];
 const DRAWN: Board = ["X", "O", "X", "X", "O", "O", "O", "X", "X"];
+const DRAWN_BUT_LAST: Board = ["X", "O", "X", "X", "O", "O", "O", "X", null];
 
 const SEAT_0_WINS = [X_WON, X_WON, X_WON, ...Array<Board>(6).fill(EMPTY)];
 const SEAT_1_WINS = [O_WON, O_WON, O_WON, ...Array<Board>(6).fill(EMPTY)];
@@ -39,6 +41,12 @@ const START = 1_000_000;
 const MINUTE = 60_000;
 
 const corner = { kind: "tictactoe", boardIndex: 0, cellIndex: 0 } as const;
+const winningMove = { kind: "tictactoe", boardIndex: 2, cellIndex: 2 } as const;
+
+/** Sets up a board where seat 0 wins the round with `winningMove`. */
+async function setSeat0AboutToWin(t: TestConvex, code: string) {
+	await setBoards(t, code, [X_WON, X_WON, X_TWO, ...Array<Board>(6).fill(EMPTY)]);
+}
 
 function useFakeTimeAtStart() {
 	vi.useFakeTimers();
@@ -324,6 +332,15 @@ describe("create", () => {
 		expect(second.code).not.toBe(first.code);
 	});
 
+	test("takes the caller out of the matchmaking queue", async () => {
+		const t = setup();
+		const ada = await signIn(t, "user_a", "Ada");
+		await ada.mutation(api.models.pairings.index.enqueue, { type: "tictactoe" });
+		await ada.mutation(create, { type: "checkers" });
+		expect(await ada.query(api.models.pairings.index.status, {})).toBe(false);
+		expect(await t.run((ctx) => ctx.db.query("pairings").collect())).toEqual([]);
+	});
+
 	test("gives up after ten code collisions", async () => {
 		const t = setup();
 		vi.spyOn(Math, "random").mockReturnValue(0);
@@ -417,6 +434,37 @@ describe("join", () => {
 		});
 	});
 
+	test("takes the open seat with a lowercase code and returns the stored code", async () => {
+		const t = setup();
+		const ada = await signIn(t, "user_a", "Ada");
+		const bea = await signIn(t, "user_b", "Bea");
+		const { code } = await ada.mutation(create, { type: "tictactoe" });
+		const result = await bea.mutation(join, { code: code.toLowerCase() });
+		expect(result).toEqual({ code, type: "tictactoe", redirected: false });
+		expect((await roomOf(t, code)).players).toHaveLength(2);
+	});
+
+	test("takes a newly seated caller out of the matchmaking queue", async () => {
+		const t = setup();
+		const ada = await signIn(t, "user_a", "Ada");
+		const bea = await signIn(t, "user_b", "Bea");
+		await bea.mutation(api.models.pairings.index.enqueue, { type: "tictactoe" });
+		const { code } = await ada.mutation(create, { type: "tictactoe" });
+		await bea.mutation(join, { code });
+		expect(await t.run((ctx) => ctx.db.query("pairings").collect())).toEqual([]);
+	});
+
+	test("leaves the queue entry of a caller reopening a seat they already hold", async () => {
+		const t = setup();
+		const { b, code } = await seatedRoom(t, "tictactoe");
+		const beaId = await userIdOf(t, "user_b");
+		await t.run((ctx) =>
+			ctx.db.insert("pairings", { userId: beaId, type: "checkers", time: 300_000 })
+		);
+		await b.mutation(join, { code });
+		expect(await t.run((ctx) => ctx.db.query("pairings").collect())).toHaveLength(1);
+	});
+
 	test("redirects to the caller's other active room", async () => {
 		const t = setup();
 		const ada = await signIn(t, "user_a", "Ada");
@@ -463,10 +511,20 @@ describe("get", () => {
 		expect(await ada.query(get, { code: "ZZZZZZ" })).toBeNull();
 	});
 
-	test("returns null for a round that doesn't exist", async () => {
+	test("returns the room for a lowercase code", async () => {
 		const t = setup();
 		const { a, code } = await seatedRoom(t, "tictactoe");
-		expect(await a.query(get, { code, round: 7 })).toBeNull();
+		expect((await a.query(get, { code: code.toLowerCase() }))?.code).toBe(code);
+	});
+
+	test("returns the live round for a round that doesn't exist yet", async () => {
+		const t = setup();
+		const { a, code } = await seatedRoom(t, "tictactoe");
+		expect((await a.query(get, { code, round: 5 }))?.game).toMatchObject({
+			round: 1,
+			latestRound: 1,
+			isLive: true
+		});
 	});
 
 	test("reports the host's seat index", async () => {
@@ -639,12 +697,13 @@ describe("play", () => {
 		);
 	});
 
-	// Bug: play never checks that every seat is filled, so the host can move before anyone joins.
-	test.fails("rejects a move while the second seat is still empty", async () => {
+	test("rejects a move while the second seat is still empty", async () => {
 		const t = setup();
 		const ada = await signIn(t, "user_a", "Ada");
 		const { code } = await ada.mutation(create, { type: "tictactoe" });
-		await expect(ada.mutation(play, { code, move: corner })).rejects.toThrow();
+		await expect(ada.mutation(play, { code, move: corner })).rejects.toThrow(
+			"Waiting for opponent"
+		);
 	});
 
 	test("applies an accepted move to the game state", async () => {
@@ -726,6 +785,26 @@ describe("play", () => {
 		await a.mutation(play, { code, move: { kind: "tictactoe", boardIndex: 2, cellIndex: 2 } });
 		const { clocks } = await gameSnapshot(t, code);
 		expect(clocks.map((clock) => clock?.turnedAt)).toEqual([undefined, undefined]);
+	});
+
+	test("credits the winning move's seat at once", async () => {
+		const t = setup();
+		const { a, code } = await seatedRoom(t, "tictactoe");
+		await setSeat0AboutToWin(t, code);
+		await a.mutation(play, { code, move: winningMove });
+		const [ada, bea] = await seats(t, code);
+		expect([ada?.player.score, bea?.player.score]).toEqual([1, 0]);
+		expect([ada?.rating, bea?.rating]).toEqual([408, 392]);
+	});
+
+	test("credits nobody for a drawing move", async () => {
+		const t = setup();
+		const { a, code } = await seatedRoom(t, "tictactoe");
+		await setBoards(t, code, [...Array<Board>(8).fill(DRAWN), DRAWN_BUT_LAST]);
+		await a.mutation(play, { code, move: { kind: "tictactoe", boardIndex: 8, cellIndex: 8 } });
+		const [ada, bea] = await seats(t, code);
+		expect([ada?.player.score, bea?.player.score]).toEqual([0, 0]);
+		expect([ada?.rating, bea?.rating]).toEqual([null, null]);
 	});
 });
 
@@ -856,6 +935,46 @@ describe("rematch", () => {
 		expect([ada?.result, bea?.result]).toEqual([null, null]);
 	});
 
+	test("is a no-op when called again for a round already rematched", async () => {
+		const t = setup();
+		const { a, b, code } = await seatedRoom(t, "tictactoe");
+		await b.mutation(resign, { code });
+		await a.mutation(rematch, { code, round: 1 });
+		await b.mutation(rematch, { code, round: 1 });
+		expect((await games(t, code)).map((game) => game.round)).toEqual([1, 2]);
+	});
+
+	test("without a round, still rejects a round in progress after a rematch", async () => {
+		const t = setup();
+		const { a, b, code } = await seatedRoom(t, "tictactoe");
+		await b.mutation(resign, { code });
+		await a.mutation(rematch, { code });
+		await expect(b.mutation(rematch, { code })).rejects.toThrow("This round isn't over yet");
+	});
+
+	test("credits nothing more for a win already settled", async () => {
+		const t = setup();
+		const { a, b, code } = await seatedRoom(t, "tictactoe");
+		await setSeat0AboutToWin(t, code);
+		await a.mutation(play, { code, move: winningMove });
+		await b.mutation(rematch, { code });
+		const [ada, bea] = await seats(t, code);
+		expect([ada?.player.score, bea?.player.score]).toEqual([1, 0]);
+		expect([ada?.rating, bea?.rating]).toEqual([408, 392]);
+		expect((await games(t, code)).map((game) => game.round)).toEqual([1, 2]);
+	});
+
+	test("settles a won round that has no settlement once", async () => {
+		const t = setup();
+		const { a, code } = await seatedRoom(t, "tictactoe");
+		await setBoards(t, code, SEAT_0_WINS);
+		await a.mutation(rematch, { code });
+		const [ada, bea] = await seats(t, code);
+		expect([ada?.player.score, bea?.player.score]).toEqual([1, 0]);
+		expect([ada?.rating, bea?.rating]).toEqual([408, 392]);
+		expect((await games(t, code))[0]?.settledAt).toBeDefined();
+	});
+
 	test("accumulates the score across rounds", async () => {
 		const t = setup();
 		const { a, code } = await seatedRoom(t, "tictactoe");
@@ -981,14 +1100,14 @@ describe("abandon", () => {
 		expect(seats[0]?.result?.state).toBeUndefined();
 	});
 
-	test("credits nobody for a finished round the abandoner won", async () => {
+	test("credits a finished round the abandoner won", async () => {
 		const t = setup();
 		const { a, code } = await seatedRoom(t, "tictactoe");
 		await setBoards(t, code, [X_WON, X_WON, X_WON, ...Array<Board>(6).fill(EMPTY)]);
 		await a.mutation(abandon, { code });
 		const { seats } = await snapshot(t, code);
-		expect(seats.map((seat) => seat.player.score)).toEqual([0, 0]);
-		expect(seats.map((seat) => seat.rating)).toEqual([null, null]);
+		expect(seats.map((seat) => seat.player.score)).toEqual([1, 0]);
+		expect(seats.map((seat) => seat.rating)).toEqual([408, 392]);
 	});
 
 	test("credits the opponent once for a round the abandoner had already resigned", async () => {
@@ -1001,14 +1120,33 @@ describe("abandon", () => {
 		expect(seats[0]?.result).toMatchObject({ state: "resign", mmr: -8 });
 	});
 
-	test("credits nobody when the opponent had already resigned the round", async () => {
+	test("keeps the abandoner's win when the opponent had already resigned the round", async () => {
 		const t = setup();
 		const { a, b, code } = await seatedRoom(t, "tictactoe");
 		await b.mutation(resign, { code });
 		await a.mutation(abandon, { code });
 		const { seats } = await snapshot(t, code);
-		expect(seats.map((seat) => seat.player.score)).toEqual([0, 0]);
+		expect(seats.map((seat) => seat.player.score)).toEqual([1, 0]);
 		expect(seats.map((seat) => seat.result?.state)).toEqual([undefined, "resign"]);
+	});
+
+	test("doesn't credit a settled win twice when the loser abandons", async () => {
+		const t = setup();
+		const { a, b, code } = await seatedRoom(t, "tictactoe");
+		await setSeat0AboutToWin(t, code);
+		await a.mutation(play, { code, move: winningMove });
+		await b.mutation(abandon, { code });
+		const { seats } = await snapshot(t, code);
+		expect(seats.map((seat) => seat.player.score)).toEqual([1, 0]);
+		expect(seats.map((seat) => seat.rating)).toEqual([408, 392]);
+	});
+
+	test("makes a lone host's round no-contest and leaves their rating at the default", async () => {
+		const t = setup();
+		const { ada, code } = await waitingRoom(t);
+		await ada.mutation(abandon, { code });
+		expect(await ada.query(api.models.ratings.index.mine, {})).toBe(400);
+		expect((await games(t, code))[0]?.isNoContest).toBe(true);
 	});
 });
 
@@ -1046,10 +1184,20 @@ describe("sweep", () => {
 			expect(seats[0]?.clock?.turnedAt).toBeUndefined();
 		});
 
+		test("makes the lone host's round no-contest", async () => {
+			const t = setup();
+			const { code } = await waitingRoom(t);
+			vi.setSystemTime(START + 46 * MINUTE);
+			await t.mutation(sweep, {});
+			expect((await games(t, code))[0]?.isNoContest).toBe(true);
+			expect((await snapshot(t, code)).seats[0]?.rating).toBeNull();
+		});
+
 		test("keeps a lone host's earlier resignation as the round's cause", async () => {
 			const t = setup();
-			const { ada, code } = await waitingRoom(t);
-			await ada.mutation(resign, { code });
+			const { code } = await waitingRoom(t);
+			const { room, game } = await roomWithHostClock(t, code);
+			await t.run((ctx) => markEnded(ctx, game._id, room.players[0], "resign"));
 			vi.setSystemTime(START + 46 * MINUTE);
 			await t.mutation(sweep, {});
 			const { seats } = await snapshot(t, code);
@@ -1163,12 +1311,47 @@ describe("sweep", () => {
 
 		test("credits nobody when every seat went silent", async () => {
 			const t = setup();
-			const { code } = await seatedRoom(t, "tictactoe");
+			const { code } = await seatedRoom(t, "tictactoe", 10 * MINUTE);
 			vi.setSystemTime(START + 5 * MINUTE);
 			await t.mutation(sweep, {});
 			const { seats } = await snapshot(t, code);
 			expect(seats.map((seat) => seat.player.score)).toEqual([0, 0]);
 			expect(seats.map((seat) => seat.rating)).toEqual([null, null]);
+		});
+
+		test("a seat whose clock ran out loses on timeout when the opponent goes silent", async () => {
+			const t = setup();
+			const { a, code } = await seatedRoom(t, "tictactoe", 10_000);
+			vi.setSystemTime(START + 3 * MINUTE);
+			await a.mutation(heartbeat, { code });
+			vi.setSystemTime(START + 4 * MINUTE + 1);
+			await t.mutation(sweep, {});
+			const { seats } = await snapshot(t, code);
+			expect(seats.map((seat) => seat.result?.state)).toEqual(["timeout", undefined]);
+			expect(seats.map((seat) => seat.player.score)).toEqual([0, 1]);
+			expect(seats.map((seat) => seat.rating)).toEqual([392, 408]);
+		});
+
+		test("a seat whose clock ran out loses on timeout when every seat goes silent", async () => {
+			const t = setup();
+			const { code } = await seatedRoom(t, "tictactoe", 10_000);
+			vi.setSystemTime(START + 5 * MINUTE);
+			await t.mutation(sweep, {});
+			const { game } = await gameSnapshot(t, code);
+			const { seats } = await snapshot(t, code);
+			expect(game.isNoContest).toBeUndefined();
+			expect(seats.map((seat) => seat.result?.state)).toEqual(["timeout", undefined]);
+			expect(seats.map((seat) => seat.rating)).toEqual([392, 408]);
+		});
+
+		test("makes the round no-contest and stops every clock when every seat went silent", async () => {
+			const t = setup();
+			const { code } = await seatedRoom(t, "tictactoe", 10 * MINUTE);
+			vi.setSystemTime(START + 5 * MINUTE);
+			await t.mutation(sweep, {});
+			const { game, clocks } = await gameSnapshot(t, code);
+			expect(game.isNoContest).toBe(true);
+			expect(clocks.map((clock) => clock?.turnedAt)).toEqual([undefined, undefined]);
 		});
 	});
 
@@ -1212,7 +1395,15 @@ describe("history", () => {
 				type: "checkers",
 				status: "active",
 				opponentName: null,
-				games: [{ round: 1, createdAt: expect.closeTo(START, 0), result: "playing", mmr: null }]
+				games: [
+					{
+						round: 1,
+						createdAt: expect.closeTo(START, 0),
+						result: "playing",
+						mmr: null,
+						reason: null
+					}
+				]
 			}
 		]);
 	});
@@ -1275,6 +1466,66 @@ describe("history", () => {
 		expect((await a.query(history, {})).map((room) => room.code)).toEqual([newCode, oldCode]);
 	});
 
+	test("leaves out an abandoned room nobody joined", async () => {
+		const t = setup();
+		const { ada, code } = await waitingRoom(t);
+		await ada.mutation(abandon, { code });
+		expect(await ada.query(history, {})).toEqual([]);
+	});
+
+	test("leaves out a round closed by the idle sweep instead of showing it as playing", async () => {
+		const t = setup();
+		const { a } = await seatedRoom(t, "tictactoe", 10 * MINUTE);
+		vi.setSystemTime(START + 5 * MINUTE);
+		await t.mutation(sweep, {});
+		expect(await a.query(history, {})).toEqual([]);
+	});
+
+	test("leaves out an unfinished round in a room closed before rounds were voided", async () => {
+		const t = setup();
+		const { a, code } = await seatedRoom(t, "tictactoe");
+		const room = await roomOf(t, code);
+		await t.run((ctx) => ctx.db.patch(room._id, { status: "closed", closedAt: START }));
+		expect(await a.query(history, {})).toEqual([]);
+	});
+
+	test("doesn't count an old abandoned round in a room nobody joined as a loss", async () => {
+		const t = setup();
+		const { ada, code } = await waitingRoom(t);
+		const { room, game } = await roomWithHostClock(t, code);
+		await t.run(async (ctx) => {
+			await markEnded(ctx, game._id, room.players[0], "abandon");
+			await ctx.db.patch(room._id, { status: "closed", closedAt: START });
+		});
+		expect(await ada.query(history, {})).toEqual([]);
+	});
+
+	test("gives a resigned round the reason resign", async () => {
+		const t = setup();
+		const { a, b, code } = await seatedRoom(t, "tictactoe");
+		await b.mutation(resign, { code });
+		const [room] = await a.query(history, {});
+		expect(room?.games[0]).toMatchObject({ result: "win", reason: "resign" });
+	});
+
+	test("gives a timed-out round the reason timeout", async () => {
+		const t = setup();
+		const { b, code } = await seatedRoom(t, "tictactoe", 10_000);
+		vi.setSystemTime(START + 10_000);
+		await b.mutation(api.models.games.index.timeout, { code });
+		const [room] = await b.query(history, {});
+		expect(room?.games[0]).toMatchObject({ result: "win", reason: "timeout" });
+	});
+
+	test("gives a round won on the board no reason", async () => {
+		const t = setup();
+		const { a, code } = await seatedRoom(t, "tictactoe");
+		await setSeat0AboutToWin(t, code);
+		await a.mutation(play, { code, move: winningMove });
+		const [room] = await a.query(history, {});
+		expect(room?.games[0]).toMatchObject({ result: "win", reason: null });
+	});
+
 	test("omits a room with no rounds", async () => {
 		const t = setup();
 		const ada = await signIn(t, "user_a", "Ada");
@@ -1327,6 +1578,13 @@ describe("stats", () => {
 		expect(await b.query(stats, {})).toEqual({ totalGames: 3, wins: 2, winRate: 67 });
 	});
 
+	test("doesn't count an abandoned room nobody joined", async () => {
+		const t = setup();
+		const { ada, code } = await waitingRoom(t);
+		await ada.mutation(abandon, { code });
+		expect(await ada.query(stats, {})).toEqual({ totalGames: 0, wins: 0, winRate: 0 });
+	});
+
 	test("adds up rounds across rooms", async () => {
 		const t = setup();
 		const { a, code: firstCode } = await seatedRoom(t, "tictactoe");
@@ -1351,6 +1609,16 @@ describe("statsForUsers", () => {
 		expect(await a.query(statsForUsers, { userIds: [adaId, beaId] })).toEqual({
 			[adaId]: { totalGames: 1, wins: 1, winRate: 100 },
 			[beaId]: { totalGames: 1, wins: 0, winRate: 0 }
+		});
+	});
+
+	test("doesn't count an abandoned room nobody joined", async () => {
+		const t = setup();
+		const { ada, code } = await waitingRoom(t);
+		await ada.mutation(abandon, { code });
+		const adaId = await userIdOf(t, "user_a");
+		expect(await ada.query(statsForUsers, { userIds: [adaId] })).toEqual({
+			[adaId]: { totalGames: 0, wins: 0, winRate: 0 }
 		});
 	});
 

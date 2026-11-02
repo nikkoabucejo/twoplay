@@ -1,4 +1,5 @@
 import { useMutation, useQuery, type UseQueryReturn } from "convex-svelte";
+import { getClerkAuth } from "$lib/services/auth";
 import { api } from "../../../../../convex/_generated/api.js";
 import type { PeerCursor } from "./types.js";
 
@@ -19,12 +20,18 @@ export class CursorPresence {
 	#update = useMutation(api.models.cursors.index.update);
 	#clear = useMutation(api.models.cursors.index.clear);
 	#lastSentAt = 0;
+	#hasSent = false;
+	// `active` is the caller's seat in an active room, so a spectator, a player who left, or a closed
+	// room never sends a cursor the server would reject.
+	#active: UseQueryReturn<typeof api.models.rooms.index.active>;
 
 	#now = $state(Date.now());
 	#tick: ReturnType<typeof setInterval>;
 
 	constructor(getCode: () => string) {
 		this.#getCode = getCode;
+		const auth = getClerkAuth();
+		this.#active = useQuery(api.models.rooms.index.active, () => (auth.isSignedIn ? {} : "skip"));
 		this.#peers = useQuery(api.models.cursors.index.list, () => ({ code: this.#getCode() }));
 		this.#tick = setInterval(() => (this.#now = Date.now()), 1000);
 	}
@@ -33,25 +40,33 @@ export class CursorPresence {
 		return (this.#peers.data ?? []) as PeerCursor[];
 	}
 
+	get #isSeated(): boolean {
+		return this.#active.data?.code === this.#getCode().toUpperCase();
+	}
+
 	peers = $derived(this.#peersData.filter((peer) => this.#now - peer.updatedAt < STALE_MS));
 
 	/** Call on every pointer move over the tracked area, with `x`/`y` normalized 0-1. */
 	move(x: number, y: number): void {
+		if (!this.#isSeated) return;
 		const now = Date.now();
 		if (now - this.#lastSentAt < SEND_INTERVAL_MS) return;
 		this.#lastSentAt = now;
+		this.#hasSent = true;
 		this.#update({ code: this.#getCode(), x, y }).catch(() => {});
 	}
 
 	/** Call when the pointer leaves the tracked area, so this player's cursor disappears for peers
 	 *  immediately rather than lingering until `STALE_MS` elapses. */
 	leave(): void {
+		if (!this.#hasSent) return;
+		this.#hasSent = false;
 		this.#clear({ code: this.#getCode() }).catch(() => {});
 	}
 
 	/** Call on component teardown to stop the staleness clock and hide this player's cursor for peers. */
 	dispose(): void {
 		clearInterval(this.#tick);
-		this.#clear({ code: this.#getCode() }).catch(() => {});
+		this.leave();
 	}
 }

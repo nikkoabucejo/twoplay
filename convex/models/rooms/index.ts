@@ -8,9 +8,9 @@ import {
 	type QueryCtx
 } from "../../_generated/server";
 import { clockByGameAndPlayer, clocksByGame } from "../clocks/index.js";
-import { otherPlayer } from "../games/engine.js";
 import {
 	applyMove,
+	claimExpiredClock,
 	countMoves,
 	createGame,
 	gameMoveValidator,
@@ -19,12 +19,13 @@ import {
 	getCurrentGame,
 	getEngine,
 	getGame,
-	roundWinner,
+	roundWinnerIndex,
+	settleRound,
 	type GameType
 } from "../games/index.js";
+import { leaveQueue } from "../pairings/queue.js";
 import { ensurePlayer, playerByUserAndRoom } from "../players/index.js";
-import { applyResult } from "../ratings/index.js";
-import { creditMmr, markEnded, resultsByGame } from "../results/index.js";
+import { markEnded, resultsByGame, type ResultState } from "../results/index.js";
 import {
 	currentPlayer,
 	getActiveRoomForUser,
@@ -80,6 +81,7 @@ export const create = mutation({
 	},
 	async handler(ctx, { type, timeControlMs, visibility }): Promise<RoomEntryResult> {
 		const user = await requireUser(ctx);
+		await leaveQueue(ctx, user._id);
 		const activeRoom = await getActiveRoomForUser(ctx, user._id);
 		if (activeRoom) return { code: activeRoom.code, type: activeRoom.type, redirected: true };
 
@@ -121,11 +123,13 @@ export const join = mutation({
 		if (!isRoomActive(room)) throw new Error("This room is no longer active");
 		const activeRoom = await getActiveRoomForUser(ctx, user._id);
 		if (activeRoom && activeRoom._id !== room._id) {
+			await leaveQueue(ctx, user._id);
 			return { code: activeRoom.code, type: activeRoom.type, redirected: true };
 		}
 
 		const engine = getEngine(room.type);
 		if (room.players.length >= engine.playerCount) throw new Error("Room is full");
+		await leaveQueue(ctx, user._id);
 
 		const player = await ensurePlayer(ctx, user._id, room._id, user.name);
 		const players = [...room.players, player._id];
@@ -253,6 +257,9 @@ export const play = mutation({
 		if (!isRoomActive(room)) throw new Error("This room is no longer active");
 
 		const player = await requirePlayer(ctx, room._id);
+		if (room.players.length < getEngine(room.type).playerCount) {
+			throw new Error("Waiting for opponent");
+		}
 		const playerIndex = room.players.indexOf(player._id);
 		if (move.kind !== room.type) throw new Error("Move does not match this room's game");
 
@@ -311,6 +318,7 @@ export const play = mutation({
 		if (nextClock && afterStatus && !afterStatus.isOver) {
 			await ctx.db.patch(nextClock._id, { turnedAt: Date.now() });
 		}
+		if (afterStatus.isOver) await settleRound(ctx, room, { ...game, state: nextState });
 	}
 });
 
@@ -318,8 +326,9 @@ export const play = mutation({
  *  here (not just by disabling the button client-side) so a direct call can't dodge a loss. Either
  *  seat can trigger it unilaterally; there's no request/accept handshake. */
 export const rematch = mutation({
-	args: { code: v.string() },
-	async handler(ctx, { code }) {
+	// `round` is the round the caller saw end; a second press for it is a no-op, not an error.
+	args: { code: v.string(), round: v.optional(v.number()) },
+	async handler(ctx, { code, round }) {
 		const room = await getRoomByCode(ctx, code);
 		if (!room) throw new Error("Room not found");
 		if (!isRoomActive(room)) throw new Error("This room is no longer active");
@@ -327,28 +336,15 @@ export const rematch = mutation({
 
 		const game = await getCurrentGame(ctx, room._id);
 		if (!game) throw new Error("Game not found");
+		if (round !== undefined && game.round !== round) return;
 
 		const results = await resultsByGame(ctx, game._id);
 		const endedResult = results.find((result) => result.state !== undefined);
 		if (!endedResult && !gameStatus(room.type, game.state)?.isOver) {
 			throw new Error("This round isn't over yet");
 		}
-		const winnerIndex = endedResult
-			? otherPlayer(room.players.indexOf(endedResult.playerId))
-			: roundWinner(room.type, game.state);
-		if (winnerIndex !== null) {
-			const winnerId = room.players[winnerIndex];
-			const loserId = room.players[otherPlayer(winnerIndex)];
-			const [winner, loser] = await Promise.all([ctx.db.get(winnerId), ctx.db.get(loserId)]);
-			if (winner) await ctx.db.patch(winnerId, { score: winner.score + 1 });
-			if (winner && loser) {
-				const { winnerMmr, loserMmr } = await applyResult(ctx, winner.userId, loser.userId);
-				await Promise.all([
-					creditMmr(ctx, game._id, winnerId, winnerMmr),
-					creditMmr(ctx, game._id, loserId, loserMmr)
-				]);
-			}
-		}
+		// Rounds that ended before settlement existed are credited here; later ones already are.
+		await settleRound(ctx, room, game);
 
 		const timeControlMs = room.time ?? DEFAULT_TIME_CONTROL_MS;
 		await createGame(ctx, room, timeControlMs, true);
@@ -356,17 +352,14 @@ export const rematch = mutation({
 });
 
 /** Shared by the `abandon` mutation and `sweep`: forfeits any round still in progress
- *  in `player`'s opponent's favor, marks `player`'s own membership over, and closes the room once no
- *  active seat remains. Assumes the caller already verified the room is active and `player` hasn't
- *  already left. */
+ *  in `player`'s opponent's favor and settles it, marks `player`'s own membership over, and closes the
+ *  room once no active seat remains. Assumes the caller already verified the room is active and
+ *  `player` hasn't already left. */
 async function forfeitRoom(ctx: MutationCtx, room: Doc<"rooms">, player: Doc<"players">) {
-	// A room with an empty seat has no opponent to forfeit the round to or credit a win — e.g. the host
-	// abandoning before anyone else has joined — but the round itself still needs to end, or it would
-	// keep reporting "playing" in history forever even after the room closes.
-	const hasOpponentSeat = room.players.length >= getEngine(room.type).playerCount;
 	const game = await getCurrentGame(ctx, room._id);
 	if (game) {
-		let results = await resultsByGame(ctx, game._id);
+		await claimExpiredClock(ctx, room, game);
+		const results = await resultsByGame(ctx, game._id);
 		const status = gameStatus(room.type, game.state);
 		const alreadyEnded = results.some((result) => result.state !== undefined);
 		if (!alreadyEnded && status && !status.isOver) {
@@ -375,32 +368,10 @@ async function forfeitRoom(ctx: MutationCtx, room: Doc<"rooms">, player: Doc<"pl
 			if (ownClock) {
 				await ctx.db.patch(ownClock._id, { turnedAt: undefined });
 				await markEnded(ctx, game._id, player._id, "abandon");
-				results = await resultsByGame(ctx, game._id);
 			}
 		}
-
-		if (hasOpponentSeat) {
-			// Reflects either the result just marked above, one an earlier resign/timeout already set
-			// (nobody had called `rematch` yet to "cash it in"), or a round that finished naturally.
-			const endedResult = results.find((result) => result.state !== undefined);
-			const winnerIndex = endedResult
-				? otherPlayer(room.players.indexOf(endedResult.playerId))
-				: roundWinner(room.type, game.state);
-			if (winnerIndex !== null && winnerIndex !== room.players.indexOf(player._id)) {
-				const winnerId = room.players[winnerIndex];
-				const winner = await ctx.db.get(winnerId);
-				// Skip crediting a score if the opponent has themselves already left — a near-simultaneous
-				// mutual abandon is treated as no-contest, matching the "everyone went idle at once" case below.
-				if (winner && winner.leftAt === undefined) {
-					await ctx.db.patch(winnerId, { score: winner.score + 1 });
-					const { winnerMmr, loserMmr } = await applyResult(ctx, winner.userId, player.userId);
-					await Promise.all([
-						creditMmr(ctx, game._id, winnerId, winnerMmr),
-						creditMmr(ctx, game._id, player._id, loserMmr)
-					]);
-				}
-			}
-		}
+		// A room with an empty seat makes this no-contest rather than a loss.
+		await settleRound(ctx, room, game);
 	}
 
 	await ctx.db.patch(player._id, { leftAt: Date.now() });
@@ -413,8 +384,8 @@ async function forfeitRoom(ctx: MutationCtx, room: Doc<"rooms">, player: Doc<"pl
 }
 
 /** Abandons the room entirely — distinct from `resign`, which only forfeits the current round. Any
- *  round still in progress is forfeited in the opponent's favor, the caller's own membership is
- *  marked over, and the room closes for good once no active seat remains. Closed rooms are never
+ *  round still in progress is forfeited in the opponent's favor, or no-contest when the other seat is
+ *  empty, the caller's own membership is marked over, and the room closes for good once no active seat remains. Closed rooms are never
  *  rejoinable but stay fully visible in history. Idempotent — calling it again once already
  *  left/closed is a no-op, matching `resign`'s own idempotent style. */
 export const abandon = mutation({
@@ -463,6 +434,7 @@ export const sweep = internalMutation({
 							await ctx.db.patch(ownClock._id, { turnedAt: undefined });
 							await markEnded(ctx, game._id, ownClock.playerId, "abandon");
 						}
+						await settleRound(ctx, room, game);
 					}
 					await ctx.db.patch(room._id, { status: "closed", closedAt: now, reason: "empty" });
 				}
@@ -479,7 +451,12 @@ export const sweep = internalMutation({
 			if (staleCount === 0) continue;
 
 			if (staleCount === players.length) {
-				// Every seat went silent at once — close it, but credit nobody.
+				// Every seat went silent at once — void the unfinished round and close the room.
+				const game = await getCurrentGame(ctx, room._id);
+				if (game) {
+					await claimExpiredClock(ctx, room, game);
+					await settleRound(ctx, room, game, { shouldVoidIfUnfinished: true });
+				}
 				await Promise.all(
 					players.map((player) => player && ctx.db.patch(player._id, { leftAt: now }))
 				);
@@ -500,6 +477,8 @@ export type GameHistoryEntry = {
 	createdAt: number;
 	result: "win" | "loss" | "draw" | "playing";
 	mmr: number | null;
+	/** Why a seat's round ended early, or null for a board result or a round still playing. */
+	reason?: ResultState | null;
 };
 
 export type RoomHistoryEntry = {
@@ -510,25 +489,26 @@ export type RoomHistoryEntry = {
 	games: GameHistoryEntry[];
 };
 
-/** "win"/"loss"/"draw" once this round has ended for the player seated at `myIndex`, else "playing".
- *  Takes the round's own `results` rows rather than fetching them itself, since every caller already
- *  needs that same query for its own purposes (the settled MMR delta, in `history`'s case). Shared by
- *  `history` (per-round display) and `stats` (aggregate win rate) so the two never classify the same
- *  round differently. */
+/** "win"/"loss"/"draw" once this round has ended for the player seated at `myIndex`, "playing" while
+ *  it runs, or "no-contest" for a round that counts for nobody. Takes the round's own `results` rows
+ *  rather than fetching them itself, since every caller already needs that same query for its own
+ *  purposes (the settled MMR delta, in `history`'s case). Shared by `history` (per-round display) and
+ *  `stats` (aggregate win rate) so the two never classify the same round differently. The rules after
+ *  `isNoContest` cover rounds that ended before settlement existed. */
 function classifyGameResult(
 	room: Doc<"rooms">,
 	myIndex: number,
 	game: Doc<"games">,
 	results: Doc<"results">[]
-): GameHistoryEntry["result"] {
+): GameHistoryEntry["result"] | "no-contest" {
+	if (game.isNoContest) return "no-contest";
 	const endedResult = results.find((r) => r.state !== undefined);
 	const status = gameStatus(room.type, game.state);
 	const isOver = endedResult !== undefined || (status?.isOver ?? false);
-	if (!isOver) return "playing";
+	if (!isOver) return isRoomActive(room) ? "playing" : "no-contest";
+	if (room.players.length < getEngine(room.type).playerCount) return "no-contest";
 
-	const winnerIndex = endedResult
-		? otherPlayer(room.players.indexOf(endedResult.playerId))
-		: roundWinner(room.type, game.state);
+	const winnerIndex = roundWinnerIndex(room, game, results);
 	return winnerIndex === null ? "draw" : winnerIndex === myIndex ? "win" : "loss";
 }
 
@@ -559,20 +539,23 @@ export const history = query({
 					.withIndex("byRoom", (q) => q.eq("roomId", room._id))
 					.collect();
 
-				const entries = await Promise.all(
-					games.map(async (game): Promise<GameHistoryEntry> => {
+				const classified = await Promise.all(
+					games.map(async (game): Promise<GameHistoryEntry | null> => {
 						const results = await resultsByGame(ctx, game._id);
 						const result = classifyGameResult(room, myIndex, game, results);
+						if (result === "no-contest") return null;
 						const myResult = results.find((r) => r.playerId === player._id);
 
 						return {
 							round: game.round,
 							createdAt: game._creationTime,
 							result,
-							mmr: myResult?.mmr ?? null
+							mmr: myResult?.mmr ?? null,
+							reason: results.find((r) => r.state !== undefined)?.state ?? null
 						};
 					})
 				);
+				const entries = classified.filter((entry) => entry !== null);
 				entries.sort((a, b) => b.round - a.round);
 
 				return {
@@ -625,7 +608,7 @@ async function computePlayerStats(ctx: QueryCtx, userId: Id<"users">): Promise<P
 				games.map(async (game) => {
 					const results = await resultsByGame(ctx, game._id);
 					const result = classifyGameResult(room, myIndex, game, results);
-					if (result === "playing") return;
+					if (result === "playing" || result === "no-contest") return;
 					totalGames++;
 					if (result === "win") wins++;
 				})

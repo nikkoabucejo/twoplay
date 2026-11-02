@@ -130,12 +130,25 @@ test("trashtalk rejects an identity with no stored user", async () => {
 	);
 });
 
-test.fails("trashtalk rejects an emoji that isn't a hex codepoint", async () => {
-	// Accepts any string, which opponents interpolate into the Noto Lottie asset URL.
+test("trashtalk rejects an emoji outside the allowed list", async () => {
 	const t = setup();
 	const { a, code } = await seatedRoom(t, "tictactoe");
 
-	await expect(a.mutation(trashtalk, { code, emoji: "../../evil" })).rejects.toThrow();
+	await expect(a.mutation(trashtalk, { code, emoji: "../../evil" })).rejects.toThrow(
+		"Unknown emoji"
+	);
+	expect((await seatOf(t, "user_a", code))?.emoji).toBe(DEFAULT_EMOJI);
+});
+
+test("trashtalk rejects a player whose room has closed", async () => {
+	const t = setup();
+	const { a, b, code } = await seatedRoom(t, "tictactoe");
+	await b.mutation(api.models.rooms.index.abandon, { code });
+
+	await expect(a.mutation(trashtalk, { code, emoji: "1f525" })).rejects.toThrow(
+		"This room is no longer active"
+	);
+	expect((await seatOf(t, "user_a", code))?.emoji).toBe(DEFAULT_EMOJI);
 });
 
 test("heartbeat records the current time as the caller's seenAt", async () => {

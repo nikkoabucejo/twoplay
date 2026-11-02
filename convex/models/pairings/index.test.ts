@@ -6,7 +6,8 @@ import { getCurrentGame } from "../games/index.js";
 import { getRoomByCode } from "../rooms/auth.js";
 import { userByClerkUserId } from "../users/index.js";
 
-const { enqueue, cancel, status } = api.models.pairings.index;
+const { enqueue, cancel, status, expired } = api.models.pairings.index;
+const sweep = internal.models.pairings.index.sweep;
 
 afterEach(() => {
 	vi.useRealTimers();
@@ -256,8 +257,7 @@ test("enqueue queues the caller when the waiting opponent's account is gone", as
 	expect(await t.run((ctx) => ctx.db.query("rooms").collect())).toHaveLength(0);
 });
 
-test.fails("enqueue does not pair with an opponent who has since entered a room", async () => {
-	// Creating or joining a room leaves the queue entry in place, so the match seats them twice.
+test("enqueue does not pair with an opponent who has since entered a room", async () => {
 	const t = setup();
 	const a = await signIn(t, "user_a", "Ada");
 	const b = await signIn(t, "user_b", "Bea");
@@ -275,6 +275,26 @@ test.fails("enqueue does not pair with an opponent who has since entered a room"
 		return rooms.filter((room) => room?.status === "active").length;
 	});
 	expect(activeRoomsOfA).toBe(1);
+	expect(await queuedSubjects(t)).toEqual(["user_b"]);
+	expect(await b.query(status, {})).toBe(true);
+});
+
+test("enqueue skips and deletes a waiting entry whose user has an active room", async () => {
+	const t = setup();
+	const a = await signIn(t, "user_a", "Ada");
+	const b = await signIn(t, "user_b", "Bea");
+	await signIn(t, "user_c", "Cy");
+	await a.mutation(api.models.rooms.index.create, { type: "checkers" });
+	const [aId, cId] = [await userIdOf(t, "user_a"), await userIdOf(t, "user_c")];
+	await t.run(async (ctx) => {
+		await ctx.db.insert("pairings", { userId: aId, type: "tictactoe", time: 300_000 });
+		await ctx.db.insert("pairings", { userId: cId, type: "tictactoe", time: 300_000 });
+	});
+	const result = await b.mutation(enqueue, { type: "tictactoe" });
+	if (result.status !== "matched") throw new Error("Expected a match");
+
+	expect((await matchedRoom(t, result.code)).subjects).toEqual(["user_c", "user_b"]);
+	expect(await queue(t)).toHaveLength(0);
 });
 
 test("enqueue rejects a signed-out caller", async () => {
@@ -348,16 +368,48 @@ test("status rejects a signed-out caller", async () => {
 	await expect(t.query(status, {})).rejects.toThrow("Sign in to play");
 });
 
-test("sweep removes entries waiting longer than 5 minutes", async () => {
+test("sweep expires an entry waiting longer than 5 minutes", async () => {
 	vi.useFakeTimers({ toFake: ["Date"] });
 	vi.setSystemTime(new Date("2026-01-01T12:00:00Z"));
 	const t = setup();
 	const a = await signIn(t, "user_a", "Ada");
 	await a.mutation(enqueue, { type: "tictactoe" });
 	vi.setSystemTime(new Date("2026-01-01T12:05:00.001Z"));
-	await t.mutation(internal.models.pairings.index.sweep, {});
+	await t.mutation(sweep, {});
+
+	expect((await queue(t))[0]?.expiredAt).toBe(Date.parse("2026-01-01T12:05:00.001Z"));
+	expect(await a.query(status, {})).toBe(false);
+	expect(await a.query(expired, {})).toBe(true);
+});
+
+test("sweep deletes an entry expired for over 60 minutes", async () => {
+	vi.useFakeTimers({ toFake: ["Date"] });
+	vi.setSystemTime(new Date("2026-01-01T12:00:00Z"));
+	const t = setup();
+	const a = await signIn(t, "user_a", "Ada");
+	await a.mutation(enqueue, { type: "tictactoe" });
+	vi.setSystemTime(new Date("2026-01-01T12:05:00.001Z"));
+	await t.mutation(sweep, {});
+	vi.setSystemTime(new Date("2026-01-01T13:05:00.002Z"));
+	await t.mutation(sweep, {});
 
 	expect(await queue(t)).toHaveLength(0);
+});
+
+test("enqueueing after expiry leaves one waiting entry", async () => {
+	vi.useFakeTimers({ toFake: ["Date"] });
+	vi.setSystemTime(new Date("2026-01-01T12:00:00Z"));
+	const t = setup();
+	const a = await signIn(t, "user_a", "Ada");
+	await a.mutation(enqueue, { type: "tictactoe" });
+	vi.setSystemTime(new Date("2026-01-01T12:06:00Z"));
+	await t.mutation(sweep, {});
+	await a.mutation(enqueue, { type: "tictactoe" });
+
+	const entries = await queue(t);
+	expect(entries).toHaveLength(1);
+	expect(entries[0]?.expiredAt).toBeUndefined();
+	expect(await a.query(expired, {})).toBe(false);
 });
 
 test("sweep keeps an entry exactly 5 minutes old", async () => {
@@ -368,12 +420,13 @@ test("sweep keeps an entry exactly 5 minutes old", async () => {
 	vi.setSystemTime(new Date("2026-01-01T12:00:00Z"));
 	await a.mutation(enqueue, { type: "tictactoe" });
 	vi.setSystemTime(new Date("2026-01-01T12:05:00Z"));
-	await t.mutation(internal.models.pairings.index.sweep, {});
+	await t.mutation(sweep, {});
 
 	expect(await queue(t)).toHaveLength(1);
+	expect((await queue(t))[0]?.expiredAt).toBeUndefined();
 });
 
-test("sweep removes only the expired entries", async () => {
+test("sweep expires only the entries past 5 minutes", async () => {
 	vi.useFakeTimers({ toFake: ["Date"] });
 	vi.setSystemTime(new Date("2026-01-01T12:00:00Z"));
 	const t = setup();
@@ -383,9 +436,10 @@ test("sweep removes only the expired entries", async () => {
 	vi.setSystemTime(new Date("2026-01-01T12:04:00Z"));
 	await b.mutation(enqueue, { type: "checkers" });
 	vi.setSystemTime(new Date("2026-01-01T12:06:00Z"));
-	await t.mutation(internal.models.pairings.index.sweep, {});
+	await t.mutation(sweep, {});
 
-	expect(await queuedSubjects(t)).toEqual(["user_b"]);
+	expect(await a.query(expired, {})).toBe(true);
+	expect(await b.query(expired, {})).toBe(false);
 });
 
 test("an expired entry no longer pairs with a newcomer", async () => {
@@ -396,8 +450,49 @@ test("an expired entry no longer pairs with a newcomer", async () => {
 	const b = await signIn(t, "user_b", "Bea");
 	await a.mutation(enqueue, { type: "tictactoe" });
 	vi.setSystemTime(new Date("2026-01-01T12:10:00Z"));
-	await t.mutation(internal.models.pairings.index.sweep, {});
+	await t.mutation(sweep, {});
 
 	expect(await b.mutation(enqueue, { type: "tictactoe" })).toEqual({ status: "waiting" });
 	expect(await a.query(api.models.rooms.index.active, {})).toBeNull();
+});
+
+test("enqueue pairs with a waiting entry behind an expired one", async () => {
+	const t = setup();
+	const b = await signIn(t, "user_b", "Bea");
+	await signIn(t, "user_a", "Ada");
+	await signIn(t, "user_c", "Cy");
+	const [aId, cId] = [await userIdOf(t, "user_a"), await userIdOf(t, "user_c")];
+	await t.run(async (ctx) => {
+		await ctx.db.insert("pairings", {
+			userId: aId,
+			type: "tictactoe",
+			time: 300_000,
+			expiredAt: 1
+		});
+		await ctx.db.insert("pairings", { userId: cId, type: "tictactoe", time: 300_000 });
+	});
+	const result = await b.mutation(enqueue, { type: "tictactoe" });
+	if (result.status !== "matched") throw new Error("Expected a match");
+
+	expect((await matchedRoom(t, result.code)).subjects).toEqual(["user_c", "user_b"]);
+	expect(await queuedSubjects(t)).toEqual(["user_a"]);
+});
+
+test("expired rejects a signed-out caller", async () => {
+	const t = setup();
+
+	await expect(t.query(expired, {})).rejects.toThrow("Sign in to play");
+});
+
+test("expired is false for a caller who isn't queued while another user's entry expired", async () => {
+	vi.useFakeTimers({ toFake: ["Date"] });
+	vi.setSystemTime(new Date("2026-01-01T12:00:00Z"));
+	const t = setup();
+	const a = await signIn(t, "user_a", "Ada");
+	const b = await signIn(t, "user_b", "Bea");
+	await a.mutation(enqueue, { type: "tictactoe" });
+	vi.setSystemTime(new Date("2026-01-01T12:06:00Z"));
+	await t.mutation(sweep, {});
+
+	expect(await b.query(expired, {})).toBe(false);
 });
