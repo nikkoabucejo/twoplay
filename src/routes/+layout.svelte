@@ -13,6 +13,7 @@
 	import { Mood, setupMood } from "$lib/features/presence";
 	import { setupClerkAuth } from "$lib/services/auth";
 	import { isGameRoomRoute, isGatedRoute, liveGameHref, showsDock } from "$lib/utils/navigation";
+	import { bindMusicLifecycle, music } from "$lib/utils/sound";
 	import { setupPreferences } from "$lib/utils/storage";
 	import { cn } from "$lib/utils/style";
 	import { api } from "../../convex/_generated/api.js";
@@ -42,6 +43,7 @@
 
 	setupPreferences();
 	const toaster = setupToaster();
+	$effect(() => bindMusicLifecycle(document, music));
 
 	const active = useQuery(api.models.rooms.index.active, () => (auth.isSignedIn ? {} : "skip"));
 	const live = $derived.by(() => {

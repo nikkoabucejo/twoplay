@@ -60,6 +60,26 @@ describe("Settings", () => {
 		expect(reload().volume).toBe(0.95);
 	});
 
+	test("the Background music switch turns music on and saves it", async () => {
+		const music = screen.getByRole("switch", { name: "Background music" });
+		expect(music).not.toBeChecked();
+		await fireEvent.click(music);
+		expect(music).toBeChecked();
+		expect(reload().music).toBe(true);
+	});
+
+	test("the Background music switch is disabled while Sound is off", async () => {
+		const music = screen.getByRole("switch", { name: "Background music" });
+		expect(music).toBeEnabled();
+		await fireEvent.click(screen.getByRole("switch", { name: "Sound" }));
+		expect(music).toBeDisabled();
+	});
+
+	test("the Sound and Background music rows describe what they control", () => {
+		expect(screen.getByText("Game sounds and music.")).toBeInTheDocument();
+		expect(screen.getByText("A quiet retro loop.")).toBeInTheDocument();
+	});
+
 	test("the Your-turn alert switch saves its value", async () => {
 		await fireEvent.click(screen.getByRole("switch", { name: "Your-turn alert" }));
 		expect(reload().turnAlert).toBe(false);

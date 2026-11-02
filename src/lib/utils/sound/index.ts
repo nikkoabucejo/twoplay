@@ -1,6 +1,7 @@
 import { getAudibleGraph, getGraph } from "./graph.js";
 
 export { configureSound } from "./graph.js";
+export { bindMusicLifecycle, music, type MusicPlayer } from "./music.js";
 
 export function prepareSound() {
 	void getGraph();

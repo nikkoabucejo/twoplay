@@ -51,7 +51,7 @@
 		<h2 class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Sound</h2>
 		<div class="flex flex-col divide-y rounded-xl border bg-muted/40 backdrop-blur-sm">
 			<div class="flex items-center gap-4 p-4">
-				{@render row("sound", "Sound", "Move, capture, and turn sounds.")}
+				{@render row("sound", "Sound", "Game sounds and music.")}
 				<Switch
 					id="sound"
 					checked={preferences.sound}
@@ -82,6 +82,15 @@
 					onValueChange={(value) => preferences.setVolume(value / 100)}
 					disabled={!preferences.sound}
 					thumbLabel="Volume"
+				/>
+			</div>
+			<div class="flex items-center gap-4 p-4">
+				{@render row("music", "Background music", "A quiet retro loop.")}
+				<Switch
+					id="music"
+					checked={preferences.music}
+					onCheckedChange={(value) => preferences.setMusic(value)}
+					disabled={!preferences.sound}
 				/>
 			</div>
 			<div class="flex items-center gap-4 p-4">

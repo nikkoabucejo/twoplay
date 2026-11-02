@@ -3,8 +3,12 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 class FakeParam {
 	value = 1;
 	values: number[] = [];
+	target: number | null = null;
 	setValueAtTime(value: number) {
 		this.values.push(value);
+	}
+	setTargetAtTime(value: number) {
+		this.target = value;
 	}
 	linearRampToValueAtTime() {}
 	exponentialRampToValueAtTime() {}
@@ -25,7 +29,7 @@ class FakeNode {
 
 class FakeAudioContext {
 	static created: FakeAudioContext[] = [];
-	state: "suspended" | "running" = "suspended";
+	state: "suspended" | "running" | "interrupted" = "suspended";
 	currentTime = 0;
 	destination = new FakeNode();
 	oscillators: FakeNode[] = [];
@@ -85,6 +89,20 @@ describe("prepareSound", () => {
 		await Promise.resolve();
 
 		expect(FakeAudioContext.created[0].state).toBe("running");
+	});
+
+	test("resumes an interrupted context", async () => {
+		stubBrowserAudio();
+		const sound = await loadSound();
+		sound.prepareSound();
+		const [context] = FakeAudioContext.created;
+		await Promise.resolve();
+
+		context.state = "interrupted";
+		sound.prepareSound();
+		await Promise.resolve();
+
+		expect(context.state).toBe("running");
 	});
 
 	test("creates the context later sounds reuse", async () => {
@@ -207,15 +225,15 @@ describe("configureSound", () => {
 		}
 	});
 
-	test("updates the master gain of a context that already exists", async () => {
+	test("glides the master gain of a context that already exists to the volume", async () => {
 		stubBrowserAudio();
 		const sound = await loadSound();
 
 		sound.prepareSound();
-		sound.configureSound({ isEnabled: true, volume: 0.25 });
+		sound.configureSound({ isEnabled: true, volume: 0.5 });
 
 		const [context] = FakeAudioContext.created;
 		const [master] = context.gains.filter((gain) => gain.outputs.includes(context.destination));
-		expect(master.gain.value).toBe(0.25);
+		expect(master.gain.target).toBe(0.5);
 	});
 });

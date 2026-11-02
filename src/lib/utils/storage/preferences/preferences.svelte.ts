@@ -1,6 +1,6 @@
 import { getContext, setContext } from "svelte";
 import { browser } from "$app/environment";
-import { configureSound } from "$lib/utils/sound";
+import { configureSound, music, type MusicPlayer } from "$lib/utils/sound";
 import type { GameType } from "../../../../../convex/models/games/index.js";
 
 export type PlayOpponent = "anyone" | "friend" | "open";
@@ -17,6 +17,7 @@ export type Preferences = {
 	motion: Motion;
 	newGameOpponent: NewGameOpponent;
 	newGameClock: NewGameClock;
+	music: boolean;
 };
 type PreferencesStorage = Pick<Storage, "getItem" | "setItem">;
 
@@ -28,7 +29,8 @@ const DEFAULT_PREFERENCES: Preferences = {
 	turnAlert: true,
 	motion: "system",
 	newGameOpponent: "matchmaking",
-	newGameClock: 5
+	newGameClock: 5,
+	music: false
 };
 const CONTEXT_KEY = Symbol("preferences");
 
@@ -87,7 +89,8 @@ export function parsePreferences(raw: string | null): Preferences {
 			fields.newGameOpponent,
 			DEFAULT_PREFERENCES.newGameOpponent
 		),
-		newGameClock: oneOf(NEW_GAME_CLOCKS, fields.newGameClock, DEFAULT_PREFERENCES.newGameClock)
+		newGameClock: oneOf(NEW_GAME_CLOCKS, fields.newGameClock, DEFAULT_PREFERENCES.newGameClock),
+		music: typeof fields.music === "boolean" ? fields.music : DEFAULT_PREFERENCES.music
 	};
 }
 
@@ -99,6 +102,7 @@ export class PreferencesStore {
 	motion = $state<Motion>(DEFAULT_PREFERENCES.motion);
 	newGameOpponent = $state<NewGameOpponent>(DEFAULT_PREFERENCES.newGameOpponent);
 	newGameClock = $state<NewGameClock>(DEFAULT_PREFERENCES.newGameClock);
+	music = $state(DEFAULT_PREFERENCES.music);
 
 	#storage: PreferencesStorage | null;
 
@@ -118,6 +122,7 @@ export class PreferencesStore {
 		this.motion = preferences.motion;
 		this.newGameOpponent = preferences.newGameOpponent;
 		this.newGameClock = preferences.newGameClock;
+		this.music = preferences.music;
 	}
 
 	setSound(value: boolean): void {
@@ -155,6 +160,11 @@ export class PreferencesStore {
 		this.#write();
 	}
 
+	setMusic(value: boolean): void {
+		this.music = value;
+		this.#write();
+	}
+
 	/** Writes every field, so changing one preference never drops another. */
 	#write(): void {
 		const preferences: Preferences = {
@@ -164,7 +174,8 @@ export class PreferencesStore {
 			turnAlert: this.turnAlert,
 			motion: this.motion,
 			newGameOpponent: this.newGameOpponent,
-			newGameClock: this.newGameClock
+			newGameClock: this.newGameClock,
+			music: this.music
 		};
 		try {
 			this.#storage?.setItem(STORAGE_KEY, JSON.stringify(preferences));
@@ -176,16 +187,20 @@ export class PreferencesStore {
 
 type ApplyDeps = {
 	configureSound: typeof configureSound;
+	music: Pick<MusicPlayer, "setWanted">;
 	root: Pick<Element, "classList">;
 };
 
-/** Keeps the sound output and the root `reduce-motion` class in step with the store. */
+/** Keeps the sound output, the music, and the root `reduce-motion` class in step with the store. */
 export function applyPreferences(
-	preferences: Pick<Preferences, "sound" | "volume" | "motion">,
+	preferences: Pick<Preferences, "sound" | "volume" | "motion" | "music">,
 	deps: ApplyDeps
 ): void {
 	$effect(() => {
 		deps.configureSound({ isEnabled: preferences.sound, volume: preferences.volume });
+	});
+	$effect(() => {
+		deps.music.setWanted(preferences.music && preferences.sound && preferences.volume > 0);
 	});
 	$effect(() => {
 		deps.root.classList.toggle("reduce-motion", preferences.motion === "reduce");
@@ -201,7 +216,9 @@ export function setupPreferences(): PreferencesStore {
 	}
 	const preferences = new PreferencesStore(storage);
 	setContext(CONTEXT_KEY, preferences);
-	if (browser) applyPreferences(preferences, { configureSound, root: document.documentElement });
+	if (browser) {
+		applyPreferences(preferences, { configureSound, music, root: document.documentElement });
+	}
 	return preferences;
 }
 

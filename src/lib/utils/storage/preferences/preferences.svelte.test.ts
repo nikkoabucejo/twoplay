@@ -43,7 +43,8 @@ const DEFAULTS = {
 	turnAlert: true,
 	motion: "system",
 	newGameOpponent: "matchmaking",
-	newGameClock: 5
+	newGameClock: 5,
+	music: false
 };
 
 beforeEach(() => {
@@ -121,6 +122,16 @@ describe("parsePreferences", () => {
 			newGameOpponent: "private",
 			newGameClock: 10
 		});
+	});
+
+	test("Invalid music value ignored: a non-boolean music reads as off and keeps the other fields", () => {
+		const raw = JSON.stringify({ music: "yes", volume: 0.4, motion: "reduce" });
+
+		expect(parsePreferences(raw)).toEqual({ ...DEFAULTS, volume: 0.4, motion: "reduce" });
+	});
+
+	test("a stored music on is kept", () => {
+		expect(parsePreferences('{"music":true}')).toEqual({ ...DEFAULTS, music: true });
 	});
 
 	test("a stored setup with an unknown game reads as absent and keeps sound", () => {
@@ -243,6 +254,32 @@ describe("PreferencesStore", () => {
 		expect(new PreferencesStore(storage).volume).toBe(0.4);
 	});
 
+	test("Music defaults off", () => {
+		expect(new PreferencesStore(memoryStorage()).music).toBe(false);
+	});
+
+	test("Music choice survives reload", () => {
+		const storage = memoryStorage();
+		new PreferencesStore(storage).setMusic(true);
+
+		expect(new PreferencesStore(storage).music).toBe(true);
+	});
+
+	test("Music change keeps other fields", () => {
+		const storage = memoryStorage();
+		const preferences = new PreferencesStore(storage);
+		preferences.setVolume(0.4);
+		preferences.setMotion("reduce");
+		preferences.setMusic(true);
+
+		expect(parsePreferences(storage.getItem("twoplay:prefs"))).toEqual({
+			...DEFAULTS,
+			volume: 0.4,
+			motion: "reduce",
+			music: true
+		});
+	});
+
 	test("corrupt stored JSON reads as the defaults", () => {
 		const storage = memoryStorage({ "twoplay:prefs": "not json" });
 		expect(new PreferencesStore(storage).sound).toBe(true);
@@ -271,12 +308,13 @@ describe("PreferencesStore", () => {
 describe("applyPreferences", () => {
 	function applyTo(store: PreferencesStore) {
 		const configureSound = vi.fn();
+		const music = { setWanted: vi.fn() };
 		const root = document.createElement("div");
 		const destroy = $effect.root(() => {
-			applyPreferences(store, { configureSound, root });
+			applyPreferences(store, { configureSound, music, root });
 		});
 		flushSync();
-		return { configureSound, root, destroy };
+		return { configureSound, music, root, destroy };
 	}
 
 	test("pushes the sound settings on start and on change", () => {
@@ -308,6 +346,29 @@ describe("applyPreferences", () => {
 		store.setMotion("system");
 		flushSync();
 		expect(root.classList.contains("reduce-motion")).toBe(false);
+		destroy();
+	});
+
+	test("music is wanted only while music and sound are on and volume is above 0", () => {
+		const store = new PreferencesStore(memoryStorage());
+		const { music, destroy } = applyTo(store);
+		expect(music.setWanted).toHaveBeenLastCalledWith(false);
+
+		store.setMusic(true);
+		flushSync();
+		expect(music.setWanted).toHaveBeenLastCalledWith(true);
+
+		store.setSound(false);
+		flushSync();
+		expect(music.setWanted).toHaveBeenLastCalledWith(false);
+
+		store.setSound(true);
+		flushSync();
+		expect(music.setWanted).toHaveBeenLastCalledWith(true);
+
+		store.setVolume(0);
+		flushSync();
+		expect(music.setWanted).toHaveBeenLastCalledWith(false);
 		destroy();
 	});
 

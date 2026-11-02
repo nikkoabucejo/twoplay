@@ -12,7 +12,7 @@ export function getGraph(): SoundGraph | null {
 		master.connect(ctx.destination);
 		audio = { ctx, master };
 	}
-	if (audio.ctx.state === "suspended") void audio.ctx.resume();
+	if (audio.ctx.state !== "running") void audio.ctx.resume();
 	return audio;
 }
 
@@ -24,5 +24,5 @@ export function getAudibleGraph(): SoundGraph | null {
 
 export function configureSound(next: { isEnabled: boolean; volume: number }) {
 	settings = next;
-	if (audio) audio.master.gain.value = next.volume;
+	if (audio) audio.master.gain.setTargetAtTime(next.volume, audio.ctx.currentTime, 0.02);
 }
