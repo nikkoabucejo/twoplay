@@ -20,6 +20,11 @@ describe("About", () => {
 		expect(repoLinks[0]).toHaveAttribute("rel", "noopener noreferrer");
 	});
 
+	test("the repo link is a plain link without the comet ring", () => {
+		render(About);
+		expect(screen.getByRole("link", { name: /Source on GitHub/ })).not.toHaveClass("hover-ring");
+	});
+
 	test("renders every timeline milestone in order with its date", () => {
 		render(About);
 		const timeline = screen.getByRole("heading", { name: "Timeline" }).nextElementSibling;

@@ -13,7 +13,7 @@
 <a
 	href="/how-to-play/{type}"
 	class={cn(
-		"hover-ring flex h-full flex-col overflow-hidden rounded-2xl border bg-muted/30 outline-none backdrop-blur-sm transition-colors hover:border-foreground/20 hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring",
+		"flex h-full flex-col overflow-hidden rounded-2xl border bg-muted/30 outline-none backdrop-blur-sm transition-colors hover:border-foreground/20 hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring",
 		className
 	)}
 >

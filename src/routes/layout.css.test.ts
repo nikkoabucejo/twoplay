@@ -56,23 +56,36 @@ describe("layout.css", () => {
 		expect(comet).toMatch(/&:where\(\.reduce-motion \*\)::before\s*{\s*animation: none;/);
 	});
 
-	test("selected-ring shows the comet ring and runs it", () => {
+	test("selected-ring runs the comet ring in seat colors", () => {
 		const selected = utility("selected-ring");
 
 		expect(selected).toMatch(/@apply comet-ring;/);
 		expect(selected).toMatch(/&::before\s*{\s*opacity: 1;\s*animation-play-state: running;/);
+		expect(selected).not.toMatch(/--ring-[01]:/);
 	});
 
-	test("hover-ring shows a fainter, still comet ring only on hover", () => {
+	test("comet-ring reads its colors from ring variables that default to seat colors", () => {
+		const comet = utility("comet-ring");
+
+		expect(comet).toMatch(/var\(--ring-0, var\(--seat-0\)\)/);
+		expect(comet).toMatch(/var\(--ring-1, var\(--seat-1\)\)/);
+		expect(comet?.replace(/var\(--ring-[01], var\(--seat-[01]\)\)/g, "")).not.toMatch(
+			/var\(--seat-[01]\)/
+		);
+	});
+
+	test("hover-ring runs a muted comet ring only on hover", () => {
 		const hover = utility("hover-ring");
 
 		expect(hover).toMatch(/@apply comet-ring;/);
+		expect(hover).toMatch(/--ring-0: var\(--muted-foreground\);/);
+		expect(hover).toMatch(/--ring-1: var\(--muted-foreground\);/);
 		expect(hover).toMatch(/@media \(hover: hover\)/);
-		const opacity = Number(
-			hover?.match(/:hover:not\(:disabled\)::before\s*{\s*opacity: ([\d.]+);/)?.[1]
-		);
+		const before = hover?.match(/:hover:not\(:disabled\)::before\s*{([^}]*)}/)?.[1];
+		const opacity = Number(before?.match(/opacity: ([\d.]+);/)?.[1]);
 		expect(opacity).toBeGreaterThan(0);
 		expect(opacity).toBeLessThan(1);
-		expect(hover).not.toMatch(/animation-play-state: running/);
+		expect(before).toMatch(/animation-play-state: running;/);
+		expect(before).not.toMatch(/animation:/);
 	});
 });

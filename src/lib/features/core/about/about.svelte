@@ -257,7 +257,7 @@
 			href={REPO_URL}
 			target="_blank"
 			rel="noopener noreferrer"
-			class="hover-ring flex w-full max-w-xs min-w-0 items-center gap-3 rounded-xl border bg-background/40 p-3 text-left transition-colors outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring"
+			class="flex w-full max-w-xs min-w-0 items-center gap-3 rounded-xl border bg-background/40 p-3 text-left transition-colors outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring"
 		>
 			<span
 				class={cn(

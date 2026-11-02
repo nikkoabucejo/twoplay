@@ -10,7 +10,7 @@
 <li>
 	<a
 		href="/play?game={type}"
-		class="group hover-ring flex items-center gap-4 rounded-xl border bg-muted/40 p-4 outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-foreground/20 hover:bg-muted/60"
+		class="group flex items-center gap-4 rounded-xl border bg-muted/40 p-4 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:border-foreground/20 hover:bg-muted/60"
 	>
 		<Preview {type} />
 		<span class="flex min-w-0 flex-1 flex-col gap-1">

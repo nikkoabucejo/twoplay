@@ -173,10 +173,11 @@
 	scroll-behavior: auto !important;
 }
 
-/* Comet ring: a faint seat-tinted border with one spark gliding around it. Both layers are
-   absolute overlays on the element's own box, so showing them never shifts layout. `comet-ring`
-   holds the shared layers, hidden and paused; `selected-ring` shows them and runs the spark,
-   `hover-ring` shows them fainter and still on hover, so a hovered item never reads as selected. */
+/* Comet ring: a faint tinted border with one spark gliding around it, marking items that are or
+   can become selected. Both layers are absolute overlays on the element's own box, so showing them
+   never shifts layout. `comet-ring` holds the shared layers, hidden and paused, colored by
+   `--ring-0`/`--ring-1` (seat colors by default). `selected-ring` shows them and runs the spark in
+   seat colors; `hover-ring` runs it in muted colors on hover. */
 @property --sel-angle {
 	syntax: "<angle>";
 	inherits: false;
@@ -211,14 +212,14 @@
 			conic-gradient(
 				from var(--sel-angle),
 				transparent 0 72%,
-				color-mix(in oklab, var(--seat-0) 90%, transparent) 86%,
+				color-mix(in oklab, var(--ring-0, var(--seat-0)) 90%, transparent) 86%,
 				var(--foreground) 90%,
-				color-mix(in oklab, var(--seat-1) 90%, transparent) 93%,
+				color-mix(in oklab, var(--ring-1, var(--seat-1)) 90%, transparent) 93%,
 				transparent 96%
 			),
 			linear-gradient(
-				color-mix(in oklab, var(--seat-0) 35%, transparent),
-				color-mix(in oklab, var(--seat-1) 35%, transparent)
+				color-mix(in oklab, var(--ring-0, var(--seat-0)) 35%, transparent),
+				color-mix(in oklab, var(--ring-1, var(--seat-1)) 35%, transparent)
 			);
 		mask:
 			linear-gradient(black 0 0) content-box exclude,
@@ -230,20 +231,20 @@
 		z-index: -1;
 		background: radial-gradient(
 			closest-side,
-			color-mix(in oklab, var(--seat-0) 40%, transparent),
+			color-mix(in oklab, var(--ring-0, var(--seat-0)) 40%, transparent),
 			transparent
 		);
 		filter: blur(10px);
 	}
 
-	/* No spark under reduced motion: a still seat-0 to seat-1 border instead. */
+	/* No spark under reduced motion: a still two-color border instead. */
 	@media (prefers-reduced-motion: reduce) {
 		&::before {
 			animation: none;
 			background: linear-gradient(
 				90deg,
-				color-mix(in oklab, var(--seat-0) 70%, transparent),
-				color-mix(in oklab, var(--seat-1) 70%, transparent)
+				color-mix(in oklab, var(--ring-0, var(--seat-0)) 70%, transparent),
+				color-mix(in oklab, var(--ring-1, var(--seat-1)) 70%, transparent)
 			);
 		}
 	}
@@ -252,8 +253,8 @@
 		animation: none;
 		background: linear-gradient(
 			90deg,
-			color-mix(in oklab, var(--seat-0) 70%, transparent),
-			color-mix(in oklab, var(--seat-1) 70%, transparent)
+			color-mix(in oklab, var(--ring-0, var(--seat-0)) 70%, transparent),
+			color-mix(in oklab, var(--ring-1, var(--seat-1)) 70%, transparent)
 		);
 	}
 }
@@ -273,14 +274,13 @@
 
 @utility hover-ring {
 	@apply comet-ring;
+	--ring-0: var(--muted-foreground);
+	--ring-1: var(--muted-foreground);
 
 	@media (hover: hover) {
 		&:hover:not(:disabled)::before {
-			opacity: 0.35;
-		}
-
-		&:hover:not(:disabled)::after {
-			opacity: 0.08;
+			opacity: 0.6;
+			animation-play-state: running;
 		}
 	}
 }

@@ -423,7 +423,7 @@
 					<button
 						type="button"
 						aria-label={option.label}
-						class="hover-ring focus-visible:ring-ring/50 flex aspect-square w-full max-w-9 items-center justify-center rounded-md outline-none transition-colors hover:bg-muted/60 focus-visible:ring-3"
+						class="focus-visible:ring-ring/50 flex aspect-square w-full max-w-9 items-center justify-center rounded-md outline-none transition-colors hover:bg-muted/60 focus-visible:ring-3"
 						onclick={() => selectEmoji(option.codepoint)}
 					>
 						<Emoji codepoint={option.codepoint} label={option.label} class="size-6" />
