@@ -5,15 +5,24 @@
 	import { fade } from "svelte/transition";
 	import { goto } from "$app/navigation";
 	import { resolve } from "$app/paths";
-	import { Board, BoardPlaceholder, type BoardStatus } from "$lib/components/layout";
-	import { Button, getToaster } from "$lib/components/ui";
+	import {
+		Board,
+		BoardPlaceholder,
+		roomStatus,
+		rovingStep,
+		scrubCommand
+	} from "$lib/components/layout";
+	import { Button, getToaster, Gate } from "$lib/components/ui";
 	import { Cursor, TurnAlert } from "$lib/features/presence";
 	import { getClerkAuth } from "$lib/services/auth";
+	import { roomPath } from "$lib/utils/multiplayer";
 	import { playCaptureSound, playMoveSound, prepareSound } from "$lib/utils/sound";
 	import { cn, ACCENTS } from "$lib/utils/style";
 	import { api } from "../../../../../convex/_generated/api.js";
 	import { DEFAULT_EMOJI } from "../../../../../convex/models/players/index.js";
+	import { GAMES } from "../games.js";
 	import { CheckersRoom } from "./game.svelte.js";
+	import { squareLabel } from "./labels.js";
 	import { playerIndexOf, type Piece } from "./types.js";
 
 	const PIECE_DURATION = 220;
@@ -66,9 +75,10 @@
 			});
 	});
 
+	// Another game's room, or a code typed in another case: move to the room's canonical URL.
 	$effect(() => {
-		if (room.wrongGameType && data)
-			goto(resolve(`/${data.type}/${roomCode}`), { replaceState: true });
+		if (data && (room.wrongGameType || data.code !== roomCode))
+			goto(resolve(roomPath(data.type, data.code, round)), { replaceState: true });
 	});
 
 	$effect(() => {
@@ -80,15 +90,20 @@
 	$effect(() => () => room.dispose());
 
 	function goLive() {
-		goto(resolve(`/checkers/${roomCode}`));
+		goto(resolve(roomPath("checkers", roomCode)));
 	}
 
 	function goToRound(round: number) {
-		goto(resolve(`/checkers/${roomCode}/${round}`));
+		goto(resolve(roomPath("checkers", roomCode, round)));
 	}
 
 	function playAgain() {
 		goto(resolve("/play?game=checkers"));
+	}
+
+	async function newOpponent() {
+		await room.abandon();
+		if (!room.error) playAgain();
 	}
 
 	function firstName(name: string) {
@@ -116,31 +131,32 @@
 		void room.select(index);
 	}
 
-	/** Arrow keys scrub this browser's personal view of the current round's move history — local only,
-	 *  never touches the real game state or other players' views. */
+	/** Scrubs this browser's own view of the round's moves. Arrows inside the board move focus
+	 *  instead; `[` and `]` scrub from anywhere. */
 	function handleKeydown(event: KeyboardEvent) {
-		if (!data) return;
-		const target = event.target as HTMLElement | null;
-		if (target && ["INPUT", "TEXTAREA"].includes(target.tagName)) return;
+		if (!data || !(event.target instanceof Element)) return;
+		const command = scrubCommand(event.key, {
+			isInBoard: event.target.closest("[data-board-grid]") !== null,
+			isTextField: event.target.matches("input, textarea, [contenteditable]")
+		});
+		if (command === null) return;
+		event.preventDefault();
+		if (command === "back") room.stepBack();
+		else if (command === "forward") room.stepForward();
+		else if (command === "first") room.jumpToFirst();
+		else room.jumpToLatest();
+	}
 
-		switch (event.key) {
-			case "ArrowLeft":
-				event.preventDefault();
-				room.stepBack();
-				break;
-			case "ArrowRight":
-				event.preventDefault();
-				room.stepForward();
-				break;
-			case "ArrowUp":
-				event.preventDefault();
-				room.jumpToLatest();
-				break;
-			case "ArrowDown":
-				event.preventDefault();
-				room.jumpToFirst();
-				break;
-		}
+	/** The one dark square in the tab order, by its drawn position (0–63). */
+	let focusedSlot = $state(1);
+
+	function moveFocus(event: KeyboardEvent & { currentTarget: HTMLElement }) {
+		if (!(event.target instanceof HTMLElement) || !event.target.dataset.slotIndex) return;
+		const next = rovingStep(Number(event.target.dataset.slotIndex), event.key, "checkers");
+		if (next === null) return;
+		event.preventDefault();
+		focusedSlot = next;
+		event.currentTarget.querySelector<HTMLElement>(`[data-slot-index="${next}"]`)?.focus();
 	}
 
 	const destinations = $derived(
@@ -152,18 +168,14 @@
 			: new Set<number>()
 	);
 
-	const status: BoardStatus = $derived(
-		room.isWaitingForOpponent
-			? { type: "waiting", closed: room.isRoomClosed }
-			: room.game.endedSeat !== null
-				? {
-						type: "winner",
-						player: room.game.endedSeat === 0 ? 1 : 0,
-						reason: room.game.reason ?? undefined
-					}
-				: room.winner
-					? { type: "winner", player: playerIndexOf(room.winner) }
-					: { type: "turn", player: playerIndexOf(room.turn) }
+	const status = $derived(
+		roomStatus({
+			isWaitingForOpponent: room.isWaitingForOpponent,
+			isRoomClosed: room.isRoomClosed,
+			endedSeat: room.game.endedSeat,
+			reason: room.game.reason,
+			live: room.liveOutcome
+		})
 	);
 
 	/** Player 1's pieces start at the bottom of the raw board; flip it so player 2 sees their own
@@ -202,12 +214,17 @@
 
 <div class={cn("flex flex-col items-center gap-6", className)}>
 	{#if !auth.isSignedIn}
-		<div class="flex flex-col items-center gap-3">
-			<p class="text-muted-foreground">Sign in to create or join a room.</p>
-			<Button disabled={auth.loadError !== null} onclick={() => auth.signIn()}>Sign in</Button>
-		</div>
+		<Gate message="Sign in to join this {GAMES.checkers.name} game." />
 	{:else if room.isLoading}
 		<BoardPlaceholder />
+	{:else if room.loadError}
+		<div class="flex flex-col items-center gap-3">
+			<p class="text-muted-foreground">Couldn't load this room.</p>
+			<div class="flex gap-2">
+				<Button onclick={() => location.reload()}>Retry</Button>
+				<Button variant="outline" href="/play?game=checkers">Back to play</Button>
+			</div>
+		</div>
 	{:else if data === null}
 		<div class="flex flex-col items-center gap-3">
 			<p class="text-muted-foreground">Room "{roomCode}" doesn't exist.</p>
@@ -221,99 +238,98 @@
 			<Button variant="outline" href="/play?game=checkers">Back to play</Button>
 		</div>
 	{:else if data}
-		<div class="relative">
-			{#if room.isViewingHistory}
-				<!-- top-18: 0.5rem into the board area, below the h-14 strip and its gap-2. -->
-				<div
-					class="pointer-events-none absolute inset-x-0 top-18 z-20 flex justify-center"
-					transition:fade={{ duration: 150 }}
-				>
-					<div
-						class="pointer-events-auto flex items-center gap-2 rounded-full border bg-background/90 px-3 py-1 text-xs whitespace-nowrap shadow-sm backdrop-blur-sm"
-					>
-						<span class="tabular-nums text-muted-foreground">
-							Move {room.viewedMoveNumber} of {room.historyLength}
-						</span>
-						<button
-							type="button"
-							class="rounded-sm font-semibold text-primary outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
-							onclick={() => room.jumpToLatest()}
-						>
-							Return to live
-						</button>
-					</div>
-				</div>
-			{/if}
-			<Board
-				players={[
-					{
-						label: room.players[0] ? firstName(room.players[0].name) : "Player 1",
-						emoji: room.players[0]?.emoji ?? DEFAULT_EMOJI,
-						accent: ACCENTS[0].text,
-						score: room.players[0]?.score ?? 0
-					},
-					{
-						label: room.players[1] ? firstName(room.players[1].name) : "Player 2",
-						emoji: room.players[1]?.emoji ?? DEFAULT_EMOJI,
-						accent: ACCENTS[1].text,
-						score: room.players[1]?.score ?? 0
-					}
-				]}
-				{status}
-				clock={room.clock}
-				myIndex={room.myIndex}
-				opponentDisconnected={room.opponentDisconnected}
-				onTrashtalk={(emoji) => room.trashtalk(emoji)}
-				markIcon={stripMark}
-				rejectionId={room.rejection?.id}
-				footer={{
-					isLive: room.game.isLive,
-					round: room.game.round,
-					latestRound: room.game.latestRound,
-					onResign: () => room.resign(),
-					onRematch: () => room.rematch(),
-					onAbandon: () => room.abandon(),
-					onPlayAgain: playAgain,
-					roomClosed: room.isRoomClosed,
-					waitingForOpponent: room.isWaitingForOpponent,
-					onGoLive: goLive,
-					onGoToRound: goToRound,
-					error: room.error
-				}}
+		<Board
+			players={[
+				{
+					label: room.players[0] ? firstName(room.players[0].name) : "Player 1",
+					emoji: room.players[0]?.emoji ?? DEFAULT_EMOJI,
+					accent: ACCENTS[0].text,
+					score: room.players[0]?.score ?? 0
+				},
+				{
+					label: room.players[1] ? firstName(room.players[1].name) : "Player 2",
+					emoji: room.players[1]?.emoji ?? DEFAULT_EMOJI,
+					accent: ACCENTS[1].text,
+					score: room.players[1]?.score ?? 0
+				}
+			]}
+			{status}
+			room={{
+				type: "checkers",
+				name: GAMES.checkers.name,
+				code: data.code,
+				icon: GAMES.checkers.icon
+			}}
+			replay={{
+				isViewingHistory: room.isViewingHistory,
+				moveNumber: room.viewedMoveNumber,
+				moveCount: room.historyLength,
+				canStepBack: room.viewedMoveNumber > 1,
+				canStepForward: room.isViewingHistory,
+				onFirst: () => room.jumpToFirst(),
+				onBack: () => room.stepBack(),
+				onForward: () => room.stepForward(),
+				onLive: () => room.jumpToLatest()
+			}}
+			rounds={room.rounds}
+			mustCapture={room.mustCapture}
+			clock={room.clock}
+			myIndex={room.myIndex}
+			opponentDisconnected={room.opponentDisconnected}
+			onTrashtalk={(emoji) => room.trashtalk(emoji)}
+			markIcon={stripMark}
+			rejectionId={room.rejection?.id}
+			footer={{
+				isLive: room.game.isLive,
+				round: room.game.round,
+				latestRound: room.game.latestRound,
+				onResign: () => room.resign(),
+				onRematch: () => room.rematch(),
+				onAbandon: () => room.abandon(),
+				onPlayAgain: playAgain,
+				onNewOpponent: newOpponent,
+				onLobby: () => goto(resolve("/lobby")),
+				roomClosed: room.isRoomClosed,
+				waitingForOpponent: room.isWaitingForOpponent,
+				onGoLive: goLive,
+				onGoToRound: goToRound,
+				error: room.error
+			}}
+		>
+			<Cursor
+				{roomCode}
+				{flip}
+				class="size-full"
+				colorFor={(index) => ACCENTS[index]?.text ?? "text-muted-foreground"}
 			>
-				<Cursor
-					{roomCode}
-					{flip}
-					class="size-full"
-					colorFor={(index) => ACCENTS[index]?.text ?? "text-muted-foreground"}
+				<!-- Arrow keys arrive from the focused square; the group moves focus between them. -->
+				<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+				<div
+					class="grid size-full grid-cols-8 grid-rows-8 overflow-hidden rounded-xl border"
+					role="group"
+					aria-label="Checkers board"
+					data-board-grid
+					onkeydown={moveFocus}
 				>
-					<div
-						class="grid size-full grid-cols-8 grid-rows-8 overflow-hidden rounded-xl border"
-						role="grid"
-						aria-label="Checkers board"
-					>
-						{#each { length: 64 } as _, slot (slot)}
-							{@const index = flip ? 63 - slot : slot}
-							{@const row = Math.floor(index / 8)}
-							{@const col = index % 8}
-							{@const dark = (row + col) % 2 === 1}
-							{@const cell = room.board[index]}
-							{@const isDestination = destinations.includes(index)}
-							{@const isSelected = room.effectiveSelected === index}
-							{@const isForcedMover = dark && cell?.color === room.turn && forcedMovers.has(index)}
+					{#each { length: 64 } as _, slot (slot)}
+						{@const index = flip ? 63 - slot : slot}
+						{@const isDark = (Math.floor(index / 8) + (index % 8)) % 2 === 1}
+						{@const cell = room.board[index]}
+						{@const isDestination = destinations.includes(index)}
+						{@const isSelected = room.effectiveSelected === index}
+						{@const isForcedMover = isDark && cell?.color === room.turn && forcedMovers.has(index)}
+						{@const isLastMove = room.lastMove?.from === index || room.lastMove?.to === index}
+						{#if isDark}
 							<button
 								type="button"
+								data-slot-index={slot}
+								tabindex={slot === focusedSlot ? 0 : -1}
 								class={cn(
-									"relative flex items-center justify-center",
-									dark
-										? "bg-foreground/10 hover:bg-foreground/15 dark:bg-foreground/15"
-										: "bg-background",
-									!dark && "cursor-default"
+									"relative flex items-center justify-center bg-foreground/10 outline-none hover:bg-foreground/15 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset dark:bg-foreground/15",
+									isLastMove && room.lastMove && ACCENTS[room.lastMove.seat].tintBg
 								)}
-								disabled={!dark}
-								aria-label={cell
-									? `Row ${row + 1}, column ${col + 1}, player ${playerIndexOf(cell.color) + 1}${cell.king ? " king" : ""}`
-									: `Row ${row + 1}, column ${col + 1}, empty`}
+								aria-label={squareLabel(index, cell, room.abilityOf(index))}
+								onfocus={() => (focusedSlot = slot)}
 								onclick={() => select(index)}
 							>
 								{#if isForcedMover}
@@ -334,10 +350,12 @@
 									{/if}
 								{/key}
 							</button>
-						{/each}
-					</div>
-				</Cursor>
-			</Board>
-		</div>
+						{:else}
+							<div class="bg-background" aria-hidden="true"></div>
+						{/if}
+					{/each}
+				</div>
+			</Cursor>
+		</Board>
 	{/if}
 </div>

@@ -25,11 +25,15 @@ describe("TurnAlert", () => {
 		return Object.assign(new EventTarget(), { title: ORIGINAL_TITLE, hidden: true });
 	}
 
-	function createAlert({ sound = true, getIsMyTurn = (): boolean | null => isMyTurn } = {}) {
+	function createAlert({
+		sound = true,
+		turnAlert = true,
+		getIsMyTurn = (): boolean | null => isMyTurn
+	} = {}) {
 		const document = fakeDocument();
 		const playChime = vi.fn();
 		destroy = $effect.root(() => {
-			new TurnAlert(getIsMyTurn, { document, playChime, preferences: { sound } });
+			new TurnAlert(getIsMyTurn, { document, playChime, preferences: { sound, turnAlert } });
 		});
 		flushSync();
 		return { document, playChime };
@@ -68,6 +72,16 @@ describe("TurnAlert", () => {
 		passTurnToViewer();
 
 		expect(document.title).toBe(ALERT_TITLE);
+		expect(playChime).not.toHaveBeenCalled();
+	});
+
+	test("with the turn alert off the title stays and no chime plays", () => {
+		const { document, playChime } = createAlert({ turnAlert: false });
+
+		passTurnToViewer();
+		vi.advanceTimersByTime(3000);
+
+		expect(document.title).toBe(ORIGINAL_TITLE);
 		expect(playChime).not.toHaveBeenCalled();
 	});
 

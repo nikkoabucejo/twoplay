@@ -8,10 +8,13 @@
 		pathname: string;
 		/** The viewer's active room, when they aren't already in it. */
 		live: HeaderLiveGame | null;
+		/** The page shows its own Sign in, so the header leaves its slot empty. */
+		isGated?: boolean;
 	};
 </script>
 
 <script lang="ts">
+	import { ChartColumn, CircleUserRound, LogOut, Settings } from "@lucide/svelte";
 	import {
 		Beacon,
 		Button,
@@ -24,11 +27,27 @@
 	} from "$lib/components/ui";
 	import { getClerkAuth } from "$lib/services/auth";
 	import { NAV_ITEMS } from "$lib/utils/navigation";
+	import { cn } from "$lib/utils/style";
 
-	let { pathname, live }: HeaderProps = $props();
+	let { pathname, live, isGated = false }: HeaderProps = $props();
 
 	const auth = getClerkAuth();
 </script>
+
+{#snippet avatar(size: "size-7" | "size-8")}
+	{#if auth.profile?.imageUrl}
+		<img src={auth.profile.imageUrl} alt="" class={cn("shrink-0 rounded-full", size)} />
+	{:else}
+		<span
+			class={cn(
+				"flex shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold",
+				size
+			)}
+		>
+			{(auth.profile?.name ?? "?").charAt(0).toUpperCase()}
+		</span>
+	{/if}
+{/snippet}
 
 <header class="flex h-14 shrink-0 items-center justify-between gap-2 border-b px-3 sm:h-16 sm:px-4">
 	<div class="flex min-w-0 items-center gap-2 sm:gap-4">
@@ -60,7 +79,7 @@
 				<span class="truncate"><span class="sr-only">Live game: </span>{live.name}</span>
 			</a>
 		{/if}
-		<!-- Fixed width (fits Sign in, 81px measured) so swapping the avatar for Sign in moves nothing. -->
+		<!-- Fixed width (fits Sign in, 81px measured) so the avatar, Sign in, or an empty slot move nothing. -->
 		<div data-slot="auth" class="flex w-21 shrink-0 justify-end">
 			{#if auth.isSignedIn}
 				<Dropdown>
@@ -70,23 +89,46 @@
 						class="shrink-0 rounded-full"
 						aria-label={auth.profile?.name ? `${auth.profile.name}, account menu` : "Account menu"}
 					>
-						{#if auth.profile?.imageUrl}
-							<img src={auth.profile.imageUrl} alt="" class="size-7 rounded-full" />
-						{:else}
-							<span
-								class="flex size-7 items-center justify-center rounded-full bg-muted text-xs font-semibold"
-							>
-								{(auth.profile?.name ?? "?").charAt(0).toUpperCase()}
-							</span>
-						{/if}
+						{@render avatar("size-7")}
 					</DropdownTrigger>
-					<DropdownContent align="end" class="w-36">
-						<DropdownItem onSelect={() => auth.openUserProfile()}>Account</DropdownItem>
+					<DropdownContent align="end" class="w-56">
+						<!-- Hidden from screen readers: the trigger's name already says whose menu this is. -->
+						<div class="flex items-center gap-2.5 px-2.5 pt-1.5 pb-2" aria-hidden="true">
+							{@render avatar("size-8")}
+							<div class="flex min-w-0 flex-col">
+								<span class="truncate text-sm font-semibold"
+									>{auth.profile?.name ?? "Signed in"}</span
+								>
+								{#if auth.profile?.email}
+									<span class="truncate text-caption text-muted-foreground">
+										{auth.profile.email}
+									</span>
+								{/if}
+							</div>
+						</div>
 						<DropdownSeparator />
-						<DropdownItem onSelect={() => auth.signOut()}>Sign out</DropdownItem>
+						<DropdownItem>
+							{#snippet child({ props })}
+								<a href="/me" {...props}><ChartColumn />My stats</a>
+							{/snippet}
+						</DropdownItem>
+						<DropdownItem>
+							{#snippet child({ props })}
+								<a href="/settings" {...props}><Settings />Settings</a>
+							{/snippet}
+						</DropdownItem>
+						<DropdownItem onSelect={() => auth.openUserProfile()}>
+							<CircleUserRound />
+							Account
+						</DropdownItem>
+						<DropdownSeparator />
+						<DropdownItem variant="destructive" onSelect={() => auth.signOut()}>
+							<LogOut />
+							Sign out
+						</DropdownItem>
 					</DropdownContent>
 				</Dropdown>
-			{:else}
+			{:else if !isGated}
 				<Button
 					size="sm"
 					class="max-w-full"

@@ -23,6 +23,13 @@ export function isGameRoomRoute(routeId: string | null): boolean {
 	return routeId?.split("/").includes("[code]") ?? false;
 }
 
+const GATED_ROUTE_IDS = new Set(["/play", "/lobby", "/history", "/leaderboard", "/me"]);
+
+/** Routes that show their own Sign in to signed-out visitors, so the header hides its own. */
+export function isGatedRoute(routeId: string | null): boolean {
+	return isGameRoomRoute(routeId) || (routeId !== null && GATED_ROUTE_IDS.has(routeId));
+}
+
 /** The tab bar stays out of game rooms. */
 export function showsDock(routeId: string | null, showsMemberNav: boolean): boolean {
 	return showsMemberNav && !isGameRoomRoute(routeId);

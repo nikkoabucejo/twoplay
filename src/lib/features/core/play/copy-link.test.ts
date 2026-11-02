@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { copyLink } from "./copy-link.js";
+import { copyLink, shareLink } from "./copy-link.js";
 
 describe("copyLink", () => {
 	const url = "https://twoplay.test/tictactoe/ABCD";
@@ -21,5 +21,37 @@ describe("copyLink", () => {
 		await copyLink(url, { clipboard, toaster });
 
 		expect(toaster.show).toHaveBeenCalledWith("Couldn't copy the link", { tone: "error" });
+	});
+});
+
+describe("shareLink", () => {
+	const url = "https://twoplay.test/tictactoe/ABCD";
+
+	test("opens the share sheet with the URL", async () => {
+		const share = vi.fn().mockResolvedValue(undefined);
+		const toaster = { show: vi.fn() };
+
+		await shareLink(url, { share, toaster });
+
+		expect(share).toHaveBeenCalledWith({ url });
+		expect(toaster.show).not.toHaveBeenCalled();
+	});
+
+	test("stays silent when the user closes the share sheet", async () => {
+		const share = vi.fn().mockRejectedValue(new DOMException("Share canceled", "AbortError"));
+		const toaster = { show: vi.fn() };
+
+		await shareLink(url, { share, toaster });
+
+		expect(toaster.show).not.toHaveBeenCalled();
+	});
+
+	test("shows an error toast when sharing fails", async () => {
+		const share = vi.fn().mockRejectedValue(new DOMException("Not allowed", "NotAllowedError"));
+		const toaster = { show: vi.fn() };
+
+		await shareLink(url, { share, toaster });
+
+		expect(toaster.show).toHaveBeenCalledWith("Couldn't share the link", { tone: "error" });
 	});
 });

@@ -296,4 +296,103 @@ describe("TictactoeRoom", () => {
 		expect(room.boards).toEqual(first.boards);
 		expect(room.turn).toBe("O");
 	});
+
+	test("every open board except the mover's last one is playable, whoever is viewing", () => {
+		const room = createRoom(roomSnapshot(played([0, 0], [4, 0], [1, 0])));
+		expect(room.turn).toBe("O");
+		expect(room.boards.map((_, boardIndex) => room.isPlayable(boardIndex))).toEqual([
+			true,
+			true,
+			true,
+			true,
+			false,
+			true,
+			true,
+			true,
+			true
+		]);
+	});
+
+	test("the mover's last board is playable when it's the only one still open", () => {
+		const lastOpen: Board = ["X", "O", null, null, null, null, null, null, null];
+		const state = withBoards([lastOpen, ...Array(8).fill(DRAWN)], { X: 0, O: null });
+		const room = createRoom(roomSnapshot(state));
+		expect(room.isPlayable(0)).toBe(true);
+		expect(room.isPlayable(1)).toBe(false);
+	});
+
+	test("no board is playable once the round is over", () => {
+		const boards = [WON_BY_X, WON_BY_X, WON_BY_X, ...Array(6).fill(EMPTY)];
+		const room = createRoom(roomSnapshot(withBoards(boards)));
+		expect(room.isPlayable(5)).toBe(false);
+	});
+
+	test("no board is playable after a resignation", () => {
+		const room = createRoom(roomSnapshot(initial, { game: { endedSeat: 1, reason: "resign" } }));
+		expect(room.isPlayable(0)).toBe(false);
+	});
+
+	test("no board is playable while waiting for an opponent", () => {
+		const room = createRoom(roomSnapshot(initial, { players: [ALICE, null] }));
+		expect(room.isPlayable(0)).toBe(false);
+	});
+
+	test("no board is playable while scrubbing", () => {
+		const first = played([0, 0]);
+		const second = played([0, 0], [1, 0]);
+		const room = createRoom(roomSnapshot(second));
+		setQueryResult(api.models.games.index.history, historyOf([first, second]));
+
+		room.stepBack();
+
+		expect(room.isPlayable(5)).toBe(false);
+	});
+
+	test("the last move is the newest mark", () => {
+		const first = played([0, 0]);
+		const second = played([0, 0], [4, 2]);
+		const room = createRoom(roomSnapshot(second));
+		setQueryResult(api.models.games.index.history, historyOf([first, second]));
+
+		expect(room.lastMove).toEqual({ boardIndex: 4, cellIndex: 2, seat: 1 });
+	});
+
+	test("the last move of the first move is its only mark", () => {
+		const first = played([3, 3]);
+		const room = createRoom(roomSnapshot(first));
+		setQueryResult(api.models.games.index.history, historyOf([first]));
+
+		expect(room.lastMove).toEqual({ boardIndex: 3, cellIndex: 3, seat: 0 });
+	});
+
+	test("a pending move is the last move at once", () => {
+		const first = played([0, 0]);
+		const room = createRoom(roomSnapshot(first, { myIndex: 1 }));
+		setQueryResult(api.models.games.index.history, historyOf([first]));
+		mutationFor(api.models.rooms.index.play).mockReturnValueOnce(deferred().promise);
+
+		void room.play(4, 2);
+
+		expect(room.lastMove).toEqual({ boardIndex: 4, cellIndex: 2, seat: 1 });
+	});
+
+	test("while scrubbing, the last move is the shown position's", () => {
+		const first = played([0, 0]);
+		const second = played([0, 0], [4, 2]);
+		const third = played([0, 0], [4, 2], [8, 8]);
+		const room = createRoom(roomSnapshot(third));
+		setQueryResult(api.models.games.index.history, historyOf([first, second, third]));
+
+		room.stepBack();
+		expect(room.lastMove).toEqual({ boardIndex: 4, cellIndex: 2, seat: 1 });
+
+		room.stepBack();
+		expect(room.lastMove).toEqual({ boardIndex: 0, cellIndex: 0, seat: 0 });
+	});
+
+	test("an empty board has no last move", () => {
+		const room = createRoom();
+		setQueryResult(api.models.games.index.history, []);
+		expect(room.lastMove).toBeNull();
+	});
 });

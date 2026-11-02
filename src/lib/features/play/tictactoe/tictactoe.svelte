@@ -5,15 +5,24 @@
 	import { draw, fade } from "svelte/transition";
 	import { goto } from "$app/navigation";
 	import { resolve } from "$app/paths";
-	import { Board, BoardPlaceholder, type BoardStatus } from "$lib/components/layout";
-	import { Button, getToaster } from "$lib/components/ui";
+	import {
+		Board,
+		BoardPlaceholder,
+		roomStatus,
+		rovingStep,
+		scrubCommand
+	} from "$lib/components/layout";
+	import { Button, getToaster, Gate } from "$lib/components/ui";
 	import { Cursor, TurnAlert } from "$lib/features/presence";
 	import { getClerkAuth } from "$lib/services/auth";
+	import { roomPath } from "$lib/utils/multiplayer";
 	import { playMoveSound, prepareSound } from "$lib/utils/sound";
 	import { cn, ACCENTS } from "$lib/utils/style";
 	import { api } from "../../../../../convex/_generated/api.js";
 	import { DEFAULT_EMOJI } from "../../../../../convex/models/players/index.js";
+	import { GAMES } from "../games.js";
 	import { TictactoeRoom } from "./game.svelte.js";
+	import { boardLabel, cellLabel } from "./labels.js";
 	import { markOf, playerIndexOf } from "./types.js";
 	import type { Board as CellBoard } from "./types.js";
 
@@ -76,9 +85,10 @@
 			});
 	});
 
+	// Another game's room, or a code typed in another case: move to the room's canonical URL.
 	$effect(() => {
-		if (room.wrongGameType && data)
-			goto(resolve(`/${data.type}/${roomCode}`), { replaceState: true });
+		if (data && (room.wrongGameType || data.code !== roomCode))
+			goto(resolve(roomPath(data.type, data.code, round)), { replaceState: true });
 	});
 
 	$effect(() => {
@@ -90,15 +100,20 @@
 	$effect(() => () => room.dispose());
 
 	function goLive() {
-		goto(resolve(`/tictactoe/${roomCode}`));
+		goto(resolve(roomPath("tictactoe", roomCode)));
 	}
 
 	function goToRound(round: number) {
-		goto(resolve(`/tictactoe/${roomCode}/${round}`));
+		goto(resolve(roomPath("tictactoe", roomCode, round)));
 	}
 
 	function playAgain() {
 		goto(resolve("/play?game=tictactoe"));
+	}
+
+	async function newOpponent() {
+		await room.abandon();
+		if (!room.error) playAgain();
 	}
 
 	function firstName(name: string) {
@@ -111,47 +126,42 @@
 		void room.play(boardIndex, cellIndex);
 	}
 
-	/** Arrow keys scrub this browser's personal view of the current round's move history — local only,
-	 *  never touches the real game state or other players' views. */
+	/** Scrubs this browser's own view of the round's moves. Arrows inside the board move focus
+	 *  instead; `[` and `]` scrub from anywhere. */
 	function handleKeydown(event: KeyboardEvent) {
-		if (!data) return;
-		const target = event.target as HTMLElement | null;
-		if (target && ["INPUT", "TEXTAREA"].includes(target.tagName)) return;
-
-		switch (event.key) {
-			case "ArrowLeft":
-				event.preventDefault();
-				room.stepBack();
-				break;
-			case "ArrowRight":
-				event.preventDefault();
-				room.stepForward();
-				break;
-			case "ArrowUp":
-				event.preventDefault();
-				room.jumpToLatest();
-				break;
-			case "ArrowDown":
-				event.preventDefault();
-				room.jumpToFirst();
-				break;
-		}
+		if (!data || !(event.target instanceof Element)) return;
+		const command = scrubCommand(event.key, {
+			isInBoard: event.target.closest("[data-board-grid]") !== null,
+			isTextField: event.target.matches("input, textarea, [contenteditable]")
+		});
+		if (command === null) return;
+		event.preventDefault();
+		if (command === "back") room.stepBack();
+		else if (command === "forward") room.stepForward();
+		else if (command === "first") room.jumpToFirst();
+		else room.jumpToLatest();
 	}
 
-	const status: BoardStatus = $derived(
-		room.isWaitingForOpponent
-			? { type: "waiting", closed: room.isRoomClosed }
-			: room.game.endedSeat !== null
-				? {
-						type: "winner",
-						player: room.game.endedSeat === 0 ? 1 : 0,
-						reason: room.game.reason ?? undefined
-					}
-				: room.winner
-					? { type: "winner", player: playerIndexOf(room.winner) }
-					: room.isOver
-						? { type: "draw" }
-						: { type: "turn", player: playerIndexOf(room.turn) }
+	/** The one cell in the tab order, as `boardIndex * 9 + cellIndex`. */
+	let focusedSlot = $state(0);
+
+	function moveFocus(event: KeyboardEvent & { currentTarget: HTMLElement }) {
+		if (!(event.target instanceof HTMLElement) || !event.target.dataset.slotIndex) return;
+		const next = rovingStep(Number(event.target.dataset.slotIndex), event.key, "tictactoe");
+		if (next === null) return;
+		event.preventDefault();
+		focusedSlot = next;
+		event.currentTarget.querySelector<HTMLElement>(`[data-slot-index="${next}"]`)?.focus();
+	}
+
+	const status = $derived(
+		roomStatus({
+			isWaitingForOpponent: room.isWaitingForOpponent,
+			isRoomClosed: room.isRoomClosed,
+			endedSeat: room.game.endedSeat,
+			reason: room.game.reason,
+			live: room.liveOutcome
+		})
 	);
 </script>
 
@@ -200,28 +210,48 @@
 	</svg>
 {/snippet}
 
+{#snippet rules()}
+	<ul class="flex list-disc flex-col gap-1.5 pl-4 text-muted-foreground">
+		<li>Three in a row wins a board.</li>
+		<li>Three boards in a row wins the game.</li>
+		<li>You can't play the board you played last turn, unless it's the only open board.</li>
+	</ul>
+	<Button href="/how-to-play/tictactoe" variant="link" size="xs" class="mt-2 px-0">
+		How to play
+	</Button>
+{/snippet}
+
 {#snippet miniBoard(cells: CellBoard, boardIndex: number)}
 	{@const status = room.statuses[boardIndex]}
-	{@const forbidden = room.isForbidden(boardIndex)}
 	<div class="relative h-full w-full">
 		<div
 			class={cn(
-				"grid h-full w-full grid-cols-3 grid-rows-3 gap-1.5 rounded-xl bg-muted/50 p-1.5 backdrop-blur-2xl backdrop-saturate-150 transition-[opacity,colors] duration-200 dark:bg-muted/40",
-				forbidden && "opacity-40"
+				"grid h-full w-full grid-cols-3 grid-rows-3 gap-1.5 rounded-xl bg-muted/50 p-1.5 backdrop-blur-2xl backdrop-saturate-150 transition-opacity duration-200 motion-reduce:transition-none dark:bg-muted/40",
+				room.isForbidden(boardIndex) && "opacity-40"
 			)}
-			role="grid"
-			aria-label="Tic-tac-toe board"
+			role="group"
+			aria-label={boardLabel(boardIndex)}
 		>
 			{#each cells as cell, cellIndex (cellIndex)}
+				{@const slot = boardIndex * 9 + cellIndex}
+				{@const isPlayable = cell === null && room.canPlay(boardIndex)}
+				{@const lastMove = room.lastMove}
+				<!-- aria-disabled, not disabled, so arrow keys can still focus every cell. -->
 				<button
 					type="button"
+					data-slot-index={slot}
+					tabindex={slot === focusedSlot ? 0 : -1}
 					class={cn(
-						"flex items-center justify-center rounded-md bg-background/90 shadow-sm backdrop-blur-md transition-colors",
-						"hover:bg-background/95 disabled:cursor-not-allowed",
-						cell !== null && ACCENTS[playerIndexOf(cell)].text
+						"flex items-center justify-center rounded-md bg-background/90 shadow-sm outline-none backdrop-blur-md transition-colors focus-visible:ring-3 focus-visible:ring-ring/50",
+						"hover:bg-background/95 aria-disabled:cursor-not-allowed aria-disabled:hover:bg-background/90",
+						cell !== null && ACCENTS[playerIndexOf(cell)].text,
+						lastMove?.boardIndex === boardIndex &&
+							lastMove.cellIndex === cellIndex &&
+							ACCENTS[lastMove.seat].tintBg
 					)}
-					disabled={cell !== null || !room.canPlay(boardIndex)}
-					aria-label={cell ? `Cell ${cellIndex + 1}, ${cell}` : `Cell ${cellIndex + 1}, empty`}
+					aria-disabled={!isPlayable}
+					aria-label={cellLabel(boardIndex, cellIndex, cell, isPlayable)}
+					onfocus={() => (focusedSlot = slot)}
 					onclick={() => play(boardIndex, cellIndex)}
 				>
 					{#if cell}
@@ -272,12 +302,17 @@
 
 <div class={cn("flex flex-col items-center gap-6", className)}>
 	{#if !auth.isSignedIn}
-		<div class="flex flex-col items-center gap-3">
-			<p class="text-muted-foreground">Sign in to create or join a room.</p>
-			<Button disabled={auth.loadError !== null} onclick={() => auth.signIn()}>Sign in</Button>
-		</div>
+		<Gate message="Sign in to join this {GAMES.tictactoe.name} game." />
 	{:else if room.isLoading}
 		<BoardPlaceholder />
+	{:else if room.loadError}
+		<div class="flex flex-col items-center gap-3">
+			<p class="text-muted-foreground">Couldn't load this room.</p>
+			<div class="flex gap-2">
+				<Button onclick={() => location.reload()}>Retry</Button>
+				<Button variant="outline" href="/play?game=tictactoe">Back to play</Button>
+			</div>
+		</div>
 	{:else if data === null}
 		<div class="flex flex-col items-center gap-3">
 			<p class="text-muted-foreground">Room "{roomCode}" doesn't exist.</p>
@@ -291,101 +326,106 @@
 			<Button variant="outline" href="/play?game=tictactoe">Back to play</Button>
 		</div>
 	{:else if data}
-		<div class="relative">
-			{#if room.isViewingHistory}
-				<!-- top-18: 0.5rem into the board area, below the h-14 strip and its gap-2. -->
-				<div
-					class="pointer-events-none absolute inset-x-0 top-18 z-20 flex justify-center"
-					transition:fade={{ duration: 150 }}
-				>
-					<div
-						class="pointer-events-auto flex items-center gap-2 rounded-full border bg-background/90 px-3 py-1 text-xs whitespace-nowrap shadow-sm backdrop-blur-sm"
-					>
-						<span class="tabular-nums text-muted-foreground">
-							Move {room.viewedMoveNumber} of {room.historyLength}
-						</span>
-						<button
-							type="button"
-							class="rounded-sm font-semibold text-primary outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
-							onclick={() => room.jumpToLatest()}
-						>
-							Return to live
-						</button>
-					</div>
-				</div>
-			{/if}
-			<Board
-				players={[
-					{
-						label: room.players[0] ? firstName(room.players[0].name) : "Player 1",
-						emoji: room.players[0]?.emoji ?? DEFAULT_EMOJI,
-						accent: ACCENTS[0].text,
-						score: room.players[0]?.score ?? 0,
-						mark: markOf(0)
-					},
-					{
-						label: room.players[1] ? firstName(room.players[1].name) : "Player 2",
-						emoji: room.players[1]?.emoji ?? DEFAULT_EMOJI,
-						accent: ACCENTS[1].text,
-						score: room.players[1]?.score ?? 0,
-						mark: markOf(1)
-					}
-				]}
-				{status}
-				clock={room.clock}
-				myIndex={room.myIndex}
-				opponentDisconnected={room.opponentDisconnected}
-				onTrashtalk={(emoji) => room.trashtalk(emoji)}
-				markIcon={stripMark}
-				rejectionId={room.rejection?.id}
-				footer={{
-					isLive: room.game.isLive,
-					round: room.game.round,
-					latestRound: room.game.latestRound,
-					onResign: () => room.resign(),
-					onRematch: () => room.rematch(),
-					onAbandon: () => room.abandon(),
-					onPlayAgain: playAgain,
-					roomClosed: room.isRoomClosed,
-					waitingForOpponent: room.isWaitingForOpponent,
-					onGoLive: goLive,
-					onGoToRound: goToRound,
-					error: room.error
-				}}
+		<Board
+			players={[
+				{
+					label: room.players[0] ? firstName(room.players[0].name) : "Player 1",
+					emoji: room.players[0]?.emoji ?? DEFAULT_EMOJI,
+					accent: ACCENTS[0].text,
+					score: room.players[0]?.score ?? 0,
+					mark: markOf(0)
+				},
+				{
+					label: room.players[1] ? firstName(room.players[1].name) : "Player 2",
+					emoji: room.players[1]?.emoji ?? DEFAULT_EMOJI,
+					accent: ACCENTS[1].text,
+					score: room.players[1]?.score ?? 0,
+					mark: markOf(1)
+				}
+			]}
+			{status}
+			room={{
+				type: "tictactoe",
+				name: GAMES.tictactoe.name,
+				code: data.code,
+				icon: GAMES.tictactoe.icon
+			}}
+			replay={{
+				isViewingHistory: room.isViewingHistory,
+				moveNumber: room.viewedMoveNumber,
+				moveCount: room.historyLength,
+				canStepBack: room.viewedMoveNumber > 1,
+				canStepForward: room.isViewingHistory,
+				onFirst: () => room.jumpToFirst(),
+				onBack: () => room.stepBack(),
+				onForward: () => room.stepForward(),
+				onLive: () => room.jumpToLatest()
+			}}
+			rounds={room.rounds}
+			{rules}
+			clock={room.clock}
+			myIndex={room.myIndex}
+			opponentDisconnected={room.opponentDisconnected}
+			onTrashtalk={(emoji) => room.trashtalk(emoji)}
+			markIcon={stripMark}
+			rejectionId={room.rejection?.id}
+			footer={{
+				isLive: room.game.isLive,
+				round: room.game.round,
+				latestRound: room.game.latestRound,
+				onResign: () => room.resign(),
+				onRematch: () => room.rematch(),
+				onAbandon: () => room.abandon(),
+				onPlayAgain: playAgain,
+				onNewOpponent: newOpponent,
+				onLobby: () => goto(resolve("/lobby")),
+				roomClosed: room.isRoomClosed,
+				waitingForOpponent: room.isWaitingForOpponent,
+				onGoLive: goLive,
+				onGoToRound: goToRound,
+				error: room.error
+			}}
+		>
+			<Cursor
+				{roomCode}
+				class="size-full"
+				colorFor={(index) => ACCENTS[index]?.text ?? "text-muted-foreground"}
 			>
-				<Cursor
-					{roomCode}
-					class="size-full"
-					colorFor={(index) => ACCENTS[index]?.text ?? "text-muted-foreground"}
+				<!-- Arrow keys arrive from the focused square; the group moves focus between them. -->
+				<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+				<div
+					role="group"
+					aria-label="Tic-tac-toe board"
+					data-board-grid
+					class="grid size-full grid-cols-3 grid-rows-3 gap-3"
+					onkeydown={moveFocus}
 				>
-					<div class="grid size-full grid-cols-3 grid-rows-3 gap-3">
-						{#each room.boards as cells, boardIndex (boardIndex)}
-							{@render miniBoard(cells, boardIndex)}
-						{/each}
-					</div>
-					{#if room.winningLine}
-						{@const [a, , c] = room.winningLine}
-						<svg
-							viewBox="0 0 3 3"
-							class={cn(
-								"pointer-events-none absolute inset-0 h-full w-full",
-								ACCENTS[playerIndexOf(room.winner ?? "O")].text
-							)}
-						>
-							<line
-								x1={(a % 3) + 0.5}
-								y1={Math.floor(a / 3) + 0.5}
-								x2={(c % 3) + 0.5}
-								y2={Math.floor(c / 3) + 0.5}
-								stroke="currentColor"
-								stroke-width="0.08"
-								stroke-linecap="round"
-								in:draw={{ duration: 400 }}
-							/>
-						</svg>
-					{/if}
-				</Cursor>
-			</Board>
-		</div>
+					{#each room.boards as cells, boardIndex (boardIndex)}
+						{@render miniBoard(cells, boardIndex)}
+					{/each}
+				</div>
+				{#if room.winningLine}
+					{@const [a, , c] = room.winningLine}
+					<svg
+						viewBox="0 0 3 3"
+						class={cn(
+							"pointer-events-none absolute inset-0 h-full w-full",
+							ACCENTS[playerIndexOf(room.winner ?? "O")].text
+						)}
+					>
+						<line
+							x1={(a % 3) + 0.5}
+							y1={Math.floor(a / 3) + 0.5}
+							x2={(c % 3) + 0.5}
+							y2={Math.floor(c / 3) + 0.5}
+							stroke="currentColor"
+							stroke-width="0.08"
+							stroke-linecap="round"
+							in:draw={{ duration: 400 }}
+						/>
+					</svg>
+				{/if}
+			</Cursor>
+		</Board>
 	{/if}
 </div>

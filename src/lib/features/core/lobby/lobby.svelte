@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { useMutation, useQuery } from "convex-svelte";
 	import { goto } from "$app/navigation";
-	import { Beacon, Button, Emblem, EmptyState, Playing, Tile } from "$lib/components/ui";
+	import { Beacon, Button, Emblem, Empty, Playing, Gate, Tile } from "$lib/components/ui";
 	import { Feed, FeedSkeleton } from "$lib/components/layout";
 	import { GAMES } from "$lib/features/play";
 	import { getClerkAuth } from "$lib/services/auth";
@@ -33,25 +33,20 @@
 
 <div class="flex min-h-0 w-full flex-1 flex-col items-center gap-3 overflow-hidden">
 	{#if !auth.isSignedIn}
-		<div class="flex shrink-0 flex-col items-center gap-3">
-			<p class="text-sm text-muted-foreground">Sign in to browse open rooms.</p>
-			<Button size="sm" disabled={auth.loadError !== null} onclick={() => auth.signIn()}>
-				Sign in
-			</Button>
-		</div>
+		<Gate message="Sign in to browse open rooms." class="shrink-0" />
 	{:else if rooms.isLoading || activeRoom.isLoading}
-		<FeedSkeleton />
+		<FeedSkeleton data-loading="lobby" />
 	{:else if rooms.error}
 		<p class="shrink-0 text-sm text-destructive">Could not load open rooms.</p>
 	{:else}
 		{#if !rooms.data?.length}
-			<EmptyState
-				title="No open rooms"
+			<Empty
+				title="No open rooms right now"
 				description="Public rooms you can join show up here."
 				class="shrink-0"
 			/>
 		{:else}
-			<Feed>
+			<Feed data-loaded="lobby">
 				<ul class="flex flex-col gap-2 py-1">
 					{#each rooms.data as room (room.code)}
 						<Tile highlighted={room.isOwn}>
@@ -73,14 +68,17 @@
 								</span>
 							{/snippet}
 							{#snippet subtitle()}
-								<span class="text-caption text-muted-foreground">
-									Hosted by {room.isOwn ? "you" : (room.hostName ?? "someone")} · {room.timeControlMs /
-										60_000} min
+								<span class="flex min-w-0 items-center gap-1 text-caption text-muted-foreground">
+									<span class="truncate">
+										Hosted by {room.isOwn ? "you" : (room.hostName ?? "someone")}
+									</span>
+									<span aria-hidden="true">·</span>
+									<span class="whitespace-nowrap">{room.timeControlMs / 60_000} min</span>
 								</span>
 							{/snippet}
 							{#snippet trailing()}
 								{#if room.isOwn}
-									<Button href="/{room.type}/{room.code}" variant="outline" size="xs">View</Button>
+									<span class="text-caption whitespace-nowrap text-muted-foreground">Waiting</span>
 								{:else}
 									<Button
 										size="xs"
@@ -99,7 +97,7 @@
 
 		<!-- Below the feed, so a room started elsewhere shrinks the feed instead of pushing it down. -->
 		{#if activeRoom.data}
-			<Playing code={activeRoom.data.code} type={activeRoom.data.type} class="max-w-md shrink-0" />
+			<Playing code={activeRoom.data.code} type={activeRoom.data.type} class="max-w-2xl shrink-0" />
 		{/if}
 	{/if}
 

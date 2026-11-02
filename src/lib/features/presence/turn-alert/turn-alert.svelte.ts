@@ -8,7 +8,7 @@ type AlertDocument = EventTarget & { title: string; readonly hidden: boolean };
 type TurnAlertDeps = {
 	document: AlertDocument;
 	playChime: () => void;
-	preferences: Pick<Preferences, "sound">;
+	preferences: Pick<Preferences, "sound" | "turnAlert">;
 };
 
 /** `previous === null` is the first observation, so a room that loads on your turn stays quiet. */
@@ -17,7 +17,8 @@ export function shouldAlert(previous: boolean | null, next: boolean, isHidden: b
 }
 
 /**
- * Flashes the tab title, and chimes if sound is on, when the viewer's turn arrives in a hidden tab.
+ * Flashes the tab title, and chimes if sound is on, when the viewer's turn arrives in a hidden tab
+ * and the turn alert preference is on.
  * `getIsMyTurn` returns `null` while the turn is unknown (the room is loading); those reads are skipped.
  */
 export class TurnAlert {
@@ -42,7 +43,7 @@ export class TurnAlert {
 			const doc = getDocument();
 			const isMyTurn = getIsMyTurn();
 			if (isMyTurn === null) return;
-			if (shouldAlert(previous, isMyTurn, doc.hidden)) {
+			if (preferences.turnAlert && shouldAlert(previous, isMyTurn, doc.hidden)) {
 				const original = doc.title;
 				const alertTitle = `Your turn · ${original}`;
 				originalTitle = original;

@@ -2,7 +2,7 @@ import { render } from "@testing-library/svelte";
 import { describe, expect, test } from "vitest";
 import { Skeleton } from "./index.js";
 
-function renderSkeleton(props: { class?: string } = {}) {
+function renderSkeleton(props: { class?: string; variant?: "block" | "text" } = {}) {
 	const { container } = render(Skeleton, { props });
 	return container.querySelector("[data-slot=skeleton]");
 }
@@ -20,5 +20,13 @@ describe("Skeleton", () => {
 
 	test("takes its size from the caller's class", () => {
 		expect(renderSkeleton({ class: "h-4 w-24" })).toHaveClass("h-4", "w-24");
+	});
+
+	test("the text variant keeps the line box and paints a thinner bar inside it", () => {
+		expect(renderSkeleton({ variant: "text", class: "h-4 w-24" })).toHaveClass(
+			"h-4",
+			"py-0.5",
+			"bg-clip-content"
+		);
 	});
 });

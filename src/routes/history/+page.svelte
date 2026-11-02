@@ -9,7 +9,7 @@
 <Page
 	title="History"
 	description="Your finished games and results."
-	titleClass="w-full max-w-md shrink-0"
+	titleClass="w-full max-w-2xl shrink-0"
 	class="min-h-0 items-center gap-3"
 >
 	<History />

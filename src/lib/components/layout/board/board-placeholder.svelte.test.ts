@@ -15,21 +15,27 @@ describe("BoardPlaceholder", () => {
 		expect(area).toHaveClass("aspect-square", "w-(--board-size)");
 	});
 
-	test("reserves a strip slot above and below the board area, then the round controls", () => {
+	test("reserves the room bar, a strip slot above and below the board area, then the round controls and notice line", () => {
 		const { container } = render(BoardPlaceholder);
 		const area = screen.getByRole("status").parentElement!;
 		const column = area.parentElement!;
-		const [upper, board, lower, footer] = column.children;
-		expect(column.children).toHaveLength(4);
+		const [roomBar, upper, board, lower, footer] = column.children;
+		expect(column.children).toHaveLength(5);
+		expect(roomBar).toHaveAttribute("data-slot", "room-bar");
 		expect(board).toBe(area);
 		for (const strip of [upper, lower]) expect(strip).toHaveClass("h-14", "w-(--board-size)");
 		expect(footer).toHaveAttribute("data-slot", "footer");
-		const [controls, round, error] = footer.children;
-		expect(footer.children).toHaveLength(3);
+		const [controls, notice] = footer.children;
+		expect(footer.children).toHaveLength(2);
 		expect(controls).toHaveClass("h-8");
-		expect(round).toHaveClass("h-4");
-		expect(error).toHaveClass("h-5");
+		expect(notice).toHaveClass("h-5");
 		expect(container.querySelector(".size-10")).not.toBeInTheDocument();
+	});
+
+	test("reserves the side panel's box beside the board column", () => {
+		render(BoardPlaceholder);
+		const column = screen.getByRole("status").parentElement!.parentElement!;
+		expect(column.nextElementSibling).toHaveAttribute("data-slot", "side-panel");
 	});
 
 	test("the board area takes BOARD_SIZE", () => {

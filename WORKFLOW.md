@@ -62,7 +62,7 @@ See `.agents/commands/dev/work.md`.
 
 ## Verify (step 7)
 
-Each phase is one or more agent calls in order. Agents in the same phase run in parallel. Work is split across them, never given to one agent whole. Layout shift for signed-out pages: `node .agents/scripts/layout-shift.mjs` (needs a running server; `BASE=` selects it).
+Each phase is one or more agent calls in order. Agents in the same phase run in parallel. Work is split across them, never given to one agent whole. Layout shift for signed-out pages: `node .agents/scripts/layout-shift.mjs --hover --overflow` (needs a running server; `BASE=` selects it). `--hover` also fails when hovering any control moves or resizes its neighbors; `--overflow` fails when a box pokes past its frame or a demo frame's content is off center.
 
 | Phase           | Agent                                        | Rule                                                                                                              |
 | --------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |

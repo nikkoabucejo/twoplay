@@ -1,0 +1,3 @@
+- PLAN done
+- QA fail: Convex backend stale (no `convex dev`), rematch rejects `round` arg; ring/dim, arrows, replay, resign confirm, result card pass; settlement/rating not shown
+- QA rerun: result card rating line, rematch race, checkers 'You must capture' in mover's strip pass; Spectating pill unverified (isolated context is signed out → sign-in prompt). 6.6 left open

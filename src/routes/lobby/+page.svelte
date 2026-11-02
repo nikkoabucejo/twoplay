@@ -9,7 +9,7 @@
 <Page
 	title="Lobby"
 	description="Public rooms waiting for a player."
-	titleClass="w-full max-w-md shrink-0"
+	titleClass="w-full max-w-2xl shrink-0"
 	class="min-h-0 items-center gap-3"
 >
 	<Lobby />

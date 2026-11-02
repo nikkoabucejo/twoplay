@@ -1,0 +1,2 @@
+- PLAN done
+- QA: /play compact centered card at 1280/360, selected ring + dark fill, fainter hover ring, ?game=checkers preselect, queue mm:ss + Cancel, Create room → Copy link toast → Cancel room, no overflow/h-scroll, load CLS ≈0.0002: pass. After a reload mid-queue the queue persists and the timer restarts at 00:00. 4.6 left open (arrows, friend-instead, tab close, reload card, remembered choices, reduced motion)

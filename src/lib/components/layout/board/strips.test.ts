@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { BoardStatus } from "./board.svelte";
-import { ringSeat, stripLine, stripSeats, type StripLine } from "./strips.js";
+import { stripLine, stripSeats, type StripLine } from "./strips.js";
 
 describe("stripSeats", () => {
 	test.each([
@@ -34,19 +34,29 @@ describe("stripLine", () => {
 	test.each(cases)("%s", (_, status, seat, myIndex, expected) => {
 		expect(stripLine(status, seat, myIndex)).toBe(expected);
 	});
-});
 
-describe("ringSeat", () => {
-	const cases: [BoardStatus, 0 | 1 | null][] = [
-		[{ type: "turn", player: 0 }, 0],
-		[{ type: "turn", player: 1 }, 1],
-		[{ type: "winner", player: 0 }, null],
-		[{ type: "draw" }, null],
-		[{ type: "waiting" }, null],
-		[{ type: "waiting", closed: true }, null]
-	];
+	test("a forced capture on the viewer's turn reads must-capture on the viewer's strip", () => {
+		expect(stripLine({ type: "turn", player: 0 }, 0, 0, true)).toBe("must-capture");
+	});
 
-	test.each(cases)("%o", (status, expected) => {
-		expect(ringSeat(status)).toBe(expected);
+	test("a forced capture leaves the opponent's strip on its score", () => {
+		expect(stripLine({ type: "turn", player: 0 }, 1, 0, true)).toBe("score");
+	});
+
+	test("a forced capture on the opponent's turn reads to-move", () => {
+		expect(stripLine({ type: "turn", player: 1 }, 1, 0, true)).toBe("to-move");
+	});
+
+	test("a spectator sees to-move on a forced capture", () => {
+		expect(stripLine({ type: "turn", player: 0 }, 0, null, true)).toBe("to-move");
+	});
+
+	test("a quiet player's strip reads reconnecting during play", () => {
+		expect(stripLine({ type: "turn", player: 1 }, 1, 0, false, true)).toBe("reconnecting");
+		expect(stripLine({ type: "turn", player: 0 }, 1, 0, false, true)).toBe("reconnecting");
+	});
+
+	test("a finished round keeps its result over reconnecting", () => {
+		expect(stripLine({ type: "winner", player: 0 }, 1, 0, false, true)).toBe("lost");
 	});
 });

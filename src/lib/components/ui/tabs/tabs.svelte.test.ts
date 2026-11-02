@@ -33,6 +33,16 @@ describe("Tabs", () => {
 		}
 	});
 
+	test("the checked item carries the selected ring, the others the hover ring", () => {
+		render(Tabs, { props: { items, value: "checkers", onValueChange: vi.fn() } });
+		expect(option("Checkers")).toHaveClass("selected-ring", "z-10");
+		expect(option("Checkers")).not.toHaveClass("hover-ring", "bg-primary");
+		for (const name of ["Tic-Tac-Toe", "Chess"]) {
+			expect(option(name)).toHaveClass("hover-ring");
+			expect(option(name)).not.toHaveClass("selected-ring");
+		}
+	});
+
 	test("reports the clicked item's value", async () => {
 		const onValueChange = vi.fn();
 		render(Tabs, { props: { items, value: "tictactoe", onValueChange } });

@@ -19,7 +19,7 @@ src/
     assets/icons/brand/   # third-party marks (KofiIcon)
     components/           # container — no barrel
       ui/                 # shadcn primitives + generic atoms (Emoji, Sparkle, Emblem, Tile, Playing,
-                          #   Skeleton, EmptyState, Toaster/ToastRegion, Banner, Link, Meta…)
+                          #   Skeleton, Empty, Toaster/ToastRegion, Banner, Link, Meta…)
       layout/             # page regions only: board, dock, feed, footer, header, page
     utils/                # container — no barrel
       style/              # cn, tv, ACCENTS, SEAT_COLORS

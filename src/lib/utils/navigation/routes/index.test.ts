@@ -1,5 +1,12 @@
 import { describe, expect, test } from "vitest";
-import { NAV_ITEMS, isCurrentPath, isGameRoomRoute, liveGameHref, showsDock } from "./index.js";
+import {
+	NAV_ITEMS,
+	isCurrentPath,
+	isGameRoomRoute,
+	isGatedRoute,
+	liveGameHref,
+	showsDock
+} from "./index.js";
 
 describe("isGameRoomRoute", () => {
 	test("is true for routes with a room code segment", () => {
@@ -11,6 +18,34 @@ describe("isGameRoomRoute", () => {
 		expect(isGameRoomRoute("/(games)")).toBe(false);
 		expect(isGameRoomRoute("/play")).toBe(false);
 		expect(isGameRoomRoute(null)).toBe(false);
+	});
+});
+
+describe("isGatedRoute", () => {
+	test.each([
+		"/(games)/tictactoe/[code]/[[round]]",
+		"/(games)/checkers/[code]/[[round]]",
+		"/play",
+		"/lobby",
+		"/history",
+		"/leaderboard",
+		"/me"
+	])("%s is gated", (routeId) => {
+		expect(isGatedRoute(routeId)).toBe(true);
+	});
+
+	test.each([
+		"/(games)",
+		"/how-to-play",
+		"/how-to-play/[game]",
+		"/tour",
+		"/about",
+		"/privacy",
+		"/terms",
+		"/settings",
+		null
+	])("%s is not gated", (routeId) => {
+		expect(isGatedRoute(routeId)).toBe(false);
 	});
 });
 

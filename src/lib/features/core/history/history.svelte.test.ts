@@ -1,6 +1,6 @@
-import { render, screen } from "@testing-library/svelte";
+import { render, screen, within } from "@testing-library/svelte";
 import { tick } from "svelte";
-import { beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { api } from "../../../../../convex/_generated/api.js";
 import { tictactoeEngine } from "../../../../../convex/models/games/tictactoe/index.js";
 import type { RoomHistoryEntry } from "../../../../../convex/models/rooms/index.js";
@@ -23,12 +23,16 @@ vi.mock("$lib/services/auth", async (importOriginal) => ({
 	getClerkAuth: () => context.auth
 }));
 
+const NOW = new Date(2026, 9, 30, 15, 0).getTime();
+const TODAY = new Date(2026, 9, 30, 10, 0).getTime();
+const YESTERDAY = new Date(2026, 9, 29, 10, 0).getTime();
+
 const PAST_ROOM: RoomHistoryEntry = {
 	code: "WXYZ",
 	type: "tictactoe",
 	status: "closed",
 	opponentName: "Bob Baker",
-	games: [{ round: 1, createdAt: 1, result: "win", mmr: 12 }]
+	games: [{ round: 1, createdAt: YESTERDAY + 2, result: "win", mmr: 8 }]
 };
 
 // Keeps lottie-web inert, as in playing.svelte.test.ts: it paints a 1x1 canvas on load, then fetches JSON.
@@ -54,10 +58,16 @@ beforeAll(async () => {
 });
 
 beforeEach(() => {
+	vi.useFakeTimers({ toFake: ["Date"] });
+	vi.setSystemTime(NOW);
 	resetConvex();
 	context.auth = new ClerkAuth();
 	context.auth.hydrate({ id: "user_ada", email: null, name: "Ada", imageUrl: null });
 	setQueryResult(api.models.rooms.index.get, roomSnapshot(tictactoeEngine.createInitialState()));
+});
+
+afterEach(() => {
+	vi.useRealTimers();
 });
 
 const OTHER_ROOM: RoomHistoryEntry = {
@@ -65,7 +75,7 @@ const OTHER_ROOM: RoomHistoryEntry = {
 	type: "checkers",
 	status: "closed",
 	opponentName: "Cy Cole",
-	games: [{ round: 1, createdAt: 2, result: "loss", mmr: -9 }]
+	games: [{ round: 1, createdAt: YESTERDAY + 1, result: "loss", mmr: -8 }]
 };
 
 const ACTIVE_ROOM: RoomHistoryEntry = {
@@ -73,15 +83,18 @@ const ACTIVE_ROOM: RoomHistoryEntry = {
 	type: "tictactoe",
 	status: "active",
 	opponentName: "Dee Dunn",
-	games: [{ round: 1, createdAt: 3, result: "playing", mmr: null }]
+	games: [{ round: 1, createdAt: TODAY, result: "playing", mmr: null }]
 };
 
+/** The opponent of each finished round on the page, in page order, read from its Replay link. */
 function rows() {
-	return screen.queryAllByText(/^You vs /);
+	return screen
+		.queryAllByRole("link", { name: /^Replay / })
+		.map((link) => link.getAttribute("aria-label")?.match(/ vs (.+), room /)?.[1]);
 }
 
 function playingCard() {
-	return screen.queryByRole("link", { name: "Play" });
+	return screen.queryByRole("button", { name: "Abandon" });
 }
 
 describe("History", () => {
@@ -97,7 +110,7 @@ describe("History", () => {
 		render(History);
 		expect(screen.getByRole("status")).toHaveTextContent("Loading");
 		expect(playingCard()).not.toBeInTheDocument();
-		expect(screen.queryByText("You vs Bob Baker")).not.toBeInTheDocument();
+		expect(screen.queryByText("Bob Baker")).not.toBeInTheDocument();
 	});
 
 	test("shows the active room and the history together once both load", () => {
@@ -106,21 +119,21 @@ describe("History", () => {
 		render(History);
 		expect(screen.queryByRole("status")).not.toBeInTheDocument();
 		expect(playingCard()).toBeInTheDocument();
-		expect(screen.getByText("You vs Bob Baker")).toBeInTheDocument();
+		expect(screen.getByText("Bob Baker")).toBeInTheDocument();
 	});
 
 	test("puts the active room after the feed, so its arrival never pushes the list down", () => {
 		setQueryResult(api.models.rooms.index.history, [PAST_ROOM]);
 		setQueryResult(api.models.rooms.index.active, { code: "ABCD", type: "tictactoe" });
 		render(History);
-		const list = screen.getByText("You vs Bob Baker");
+		const list = screen.getByText("Bob Baker");
 		const card = playingCard();
 		expect(card?.compareDocumentPosition(list)).toBe(Node.DOCUMENT_POSITION_PRECEDING);
 	});
 
 	test("an in-progress game only pulses when motion is allowed", () => {
 		setQueryResult(api.models.rooms.index.history, [
-			{ ...PAST_ROOM, games: [{ round: 1, createdAt: 1, result: "playing", mmr: null }] }
+			{ ...PAST_ROOM, games: [{ round: 1, createdAt: TODAY, result: "playing", mmr: null }] }
 		]);
 		setQueryResult(api.models.rooms.index.active, null);
 		render(History);
@@ -133,10 +146,7 @@ describe("History", () => {
 		setQueryResult(api.models.rooms.index.history, [ACTIVE_ROOM, PAST_ROOM, OTHER_ROOM]);
 		setQueryResult(api.models.rooms.index.active, { code: "ABCD", type: "tictactoe" });
 		render(History);
-		expect(rows().map((row) => row.textContent?.trim())).toEqual([
-			"You vs Bob Baker",
-			"You vs Cy Cole"
-		]);
+		expect(rows()).toEqual(["Bob Baker", "Cy Cole"]);
 		expect(playingCard()).toBeInTheDocument();
 	});
 
@@ -174,7 +184,7 @@ describe("History", () => {
 			{
 				...ACTIVE_ROOM,
 				status: "closed",
-				games: [{ round: 1, createdAt: 3, result: "win", mmr: 10 }]
+				games: [{ round: 1, createdAt: TODAY, result: "win", mmr: 8 }]
 			},
 			PAST_ROOM,
 			OTHER_ROOM
@@ -183,11 +193,7 @@ describe("History", () => {
 		await tick();
 
 		expect(playingCard()).not.toBeInTheDocument();
-		expect(rows().map((row) => row.textContent?.trim())).toEqual([
-			"You vs Bob Baker",
-			"You vs Cy Cole",
-			"You vs Dee Dunn"
-		]);
+		expect(rows()).toEqual(["Bob Baker", "Cy Cole", "Dee Dunn"]);
 	});
 
 	test("with only the active room, its finishing keeps the room and shows no empty state", async () => {
@@ -200,14 +206,14 @@ describe("History", () => {
 			{
 				...ACTIVE_ROOM,
 				status: "closed",
-				games: [{ round: 1, createdAt: 3, result: "win", mmr: 10 }]
+				games: [{ round: 1, createdAt: TODAY, result: "win", mmr: 8 }]
 			}
 		]);
 		setQueryResult(api.models.rooms.index.active, null);
 		await tick();
 
 		expect(screen.queryByText("No games yet")).not.toBeInTheDocument();
-		expect(rows().map((row) => row.textContent?.trim())).toEqual(["You vs Dee Dunn"]);
+		expect(rows()).toEqual(["Dee Dunn"]);
 	});
 
 	test("a second game started in the same visit puts its Playing card above the held room", async () => {
@@ -222,28 +228,132 @@ describe("History", () => {
 			{
 				...ACTIVE_ROOM,
 				status: "closed",
-				games: [{ round: 1, createdAt: 3, result: "win", mmr: 10 }]
+				games: [{ round: 1, createdAt: TODAY, result: "win", mmr: 8 }]
 			},
 			PAST_ROOM
 		]);
 		setQueryResult(api.models.rooms.index.active, { code: "JKLM", type: "tictactoe" });
 		await tick();
 
-		const held = screen.getByText("You vs Dee Dunn");
+		const held = screen.getByText("Dee Dunn");
 		expect(playingCard()?.compareDocumentPosition(held)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-		expect(screen.queryByText("You vs Eve Ek")).not.toBeInTheDocument();
+		expect(screen.queryByText("Eve Ek")).not.toBeInTheDocument();
 	});
 
-	test("Sign in is disabled when the auth client failed to load", () => {
-		context.auth!.hydrate(null);
-		context.auth!.loadError = "Failed to load @clerk/ui bundle";
+	test("lists one row per round under its day, newest first", () => {
+		setQueryResult(api.models.rooms.index.history, [
+			{
+				...PAST_ROOM,
+				games: [
+					{ round: 2, createdAt: TODAY, result: "win", mmr: 8 },
+					{ round: 1, createdAt: YESTERDAY + 2, result: "win", mmr: 8 }
+				]
+			},
+			OTHER_ROOM
+		]);
+		setQueryResult(api.models.rooms.index.active, null);
 		render(History);
-		expect(screen.getByRole("button", { name: "Sign in" })).toBeDisabled();
+		const headings = screen.getAllByRole("heading", { level: 2 });
+		expect(headings.map((heading) => heading.textContent)).toEqual(["Today", "Yesterday"]);
+		const today = within(headings[0].closest("section")!);
+		const yesterday = within(headings[1].closest("section")!);
+		expect(today.getAllByRole("listitem")).toHaveLength(1);
+		expect(yesterday.getAllByRole("listitem")).toHaveLength(2);
+		expect(today.getByText("Round 2")).toBeInTheDocument();
 	});
 
-	test("Sign in is enabled while signed out", () => {
+	test("a won round shows the game, the opponent, the round, a W badge, and the gain", () => {
+		setQueryResult(api.models.rooms.index.history, [PAST_ROOM]);
+		setQueryResult(api.models.rooms.index.active, null);
+		render(History);
+		const row = within(screen.getByRole("listitem"));
+		expect(row.getByText("Tic-Tac-Toe")).toBeInTheDocument();
+		expect(row.getByText("Bob Baker")).toBeInTheDocument();
+		expect(row.getByText("Round 1")).toBeInTheDocument();
+		expect(row.getByText("W")).toBeInTheDocument();
+		expect(row.getByText("Win")).toBeInTheDocument();
+		expect(row.getByText("+8")).toBeInTheDocument();
+	});
+
+	test("a loss at the rating floor shows 0", () => {
+		setQueryResult(api.models.rooms.index.history, [
+			{ ...PAST_ROOM, games: [{ round: 1, createdAt: TODAY, result: "loss", mmr: 0 }] }
+		]);
+		setQueryResult(api.models.rooms.index.active, null);
+		render(History);
+		expect(screen.getByText("0")).toBeInTheDocument();
+		expect(screen.queryByText(/[-\u2212]0/)).not.toBeInTheDocument();
+	});
+
+	test("a round without a rating change keeps its slot with a dash", () => {
+		setQueryResult(api.models.rooms.index.history, [
+			{ ...PAST_ROOM, games: [{ round: 1, createdAt: TODAY, result: "draw", mmr: null }] }
+		]);
+		setQueryResult(api.models.rooms.index.active, null);
+		render(History);
+		expect(within(screen.getByRole("listitem")).getByText("—")).toBeInTheDocument();
+	});
+
+	test("a room whose second seat never filled shows Waiting for an opponent", () => {
+		setQueryResult(api.models.rooms.index.history, [{ ...PAST_ROOM, opponentName: null }]);
+		setQueryResult(api.models.rooms.index.active, null);
+		render(History);
+		expect(screen.getByText("Waiting for an opponent")).toBeInTheDocument();
+	});
+
+	test("each round's Replay link has its own name and links to that round", () => {
+		setQueryResult(api.models.rooms.index.history, [
+			{
+				...PAST_ROOM,
+				games: [
+					{ round: 2, createdAt: TODAY, result: "win", mmr: 8 },
+					{ round: 1, createdAt: YESTERDAY, result: "loss", mmr: -8 }
+				]
+			}
+		]);
+		setQueryResult(api.models.rooms.index.active, null);
+		render(History);
+		expect(
+			screen.getByRole("link", { name: "Replay Tic-Tac-Toe round 2 vs Bob Baker, room WXYZ" })
+		).toHaveAttribute("href", "/tictactoe/WXYZ/2");
+		expect(
+			screen.getByRole("link", { name: "Replay Tic-Tac-Toe round 1 vs Bob Baker, room WXYZ" })
+		).toHaveAttribute("href", "/tictactoe/WXYZ/1");
+	});
+
+	test("shows the end reason when the entry has one", () => {
+		const room = {
+			...PAST_ROOM,
+			games: [
+				{ round: 1, createdAt: TODAY, result: "loss" as const, mmr: -8, reason: "timeout" as const }
+			]
+		};
+		setQueryResult(api.models.rooms.index.history, [room]);
+		setQueryResult(api.models.rooms.index.active, null);
+		render(History);
+		expect(screen.getByText("Timeout")).toBeInTheDocument();
+	});
+
+	test("shows no reason text for an entry without one", () => {
+		setQueryResult(api.models.rooms.index.history, [PAST_ROOM]);
+		setQueryResult(api.models.rooms.index.active, null);
+		render(History);
+		const row = screen.getByRole("listitem");
+		expect(row).not.toHaveTextContent(/Timeout|Resigned|Abandoned|undefined|null/);
+	});
+
+	test("with no games, says so and leaves new games to the Play nav", () => {
+		setQueryResult(api.models.rooms.index.history, []);
+		setQueryResult(api.models.rooms.index.active, null);
+		render(History);
+		expect(screen.getByText("No games yet")).toBeInTheDocument();
+		expect(screen.queryByRole("link")).not.toBeInTheDocument();
+	});
+
+	test("signed out, asks to sign in with a Sign in button", () => {
 		context.auth!.hydrate(null);
 		render(History);
+		expect(screen.getByText("Sign in to see your games.")).toBeInTheDocument();
 		expect(screen.getByRole("button", { name: "Sign in" })).toBeEnabled();
 	});
 });

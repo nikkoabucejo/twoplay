@@ -19,8 +19,8 @@
 		base: "focus-visible:border-ring focus-visible:ring-ring/50 flex-1 px-3 py-1.5 font-medium outline-none transition-colors first:rounded-l-md last:rounded-r-md focus-visible:relative focus-visible:z-10 focus-visible:ring-3",
 		variants: {
 			active: {
-				true: "bg-primary text-primary-foreground",
-				false: "text-muted-foreground hover:bg-muted"
+				true: "selected-ring z-10 bg-foreground/6 text-foreground",
+				false: "hover-ring text-muted-foreground hover:bg-foreground/3"
 			},
 			disabled: {
 				true: "",

@@ -10,18 +10,28 @@ import type { GameState } from "../../../../../convex/models/games/index.js";
 type MutationMock = Mock<(args: Record<string, unknown>) => Promise<unknown>>;
 
 const results = new SvelteMap<string, unknown>();
+const errors = new SvelteMap<string, Error>();
 const mutations = new Map<string, MutationMock>();
 
-export function useQuery(query: FunctionReference<"query">) {
+type QueryArgs = Record<string, unknown> | "skip";
+
+/** Like the real `useQuery`, a `"skip"` query has no data and isn't loading. */
+export function useQuery(
+	query: FunctionReference<"query">,
+	args: QueryArgs | (() => QueryArgs) = {}
+) {
 	const name = getFunctionName(query);
+	const isSkipped = () => (typeof args === "function" ? args() : args) === "skip";
 	return {
 		get data() {
-			return results.get(name);
+			return isSkipped() ? undefined : results.get(name);
 		},
 		get isLoading() {
-			return results.get(name) === undefined;
+			return !isSkipped() && !errors.has(name) && results.get(name) === undefined;
 		},
-		error: undefined,
+		get error() {
+			return isSkipped() ? undefined : errors.get(name);
+		},
 		isStale: false
 	};
 }
@@ -36,6 +46,11 @@ export function setQueryResult<Query extends FunctionReference<"query">>(
 	value: FunctionReturnType<Query> | undefined
 ) {
 	results.set(getFunctionName(query), value);
+}
+
+/** Makes every `useQuery` subscribed to `query` report `error`, as a failed subscription does. */
+export function setQueryError(query: FunctionReference<"query">, error: Error) {
+	errors.set(getFunctionName(query), error);
 }
 
 /** The shared mock behind every `useMutation(mutation)`. Resolves to null unless reconfigured. */
@@ -57,6 +72,7 @@ export function deferred<T>() {
 
 export function resetConvex() {
 	results.clear();
+	errors.clear();
 	mutations.clear();
 }
 

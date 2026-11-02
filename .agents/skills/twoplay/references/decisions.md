@@ -13,6 +13,15 @@ Template:
 **Follow-ups:** <existing code that now violates it, or "—">
 ```
 
+## 2026-11-02 — Rounds settle when they end
+**Decision:** Every path that ends a round (`play`, `resign`, `timeout`, `abandon`, `sweep`) calls
+`settleRound` (`convex/models/games/index.ts`), which credits score and rating once (`games.settledAt`).
+A round with an empty seat, or voided by the idle sweep, is `isNoContest` and stays out of history and stats.
+**Why:** Crediting only on `rematch` left wins uncounted when nobody pressed Rematch, and let a seat
+that never filled turn an abandon into a loss.
+**Supersedes:** crediting in `rematch` and `forfeitRoom`.
+**Follow-ups:** —
+
 ## 2026-11-02 — Room predicts the viewer's moves
 **Decision:** `Room` takes a `ClientEngine` (`applyMove`, `status`) in its constructor and owns
 `activeSeat`; subclasses don't override it. The viewer's moves show as a pending queue in

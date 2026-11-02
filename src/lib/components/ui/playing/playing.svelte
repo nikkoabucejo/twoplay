@@ -17,8 +17,10 @@
 	import { ACCENTS, cn } from "$lib/utils/style";
 	import { DEFAULT_EMOJI } from "../../../../../convex/models/players/index.js";
 	import { Button } from "../button/index.js";
+	import { Confirm } from "../confirm/index.js";
 	import { Emblem } from "../emblem/index.js";
 	import { Emoji } from "../emoji/index.js";
+	import { abandonMessage } from "./abandon.js";
 
 	let { code, type, class: className }: PlayingProps = $props();
 
@@ -29,6 +31,15 @@
 	const room = type === "tictactoe" ? new TictactoeRoom(() => code) : new CheckersRoom(() => code);
 
 	$effect(() => () => room.dispose());
+
+	const opponent = $derived(room.myIndex === null ? null : room.players[1 - room.myIndex]);
+	const confirmMessage = $derived(
+		abandonMessage({
+			round: room.game.round,
+			opponentName: opponent ? firstName(opponent.name) : null,
+			isRoundLive: room.activeSeat !== null
+		})
+	);
 
 	function firstName(name: string) {
 		return name.split(" ")[0];
@@ -47,7 +58,7 @@
 	<div class={cn("flex flex-1 items-center gap-2", index === 1 && "flex-row-reverse text-right")}>
 		<Emoji
 			codepoint={player?.emoji ?? DEFAULT_EMOJI}
-			label={player ? firstName(player.name) : "Waiting for opponent"}
+			label={player ? firstName(player.name) : "Waiting for an opponent"}
 			class="size-7 shrink-0"
 		/>
 		<div class={cn("flex flex-col", index === 1 && "items-end")}>
@@ -72,11 +83,18 @@
 			{GAMES[type].name}
 			<span class="text-muted-foreground">{code}</span>
 		</span>
-		<div class="flex items-center gap-1.5">
-			<Button variant="outline" size="xs" class="text-destructive" onclick={() => room.abandon()}>
-				Abandon
-			</Button>
-			<Button href="/{type}/{code}" size="xs">Play</Button>
+		<div class="flex items-center">
+			<Confirm
+				title="Abandon this room?"
+				description={confirmMessage}
+				confirmLabel="Abandon"
+				onConfirm={() => room.abandon()}
+				align="end"
+			>
+				{#snippet trigger({ props })}
+					<Button {...props} variant="outline" size="xs" class="text-destructive">Abandon</Button>
+				{/snippet}
+			</Confirm>
 		</div>
 	</div>
 

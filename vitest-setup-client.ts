@@ -14,6 +14,10 @@ if (!Element.prototype.animate) {
 	};
 }
 
+if (!Element.prototype.getAnimations) {
+	Element.prototype.getAnimations = () => [];
+}
+
 // jsdom has no matchMedia; svelte/motion's prefersReducedMotion calls it on import.
 if (!window.matchMedia) {
 	window.matchMedia = (query: string) =>

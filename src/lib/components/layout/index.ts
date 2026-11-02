@@ -4,7 +4,14 @@ export {
 	type BoardClock,
 	type BoardFooter,
 	type BoardPlayer,
-	type BoardStatus
+	type BoardStatus,
+	resultView,
+	type ResultAction,
+	type ResultView,
+	roomStatus,
+	rovingStep,
+	scrubCommand,
+	type ScrubCommand
 } from "./board/index.js";
 export { Dock, type DockProps } from "./dock/index.js";
 export { Feed, FeedSkeleton, type FeedProps, type FeedSkeletonProps } from "./feed/index.js";

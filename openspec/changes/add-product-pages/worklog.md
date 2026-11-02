@@ -1,0 +1,2 @@
+- PLAN done
+- PLAN revised: B's #write() for prefs, SEO indexing group, approved edits

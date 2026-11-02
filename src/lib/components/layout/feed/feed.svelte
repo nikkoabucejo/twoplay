@@ -1,8 +1,8 @@
 <script lang="ts" module>
 	import type { Snippet } from "svelte";
+	import type { HTMLAttributes } from "svelte/elements";
 
-	export type FeedProps = {
-		class?: string;
+	export type FeedProps = HTMLAttributes<HTMLDivElement> & {
 		children: Snippet;
 	};
 </script>
@@ -12,7 +12,7 @@
 	import { cn } from "$lib/utils/style";
 	import { feedEdges, type FeedEdges } from "./edges.js";
 
-	let { class: className, children }: FeedProps = $props();
+	let { class: className, children, ...restProps }: FeedProps = $props();
 
 	let edges = $state<FeedEdges>({ top: false, bottom: false });
 
@@ -35,7 +35,7 @@
 	{@attach trackEdges}
 	onscroll={(event) => measure(event.currentTarget)}
 	class={cn(
-		"no-scrollbar min-h-0 w-full max-w-md flex-1 overflow-y-auto",
+		"no-scrollbar min-h-0 w-full max-w-2xl flex-1 overflow-y-auto",
 		edges.top &&
 			edges.bottom &&
 			"mask-[linear-gradient(to_bottom,transparent,black_1.5rem,black_calc(100%_-_1.5rem),transparent)]",
@@ -43,6 +43,7 @@
 		!edges.top && edges.bottom && "mask-[linear-gradient(to_top,transparent,black_1.5rem)]",
 		className
 	)}
+	{...restProps}
 >
 	{@render children()}
 </div>

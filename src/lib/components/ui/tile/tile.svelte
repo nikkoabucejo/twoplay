@@ -38,7 +38,7 @@
 >
 	<div class="flex items-center gap-2">
 		{@render icon()}
-		<div class="flex flex-1 flex-col">
+		<div class="flex min-w-0 flex-1 flex-col">
 			{@render title()}
 			{@render subtitle()}
 		</div>

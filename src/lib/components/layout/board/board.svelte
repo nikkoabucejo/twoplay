@@ -1,9 +1,18 @@
 <script lang="ts" module>
-	/** Width: the room page's `px-3`. Height: the `sm:h-16` header (4rem), the page's `py-4` (2rem),
-	 *  two `h-14` strips (7rem), the controls row `h-8`, round line `h-4`, and error slot `h-5`
-	 *  (4.25rem), and five `gap-2` gaps (2.5rem): 19.75rem. At 360x640 that's min(336px, 324px), so
-	 *  the board is 324px. `BoardPlaceholder` shares it so loading takes the same box. */
-	export const BOARD_SIZE = "min(calc(100vw - 1.5rem), calc(100dvh - 19.75rem), 34rem)";
+	import type { Component } from "svelte";
+	import type { GameType } from "../../../../../convex/models/games/index.js";
+
+	/** Width: the room page's `px-3`. Height: the page chrome around the board, `--board-chrome`
+	 *  (`BOARD_CHROME`). `BoardPlaceholder` shares both so loading takes the same box. */
+	export const BOARD_SIZE =
+		"min(calc(100vw - 1.5rem), calc(100dvh - var(--board-chrome, 20.75rem)), 34rem)";
+
+	/** Below `lg`: the `sm:h-16` header (4rem), the page's `py-4` (2rem), the room bar `h-8` (2rem),
+	 *  two `h-14` strips (7rem), the controls row `h-8` and notice line `h-5` (3.25rem), and five
+	 *  `gap-2` gaps (2.5rem): 20.75rem, so at 360x640 the board is min(336px, 308px) = 308px.
+	 *  From `lg` the room bar and controls move into the side panel, leaving the header, `py-4`, two
+	 *  strips, and two gaps: 14rem, so at 1280x800 the board reaches its 34rem cap. */
+	export const BOARD_CHROME = "[--board-chrome:20.75rem] lg:[--board-chrome:14rem]";
 
 	export type BoardPlayer = {
 		/** Name shown in the player's strip. */
@@ -58,19 +67,21 @@
 		round: number;
 		/** The room's most recent round — 1-indexed. */
 		latestRound: number;
-		/** Forfeits the round in progress in favor of the opponent. Offered as one of two choices in the
-		 *  Resign button's dropdown, alongside `onAbandon`. Only called while `isLive`, the round is
-		 *  still running, and `!roomClosed`. */
+		/** Forfeits the round in progress in favor of the opponent, after a confirmation. Only called
+		 *  while `isLive`, the round is still running, and `!roomClosed`. */
 		onResign: () => void;
-		/** Starts the room's next round. Only called while `isLive` and the round is over. Offered as
-		 *  one of two choices in the Rematch button's dropdown, alongside `onAbandon`. */
+		/** Starts the room's next round in one click. Only called while `isLive` and the round is over. */
 		onRematch: () => void;
-		/** Abandons the room entirely, forfeiting the match and closing the room for good — distinct
-		 *  from `onResign`, which only ends the current round. The other choice in both the Resign and
-		 *  Rematch buttons' dropdowns. Only called while `!roomClosed`. */
+		/** Abandons the room entirely, forfeiting the match and closing the room for good, after a
+		 *  confirmation. Distinct from `onResign`, which only ends the current round. Only called
+		 *  while `!roomClosed`. */
 		onAbandon: () => void;
 		/** Leaves this closed room for a fresh one. Replaces Resign/Rematch once `roomClosed`. */
 		onPlayAgain: () => void;
+		/** Leaves this room for a new opponent. Offered on the result card. */
+		onNewOpponent: () => void;
+		/** Opens the lobby without leaving the room. Offered on the result card. */
+		onLobby: () => void;
 		/** Navigates to the room's current live round. Only called while `!isLive`. */
 		onGoLive: () => void;
 		/** Navigates to a specific past or present round. */
@@ -83,26 +94,51 @@
 		waitingForOpponent?: boolean;
 		error?: string | null;
 	};
+
+	/** What room this is. The game passes its own name and icon. */
+	export type BoardRoom = {
+		type: GameType;
+		name: string;
+		code: string;
+		icon: Component<{ class?: string }>;
+	};
+
+	/** This browser's position in the shown round's moves. Local only. */
+	export type BoardReplay = {
+		isViewingHistory: boolean;
+		/** 1-based move shown, and the round's move count, for the "Move N of M" readout. */
+		moveNumber: number;
+		moveCount: number;
+		canStepBack: boolean;
+		canStepForward: boolean;
+		onFirst: () => void;
+		onBack: () => void;
+		onForward: () => void;
+		onLive: () => void;
+	};
+
+	/** One of the viewer's rounds in this room, for the side panel's list. */
+	export type BoardRound = {
+		round: number;
+		result: "win" | "loss" | "draw" | "playing";
+		/** The viewer's settled rating change, or null until it's known. */
+		mmr: number | null;
+	};
 </script>
 
 <script lang="ts">
-	import { ChevronLeft, ChevronRight } from "@lucide/svelte";
-	import {
-		Button,
-		Dropdown,
-		DropdownContent,
-		DropdownItem,
-		DropdownSeparator,
-		DropdownTrigger,
-		Emoji,
-		Popover,
-		PopoverContent,
-		PopoverTrigger
-	} from "$lib/components/ui";
+	import { Emoji, getToaster, Popover, PopoverContent, PopoverTrigger } from "$lib/components/ui";
 	import { ACCENTS, cn } from "$lib/utils/style";
 	import { untrack, type Snippet } from "svelte";
 	import { getMood } from "$lib/features/presence";
-	import { ringSeat, stripLine, stripSeats, type StripLine } from "./strips.js";
+	import Controls from "./controls.svelte";
+	import InviteCard from "./invite-card.svelte";
+	import { copyRoomLink, roomUrl, shareRoom } from "./invite.js";
+	import { resultView } from "./outcome.js";
+	import ResultCard from "./result-card.svelte";
+	import RoomBar from "./room-bar.svelte";
+	import SidePanel from "./side-panel.svelte";
+	import { stripLine, stripSeats, type StripLine } from "./strips.js";
 
 	let {
 		players,
@@ -116,6 +152,11 @@
 		onTrashtalk,
 		markIcon,
 		rejectionId = null,
+		room,
+		replay,
+		rounds = [],
+		rules,
+		mustCapture = false,
 		children
 	}: {
 		/** The two players, shown in the strips above and below the board. */
@@ -132,7 +173,7 @@
 		/** Which seat the viewer occupies: that strip sits below the board and its emoji becomes
 		 *  clickable. Null/omitted (e.g. spectating) keeps both emoji purely decorative. */
 		myIndex?: 0 | 1 | null;
-		/** True while the opponent's seat has gone quiet — shows a small indicator on their emoji. */
+		/** True while the opponent's seat has gone quiet: their strip reads "Reconnecting…" and dims. */
 		opponentDisconnected?: boolean;
 		/** Called with the chosen codepoint when the viewer picks a new emoji for their own seat. */
 		onTrashtalk?: (emoji: string) => void;
@@ -141,6 +182,16 @@
 		markIcon?: Snippet<[seat: 0 | 1]>;
 		/** Changes to a new value each time the viewer's move is rejected, which shakes the board. */
 		rejectionId?: number | null;
+		/** The room's name, code, and links. Adds the room bar and, at `lg`, the side panel. */
+		room?: BoardRoom;
+		/** Move-by-move replay of the shown round. Adds the replay buttons and the move readout. */
+		replay?: BoardReplay;
+		/** The viewer's rounds in this room, newest first, for the side panel. */
+		rounds?: BoardRound[];
+		/** The game's rules, shown in a popover from the room bar and the side panel. */
+		rules?: Snippet;
+		/** Every legal move on the viewer's live turn is a capture. */
+		mustCapture?: boolean;
 		/** The game itself. Fills the square board area — use `size-full`. */
 		children: Snippet;
 	} = $props();
@@ -159,6 +210,8 @@
 
 	/** Every variant renders stacked in one cell so the line keeps its box when the status changes. */
 	const STRIP_LINES: StripLine[] = [
+		"reconnecting",
+		"must-capture",
 		"your-turn",
 		"to-move",
 		"waiting",
@@ -170,12 +223,64 @@
 	];
 
 	const mood = getMood();
+	const toaster = getToaster();
 
 	const seats = $derived(stripSeats(myIndex));
-	const ringed = $derived(status ? ringSeat(status) : null);
+
+	const result = $derived(
+		footer &&
+			resultView({
+				status,
+				myIndex,
+				players: [
+					{ name: players[0].label, score: players[0].score ?? 0 },
+					{ name: players[1].label, score: players[1].score ?? 0 }
+				],
+				isLive: footer.isLive,
+				isViewingHistory: replay?.isViewingHistory ?? false,
+				isRoomClosed: footer.roomClosed ?? false,
+				mmr: rounds.find((row) => row.round === footer.round)?.mmr ?? null
+			})
+	);
+	/** The round whose result card the viewer hid with "View board" or Escape. */
+	let dismissedRound = $state<number | null>(null);
+	const isResultShown = $derived(!!result && dismissedRound !== footer?.round);
+	/** From `lg` the side panel holds the round controls, so the column is just strips and board. */
+	const hasSidePanel = $derived(!!room && !!footer);
+	/** The seated viewer's opponent while their seat has gone quiet, else null. */
+	const disconnectedSeat = $derived<0 | 1 | null>(
+		myIndex !== null && opponentDisconnected ? (myIndex === 0 ? 1 : 0) : null
+	);
+	const isInviteShown = $derived(
+		!!footer?.isLive && status?.type === "waiting" && !status.closed && !footer.roomClosed
+	);
+	/** Only the seated host's invite card has Copy link. */
+	const isCopyLinkHidden = $derived(!isResultShown && isInviteShown && myIndex !== null);
 
 	let pickerOpen = $state(false);
-	let boardArea: HTMLDivElement;
+	/** Each seat's strip, by seat. The picker opens over the viewer's own. */
+	let strips = $state<HTMLDivElement[]>([]);
+	let boardArea = $state<HTMLDivElement>();
+
+	function dismissResult() {
+		dismissedRound = footer?.round ?? null;
+	}
+
+	function handleKeydown(event: KeyboardEvent) {
+		if (event.key === "Escape" && isResultShown) dismissResult();
+	}
+
+	function copyLink() {
+		if (!room) return;
+		const url = roomUrl(location.origin, room.type, room.code);
+		void copyRoomLink(url, { clipboard: navigator.clipboard, toaster });
+	}
+
+	function share() {
+		if (!room) return;
+		const url = roomUrl(location.origin, room.type, room.code);
+		void shareRoom(url, { share: (data) => navigator.share(data), toaster });
+	}
 
 	function emojiLabel(codepoint: string): string {
 		return EMOJI_OPTIONS.find((option) => option.codepoint === codepoint)?.label ?? "Player emoji";
@@ -186,11 +291,22 @@
 		pickerOpen = false;
 	}
 
+	/** Left and Right step through the picker's emoji, wrapping at the ends. */
+	function moveFocus(event: KeyboardEvent & { currentTarget: HTMLDivElement }) {
+		const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+		if (step === 0) return;
+		const options = [...event.currentTarget.querySelectorAll("button")];
+		const current = options.indexOf(document.activeElement as HTMLButtonElement);
+		options.at((current + step) % options.length)?.focus();
+		event.preventDefault();
+	}
+
 	/** The status as screen readers hear it; the strip lines are hidden from them. */
 	function statusText(status: BoardStatus): string {
 		switch (status.type) {
 			case "turn":
-				return status.player === myIndex ? "Your turn" : `${players[status.player].label}'s turn`;
+				if (status.player !== myIndex) return `${players[status.player].label}'s turn`;
+				return mustCapture ? "Your turn. You must capture." : "Your turn";
 			case "winner":
 				return `${status.player === myIndex ? "You" : players[status.player].label} won`;
 			case "draw":
@@ -202,6 +318,10 @@
 
 	function lineText(line: StripLine, seat: 0 | 1): string {
 		switch (line) {
+			case "reconnecting":
+				return "Reconnecting…";
+			case "must-capture":
+				return "You must capture";
 			case "your-turn":
 				return "Your turn";
 			case "to-move":
@@ -223,6 +343,9 @@
 
 	function lineColor(line: StripLine, seat: 0 | 1): string {
 		switch (line) {
+			case "reconnecting":
+				return "text-amber-500";
+			case "must-capture":
 			case "your-turn":
 			case "to-move":
 				return cn("font-semibold", ACCENTS[seat].text);
@@ -248,7 +371,7 @@
 		if (rejectionId === null || rejectionId === shakenRejectionId) return;
 		shakenRejectionId = rejectionId;
 		if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-		boardArea.animate(SHAKE_KEYFRAMES, { duration: 300, easing: "ease-out" });
+		boardArea?.animate(SHAKE_KEYFRAMES, { duration: 300, easing: "ease-out" });
 	});
 
 	$effect(() => {
@@ -272,16 +395,30 @@
 				class="size-6"
 			/>
 		</PopoverTrigger>
-		<PopoverContent side="top" sideOffset={8} align="start">
-			<div class="flex flex-nowrap items-center gap-1">
+		<!-- Covers the viewer's own strip exactly: anchored to it, pulled up by its height, and sized to
+		     its box. It never flips, so it can't land anywhere else. -->
+		<PopoverContent
+			customAnchor={strips[seat]}
+			side="bottom"
+			sideOffset={-(strips[seat]?.offsetHeight ?? 0)}
+			align="start"
+			avoidCollisions={false}
+			class="flex h-(--bits-popover-anchor-height) w-(--bits-popover-anchor-width) items-center rounded-lg p-2"
+			onkeydown={moveFocus}
+		>
+			<div
+				role="group"
+				aria-label="Trash talk"
+				class="grid flex-1 grid-cols-10 items-center justify-items-center gap-1"
+			>
 				{#each EMOJI_OPTIONS as option (option.codepoint)}
 					<button
 						type="button"
 						aria-label={option.label}
-						class="focus-visible:border-ring focus-visible:ring-ring/50 flex items-center justify-center rounded-md p-1.5 outline-none focus-visible:ring-3 hover:bg-muted"
+						class="hover-ring focus-visible:ring-ring/50 flex aspect-square w-full max-w-9 items-center justify-center rounded-md outline-none transition-colors hover:bg-muted/60 focus-visible:ring-3"
 						onclick={() => selectEmoji(option.codepoint)}
 					>
-						<Emoji codepoint={option.codepoint} label={option.label} class="size-5" />
+						<Emoji codepoint={option.codepoint} label={option.label} class="size-6" />
 					</button>
 				{/each}
 			</div>
@@ -301,14 +438,6 @@
 				label={emojiLabel(players[seat].emoji)}
 				class="size-6"
 			/>
-		{/if}
-		{#if myIndex !== null && myIndex !== seat && opponentDisconnected}
-			<span
-				role="img"
-				class="absolute -top-1 -right-1 size-3 rounded-full bg-destructive ring-2 ring-background"
-				aria-label="Opponent disconnected"
-				title="Opponent disconnected"
-			></span>
 		{/if}
 	</div>
 {/snippet}
@@ -336,21 +465,29 @@
 	</div>
 {/snippet}
 
-<!-- The ring is a box-shadow, so passing the turn never changes the strip's box. -->
 {#snippet playerStrip(seat: 0 | 1)}
-	{@const line = status ? stripLine(status, seat, myIndex) : "score"}
+	{@const line = status
+		? stripLine(status, seat, myIndex, mustCapture, disconnectedSeat === seat)
+		: "score"}
+	{@const isQuiet = line === "reconnecting"}
 	<div
+		bind:this={strips[seat]}
 		data-slot="strip"
 		data-seat={seat}
-		class={cn(
-			"flex h-14 w-(--board-size) items-center gap-2 rounded-lg border bg-muted/40 px-2 text-left whitespace-nowrap ring-2 backdrop-blur-sm",
-			ringed === seat ? ACCENTS[seat].ring : "ring-transparent"
-		)}
+		class="flex h-14 w-(--board-size) items-center gap-2 rounded-lg border bg-muted/40 px-2 text-left whitespace-nowrap backdrop-blur-sm"
 	>
-		{@render emojiBox(seat)}
+		<!-- A quiet player's strip dims, except its status line. Opacity only, so no box changes. -->
+		<div class={cn("transition-opacity motion-reduce:transition-none", isQuiet && "opacity-50")}>
+			{@render emojiBox(seat)}
+		</div>
 
 		<div class="flex min-w-0 flex-1 flex-col gap-0.5">
-			<div class="flex min-w-0 items-center gap-1.5 text-sm font-semibold">
+			<div
+				class={cn(
+					"flex min-w-0 items-center gap-1.5 text-sm font-semibold transition-opacity motion-reduce:transition-none",
+					isQuiet && "opacity-50"
+				)}
+			>
 				<span class="min-w-0 truncate">{players[seat].label}</span>
 				<span
 					data-slot="mark"
@@ -388,7 +525,10 @@
 							variant !== line && "invisible"
 						)}
 					>
-						{#if variant === "your-turn" || variant === "to-move"}
+						{#if variant === "reconnecting"}
+							<span class="size-1.5 shrink-0 rounded-full bg-amber-500 motion-safe:animate-pulse"
+							></span>
+						{:else if variant === "must-capture" || variant === "your-turn" || variant === "to-move"}
 							<span
 								class={cn(
 									"size-1.5 shrink-0 rounded-full motion-safe:animate-pulse",
@@ -403,133 +543,77 @@
 		</div>
 
 		{#if clock}
-			{@render clockBox(seat)}
+			<div class={cn("transition-opacity motion-reduce:transition-none", isQuiet && "opacity-50")}>
+				{@render clockBox(seat)}
+			</div>
 		{/if}
 	</div>
 {/snippet}
 
+<svelte:window onkeydown={handleKeydown} />
+
 <div
-	class={cn("mx-auto flex w-fit flex-col items-center gap-2", className)}
+	class={cn(
+		"mx-auto flex w-fit items-stretch gap-4",
+		hasSidePanel ? BOARD_CHROME : "[--board-chrome:20.75rem]",
+		className
+	)}
 	style:--board-size={size}
 >
-	{@render playerStrip(seats.top)}
+	<div class="flex flex-col items-center gap-2">
+		{#if room && footer}
+			<RoomBar {room} {footer} {rules} {isCopyLinkHidden} onCopyLink={copyLink} />
+		{/if}
 
-	<div bind:this={boardArea} class="aspect-square w-(--board-size)">
-		{@render children()}
+		{@render playerStrip(seats.top)}
+
+		<div bind:this={boardArea} class="relative aspect-square w-(--board-size)">
+			<p class="sr-only">Arrow keys move on the board. [ and ] step through moves.</p>
+			{@render children()}
+
+			{#if result && footer && isResultShown}
+				<ResultCard view={result} {footer} {players} {markIcon} onDismiss={dismissResult} />
+			{:else if room && isInviteShown}
+				<InviteCard
+					code={room.code}
+					isHost={myIndex !== null}
+					onCopyLink={copyLink}
+					onShare={share}
+				/>
+			{/if}
+		</div>
+
+		{@render playerStrip(seats.bottom)}
+
+		<span role="status" class="sr-only">{status ? statusText(status) : ""}</span>
+		<span role="status" class="sr-only">
+			{disconnectedSeat === null ? "" : `${players[disconnectedSeat].label} disconnected`}
+		</span>
+
+		{#if footer}
+			<Controls
+				{footer}
+				{replay}
+				{status}
+				{myIndex}
+				isActionHidden={isResultShown}
+				class={cn(hasSidePanel && "lg:hidden")}
+			/>
+		{/if}
 	</div>
 
-	{@render playerStrip(seats.bottom)}
-
-	<span role="status" class="sr-only">{status ? statusText(status) : ""}</span>
-
-	{#if footer}
-		{@const prevDisabled = footer.round <= 1}
-		{@const nextDisabled = footer.round >= footer.latestRound}
-		{@const roundOver = status?.type === "winner" || status?.type === "draw"}
-		{@const isSpectator = myIndex === null}
-		<div class="flex w-(--board-size) flex-col items-center gap-2">
-			<div data-slot="controls" class="flex h-8 items-center gap-1.5 sm:gap-2">
-				<span class={cn(prevDisabled && "cursor-not-allowed")}>
-					<Button
-						variant="outline"
-						size="icon-sm"
-						aria-label="Previous round"
-						disabled={prevDisabled}
-						onclick={() => footer.onGoToRound(footer.round - 1)}
-					>
-						<ChevronLeft />
-					</Button>
-				</span>
-
-				<span class={cn(footer.isLive && isSpectator && "cursor-not-allowed")}>
-					{#if !footer.isLive}
-						<Button variant="outline" size="sm" class="w-28 px-3 sm:w-32" onclick={footer.onGoLive}>
-							Go live
-						</Button>
-					{:else if footer.roomClosed}
-						<Button
-							variant="outline"
-							size="sm"
-							class="w-28 px-3 sm:w-32"
-							onclick={footer.onPlayAgain}
-						>
-							Play again
-						</Button>
-					{:else if footer.waitingForOpponent}
-						<Button
-							variant="outline"
-							size="sm"
-							class="w-28 px-3 sm:w-32"
-							onclick={footer.onAbandon}
-							disabled={isSpectator}
-						>
-							Abandon
-						</Button>
-					{:else if !roundOver}
-						<Dropdown>
-							<DropdownTrigger
-								variant="outline"
-								size="sm"
-								class="w-28 px-3 sm:w-32"
-								disabled={isSpectator}
-							>
-								Resign
-							</DropdownTrigger>
-							<DropdownContent side="bottom" sideOffset={8} class="w-28 sm:w-32">
-								<DropdownItem onSelect={footer.onResign}>Resign</DropdownItem>
-								<DropdownSeparator />
-								<DropdownItem variant="destructive" onSelect={footer.onAbandon}>
-									Abandon
-								</DropdownItem>
-							</DropdownContent>
-						</Dropdown>
-					{:else}
-						<Dropdown>
-							<DropdownTrigger
-								variant="outline"
-								size="sm"
-								class="w-28 px-3 sm:w-32"
-								disabled={isSpectator}
-							>
-								Rematch
-							</DropdownTrigger>
-							<DropdownContent side="bottom" sideOffset={8} class="w-28 sm:w-32">
-								<DropdownItem onSelect={footer.onRematch}>Rematch</DropdownItem>
-								<DropdownSeparator />
-								<DropdownItem variant="destructive" onSelect={footer.onAbandon}>
-									Abandon
-								</DropdownItem>
-							</DropdownContent>
-						</Dropdown>
-					{/if}
-				</span>
-
-				<span class={cn(nextDisabled && "cursor-not-allowed")}>
-					<Button
-						variant="outline"
-						size="icon-sm"
-						aria-label="Next round"
-						disabled={nextDisabled}
-						onclick={() => footer.onGoToRound(footer.round + 1)}
-					>
-						<ChevronRight />
-					</Button>
-				</span>
-			</div>
-
-			<p class="h-4 text-xs tabular-nums text-muted-foreground">
-				Round {footer.round} of {footer.latestRound}
-			</p>
-
-			<p
-				role="alert"
-				class={cn(
-					"h-5 w-full truncate text-sm text-destructive transition-opacity",
-					footer.error ? "opacity-100" : "opacity-0"
-				)}
-			>
-				{footer.error}
-			</p>
-		</div>
+	{#if room && footer}
+		<SidePanel
+			{room}
+			{footer}
+			{replay}
+			{status}
+			{myIndex}
+			{rounds}
+			{rules}
+			{isCopyLinkHidden}
+			isActionHidden={isResultShown}
+			onCopyLink={copyLink}
+		/>
 	{/if}
 </div>

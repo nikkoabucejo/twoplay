@@ -1,1 +1,1 @@
-export { Room, type ClientEngine } from "./room/index.js";
+export { Room, roomPath, type ClientEngine, type RoomRound } from "./room/index.js";

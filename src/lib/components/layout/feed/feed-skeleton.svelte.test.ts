@@ -10,7 +10,7 @@ describe("FeedSkeleton", () => {
 
 	test("takes the Feed's box", () => {
 		render(FeedSkeleton);
-		expect(screen.getByRole("status")).toHaveClass("w-full", "max-w-md", "min-h-0", "flex-1");
+		expect(screen.getByRole("status")).toHaveClass("w-full", "max-w-2xl", "min-h-0", "flex-1");
 	});
 
 	test("renders five rows by default", () => {
@@ -28,8 +28,15 @@ describe("FeedSkeleton", () => {
 		for (const row of container.querySelectorAll("li")) {
 			expect(row).toHaveClass("rounded-xl", "border", "p-3");
 			expect(row.querySelector("[data-slot='skeleton'].size-8")).toBeInTheDocument();
-			expect(row.querySelectorAll("[data-slot='skeleton'].h-3")).toHaveLength(2);
+			// Title and subtitle each take a 1rem line box, like text-xs and text-caption.
+			expect(row.querySelectorAll("[data-slot='skeleton'].h-4.bg-clip-content")).toHaveLength(2);
+			expect(row.querySelector("[data-slot='skeleton'].h-6")).toBeInTheDocument();
 		}
+	});
+
+	test("passes extra attributes to its root", () => {
+		render(FeedSkeleton, { props: { "data-loading": "lobby" } });
+		expect(screen.getByRole("status")).toHaveAttribute("data-loading", "lobby");
 	});
 
 	test("hides the rows from assistive technology", () => {

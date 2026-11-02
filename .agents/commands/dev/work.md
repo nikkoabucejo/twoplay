@@ -112,7 +112,7 @@ message, give each a narrow brief and a time budget, and merge their reports.
    failing agents. Still failing after 3: stop and show the failures as-is.
 2. **QA** (max 2 loops; skip only when no scenario is user-visible). Split the scenarios three ways:
    - **Scripted**: anything that needs no signed-in player. This covers signed-out page loads, layout-shift matrices,
-     metadata, SSR HTML, and blocked-script cases. The orchestrator runs `node .agents/scripts/layout-shift.mjs`
+     metadata, SSR HTML, and blocked-script cases. The orchestrator runs `node .agents/scripts/layout-shift.mjs --hover --overflow`
      plus `curl`, which takes seconds. No agent is needed.
    - **Live**: spawn one `qa` agent per browser pair, in parallel, each with its own scenario slice and about a
      10-minute budget. Pair 1 is `browser-a` + `browser-b`; pair 2 is `browser-c` + `browser-d`. A pair is never

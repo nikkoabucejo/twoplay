@@ -5,6 +5,24 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* "Always reduce" in settings puts .reduce-motion on <html>, which these honor on top of the OS setting. */
+@custom-variant motion-safe {
+	@media (prefers-reduced-motion: no-preference) {
+		&:not(.reduce-motion *) {
+			@slot;
+		}
+	}
+}
+
+@custom-variant motion-reduce {
+	@media (prefers-reduced-motion: reduce) {
+		@slot;
+	}
+	&:where(.reduce-motion *) {
+		@slot;
+	}
+}
+
 /* Arial scaled to Inter's width; overrides are Inter's ascender (0.96875em) and descender (0.2421875em) divided by size-adjust. */
 @font-face {
 	font-family: "Inter Fallback";
@@ -143,4 +161,196 @@
 	html {
 		@apply overscroll-none font-sans;
 	}
+}
+
+/* 0.01ms rather than none, so animationend and transitionend still fire. */
+.reduce-motion *,
+.reduce-motion *::before,
+.reduce-motion *::after {
+	animation-duration: 0.01ms !important;
+	animation-iteration-count: 1 !important;
+	transition-duration: 0.01ms !important;
+	scroll-behavior: auto !important;
+}
+
+/* Comet ring: a faint seat-tinted border with one spark gliding around it. Both layers are
+   absolute overlays on the element's own box, so showing them never shifts layout. `comet-ring`
+   holds the shared layers, hidden and paused; `selected-ring` shows them and runs the spark,
+   `hover-ring` shows them fainter and still on hover, so a hovered item never reads as selected. */
+@property --sel-angle {
+	syntax: "<angle>";
+	inherits: false;
+	initial-value: 0deg;
+}
+
+@keyframes sel-spin {
+	to {
+		--sel-angle: 360deg;
+	}
+}
+
+@utility comet-ring {
+	position: relative;
+	isolation: isolate;
+
+	&::before,
+	&::after {
+		content: "";
+		position: absolute;
+		inset: -1px;
+		border-radius: inherit;
+		pointer-events: none;
+		opacity: 0;
+		transition: opacity 150ms;
+	}
+
+	&::before {
+		z-index: 1;
+		padding: 1.5px;
+		background:
+			conic-gradient(
+				from var(--sel-angle),
+				transparent 0 72%,
+				color-mix(in oklab, var(--seat-0) 90%, transparent) 86%,
+				var(--foreground) 90%,
+				color-mix(in oklab, var(--seat-1) 90%, transparent) 93%,
+				transparent 96%
+			),
+			linear-gradient(
+				color-mix(in oklab, var(--seat-0) 35%, transparent),
+				color-mix(in oklab, var(--seat-1) 35%, transparent)
+			);
+		mask:
+			linear-gradient(black 0 0) content-box exclude,
+			linear-gradient(black 0 0);
+		animation: sel-spin 4.5s linear infinite paused;
+	}
+
+	&::after {
+		z-index: -1;
+		background: radial-gradient(
+			closest-side,
+			color-mix(in oklab, var(--seat-0) 40%, transparent),
+			transparent
+		);
+		filter: blur(10px);
+	}
+
+	/* No spark under reduced motion: a still seat-0 to seat-1 border instead. */
+	@media (prefers-reduced-motion: reduce) {
+		&::before {
+			animation: none;
+			background: linear-gradient(
+				90deg,
+				color-mix(in oklab, var(--seat-0) 70%, transparent),
+				color-mix(in oklab, var(--seat-1) 70%, transparent)
+			);
+		}
+	}
+
+	&:where(.reduce-motion *)::before {
+		animation: none;
+		background: linear-gradient(
+			90deg,
+			color-mix(in oklab, var(--seat-0) 70%, transparent),
+			color-mix(in oklab, var(--seat-1) 70%, transparent)
+		);
+	}
+}
+
+@utility selected-ring {
+	@apply comet-ring;
+
+	&::before {
+		opacity: 1;
+		animation-play-state: running;
+	}
+
+	&::after {
+		opacity: 0.18;
+	}
+}
+
+@utility hover-ring {
+	@apply comet-ring;
+
+	@media (hover: hover) {
+		&:hover:not(:disabled)::before {
+			opacity: 0.35;
+		}
+
+		&:hover:not(:disabled)::after {
+			opacity: 0.08;
+		}
+	}
+}
+
+/* Quick-match search: the comet ring runs faster around the queue card. */
+@utility search-ring {
+	@apply comet-ring;
+
+	&::before {
+		opacity: 1;
+		animation-play-state: running;
+		animation-duration: 2.4s;
+	}
+
+	&::after {
+		opacity: 0.25;
+	}
+}
+
+/* Search radar: rings ripple out from the timer and two seat dots orbit it on an ellipse. The
+   orbit splits into x and y oscillations on nested elements, a quarter cycle apart, so the dots
+   stay round. Apply these behind `motion-safe:`. */
+@keyframes radar-ripple {
+	from {
+		scale: 0.6;
+		opacity: 0.8;
+	}
+	to {
+		scale: 4;
+		opacity: 0;
+	}
+}
+
+@keyframes orbit-x {
+	from {
+		translate: -5rem 0;
+	}
+	to {
+		translate: 5rem 0;
+	}
+}
+
+@keyframes orbit-y {
+	from {
+		translate: 0 -1.75rem;
+	}
+	to {
+		translate: 0 1.75rem;
+	}
+}
+
+@utility radar-ripple {
+	animation-name: radar-ripple;
+	animation-duration: 2.4s;
+	animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+	animation-iteration-count: infinite;
+}
+
+@utility orbit-x {
+	animation-name: orbit-x;
+	animation-duration: 1.2s;
+	animation-timing-function: cubic-bezier(0.37, 0, 0.63, 1);
+	animation-iteration-count: infinite;
+	animation-direction: alternate;
+}
+
+@utility orbit-y {
+	animation-name: orbit-y;
+	animation-duration: 1.2s;
+	animation-timing-function: cubic-bezier(0.37, 0, 0.63, 1);
+	animation-iteration-count: infinite;
+	animation-direction: alternate;
 }

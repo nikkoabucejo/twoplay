@@ -1,14 +1,23 @@
 import { useMutation, useQuery, type UseQueryReturn } from "convex-svelte";
 import type { GameMove, GameState, GameType } from "../../../../../convex/models/games/index.js";
 import { api } from "../../../../../convex/_generated/api.js";
+import type { GameHistoryEntry } from "../../../../../convex/models/rooms/index.js";
 
 /** A game's pure engine, narrowed to its own `kind` by each subclass. `Room` uses it to predict the
  *  viewer's own moves and to read whose turn a state is. */
 export type ClientEngine = {
 	/** Throws like the server's engine does for an illegal move. */
 	applyMove(state: GameState, seat: 0 | 1, move: GameMove): GameState;
-	status(state: GameState): { turnIndex: number; isOver: boolean };
+	status(state: GameState): { turnIndex: number; winnerIndex: number | null; isOver: boolean };
 };
+
+/** A round's result for the viewer, from their room history. */
+export type RoomRound = Pick<GameHistoryEntry, "round" | "result" | "mmr">;
+
+/** The URL of a room, or of one of its rounds. */
+export function roomPath(type: GameType, code: string, round?: number): `/${GameType}/${string}` {
+	return round === undefined ? `/${type}/${code}` : `/${type}/${code}/${round}`;
+}
 
 /** One of the viewer's moves, shown before the server has confirmed it. */
 type PendingMove = {
@@ -50,6 +59,7 @@ export abstract class Room {
 	#getCode: () => string;
 	#room: UseQueryReturn<typeof api.models.rooms.index.get>;
 	#history: UseQueryReturn<typeof api.models.games.index.history>;
+	#roomHistory: UseQueryReturn<typeof api.models.rooms.index.history>;
 	#play = useMutation(api.models.rooms.index.play);
 	#rematch = useMutation(api.models.rooms.index.rematch);
 	#resign = useMutation(api.models.games.index.resign);
@@ -99,6 +109,9 @@ export abstract class Room {
 			code: this.#getCode(),
 			round: getRound()
 		}));
+		this.#roomHistory = useQuery(api.models.rooms.index.history, () =>
+			this.myIndex === null ? "skip" : {}
+		);
 		this.#tick = setInterval(() => (this.#now = Date.now()), 1000);
 
 		// Records that this browser is still here, for the opponent's "disconnected" indicator and the
@@ -150,6 +163,11 @@ export abstract class Room {
 
 	get data() {
 		return this.#room.data;
+	}
+
+	/** The room query's failure, or null. */
+	get loadError(): Error | null {
+		return this.#room.error ?? null;
 	}
 
 	/** True once the room is found but belongs to a different game type — a room-code collision across games. */
@@ -231,22 +249,30 @@ export abstract class Room {
 		return this.#roundPending.findLastIndex((entry) => isSameState(entry.predicted, server)) + 1;
 	});
 
-	/** The server state with the unconfirmed pending moves applied, and the moves that applied. A move
-	 *  that no longer applies stops the fold, since every later move was predicted on top of it. */
+	/** The server state with the unconfirmed pending moves applied, the state before the last of them,
+	 *  and the moves that applied. A move that no longer applies stops the fold, since every later move
+	 *  was predicted on top of it. */
 	#fold = $derived.by(() => {
 		let state = this.#serverState;
+		let previous: GameState | null = null;
 		const applied: PendingMove[] = [];
-		if (state === null || !this.game.isLive) return { state, applied };
+		if (state === null || !this.game.isLive) return { state, previous, applied };
 		for (const entry of this.#roundPending.slice(this.#confirmedCount)) {
 			const next = this.#predict(state, entry.seat, entry.move);
 			if (next === null) break;
+			previous = state;
 			state = next;
 			applied.push(entry);
 		}
-		return { state, applied };
+		return { state, previous, applied };
 	});
 
 	#liveState = $derived(this.#fold.state);
+
+	/** The server state with the viewer's pending moves applied, whatever the scrub cursor shows. */
+	protected get liveState(): GameState | null {
+		return this.#liveState;
+	}
 
 	/** The state after `move`, or null when the engine rejects it or it changes nothing. */
 	#predict(state: GameState, seat: 0 | 1, move: GameMove): GameState | null {
@@ -270,6 +296,21 @@ export abstract class Room {
 	activeSeat = $derived(this.#seatOf(this.#liveState));
 
 	#confirmedActiveSeat = $derived(this.#seatOf(this.#serverState));
+
+	/** Whose turn it is and who won in the live state, including pending moves and ignoring the scrub
+	 *  cursor. Null while loading or for another game's state. */
+	liveOutcome = $derived.by(() => {
+		const state = this.#liveState;
+		if (state === null || state.kind !== this.#kind) return null;
+		const { turnIndex, winnerIndex, isOver } = this.#engine.status(state);
+		return { turnIndex, winnerIndex, isOver };
+	});
+
+	/** The viewer's rounds in this room, newest first. Empty for a spectator. */
+	rounds = $derived.by((): RoomRound[] => {
+		const entry = this.#roomHistory.data?.find((room) => room.code === this.data?.code);
+		return (entry?.games ?? []).map(({ round, result, mmr }) => ({ round, result, mmr }));
+	});
 
 	/** Frozen (not ticking) while reviewing history by default — a subclass can override for its own
 	 *  additional freeze conditions, but every game freezes the clock display while scrubbing. */
@@ -296,6 +337,19 @@ export abstract class Room {
 	protected displayState = $derived.by((): GameState | null => {
 		if (this.#cursor === null) return this.#liveState;
 		return this.#historyMoves[this.#cursor]?.state ?? this.#serverState;
+	});
+
+	/** The position before the shown one, for the last-move highlight: the state a pending move was
+	 *  played on, the history entry before the shown one, or null before the first move. */
+	protected previousDisplayState = $derived.by((): GameState | null => {
+		const moves = this.#historyMoves;
+		if (this.#cursor !== null) return moves[this.#cursor - 1]?.state ?? null;
+		if (this.#fold.previous !== null) return this.#fold.previous;
+		const shown = this.#liveState;
+		if (shown === null) return null;
+		// History can arrive a push behind the room, so the shown state may not be in it yet.
+		const at = moves.findLastIndex((entry) => isSameState(entry.state, shown));
+		return (at === -1 ? moves.at(-1) : moves[at - 1])?.state ?? null;
 	});
 
 	/** Step one move back in this round's history. A no-op past the first move. Local only. */
@@ -421,7 +475,7 @@ export abstract class Room {
 		this.#pending = [];
 		this.error = null;
 		try {
-			await this.#rematch({ code: this.#getCode() });
+			await this.#rematch({ code: this.#getCode(), round: this.game.round });
 		} catch (err) {
 			this.error = err instanceof Error ? err.message : "Something went wrong";
 		}

@@ -9,8 +9,20 @@ function links() {
 }
 
 describe("Footer", () => {
-	test("repeats no header or dock link", () => {
-		const taken = new Set(["/", ...NAV_ITEMS.map((item) => item.href)]);
+	test("links to How to play, Tour, About, Privacy, Terms, and Support, in that order", () => {
+		const hrefs = links().map((link) => link.getAttribute("href"));
+		expect(hrefs).toEqual(["/how-to-play", "/tour", "/about", "/privacy", "/terms", SUPPORT_URL]);
+	});
+
+	test("names each internal link", () => {
+		const names = links()
+			.filter((link) => link.getAttribute("href")?.startsWith("/"))
+			.map((link) => link.textContent?.trim());
+		expect(names).toEqual(["How to play", "Tour", "About", "Privacy", "Terms"]);
+	});
+
+	test("repeats no header, dock, or avatar menu link", () => {
+		const taken = new Set(["/", "/me", "/settings", ...NAV_ITEMS.map((item) => item.href)]);
 		const hrefs = links().map((link) => link.getAttribute("href"));
 		expect(hrefs.filter((href) => href !== null && taken.has(href))).toEqual([]);
 	});
@@ -24,8 +36,8 @@ describe("Footer", () => {
 		expect(external[0]).toHaveAttribute("rel", "noopener noreferrer");
 	});
 
-	test("shows the copyright", () => {
+	test("shows no copyright", () => {
 		render(Footer);
-		expect(screen.getByText("© 2026 twoplay")).toBeInTheDocument();
+		expect(screen.queryByText(/©/)).not.toBeInTheDocument();
 	});
 });

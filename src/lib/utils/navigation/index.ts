@@ -3,6 +3,7 @@ export {
 	SUPPORT_URL,
 	isCurrentPath,
 	isGameRoomRoute,
+	isGatedRoute,
 	liveGameHref,
 	showsDock
 } from "./routes/index.js";

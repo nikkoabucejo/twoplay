@@ -22,11 +22,16 @@ beforeEach(() => {
 
 function renderHeader({
 	profile = null,
-	live = null
-}: { profile?: ClerkProfile; live?: { href: string; name: string } | null } = {}) {
+	live = null,
+	isGated = false
+}: {
+	profile?: ClerkProfile;
+	live?: { href: string; name: string } | null;
+	isGated?: boolean;
+} = {}) {
 	const auth = context.auth as ClerkAuth;
 	auth.hydrate(profile);
-	render(Header, { props: { pathname: "/history", live } });
+	render(Header, { props: { pathname: "/history", live, isGated } });
 	return auth;
 }
 
@@ -74,6 +79,19 @@ describe("Header", () => {
 		expect(screen.getByRole("button", { name: "Sign in" })).toBeDisabled();
 	});
 
+	test("on a gated page, signed out leaves Sign in to the page and keeps the empty slot", () => {
+		renderHeader({ isGated: true });
+		expect(screen.queryByRole("button", { name: "Sign in" })).not.toBeInTheDocument();
+		const slot = screen.getByRole("banner").querySelector('[data-slot="auth"]');
+		expect(slot).toBeEmptyDOMElement();
+		expect(slot?.className.split(" ").some((name) => /^w-\d+$/.test(name))).toBe(true);
+	});
+
+	test("on a gated page, signed in still shows the account menu", () => {
+		renderHeader({ profile: ADA, isGated: true });
+		expect(screen.getByRole("button", { name: /Ada/ })).toBeInTheDocument();
+	});
+
 	test("signed in shows the member links with the current page marked", () => {
 		renderHeader({ profile: ADA });
 		expect(screen.getByRole("link", { name: "History" })).toHaveAttribute("aria-current", "page");
@@ -110,11 +128,23 @@ describe("Header", () => {
 		expect(signOut).toHaveBeenCalledOnce();
 	});
 
-	test("the avatar menu has only Account and Sign out, and no Support link", async () => {
+	test("the avatar menu has My stats, Settings, Account, and Sign out, in that order", async () => {
 		renderHeader({ profile: ADA });
 		await openAccountMenu();
 		const items = screen.getAllByRole("menuitem").map((item) => item.textContent?.trim());
-		expect(items).toEqual(["Account", "Sign out"]);
+		expect(items).toEqual(["My stats", "Settings", "Account", "Sign out"]);
+	});
+
+	test("My stats goes to /me and Settings to /settings", async () => {
+		renderHeader({ profile: ADA });
+		await openAccountMenu();
+		expect(screen.getByRole("menuitem", { name: "My stats" })).toHaveAttribute("href", "/me");
+		expect(screen.getByRole("menuitem", { name: "Settings" })).toHaveAttribute("href", "/settings");
+	});
+
+	test("the avatar menu has no Support link", async () => {
+		renderHeader({ profile: ADA });
+		await openAccountMenu();
 		expect(
 			screen.queryAllByRole("link").filter((link) => link.getAttribute("href") === SUPPORT_URL)
 		).toHaveLength(0);

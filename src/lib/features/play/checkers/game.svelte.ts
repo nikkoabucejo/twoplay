@@ -60,6 +60,38 @@ export class CheckersRoom extends Room {
 			: null
 	);
 
+	/** True on the viewer's live turn when every legal move is a capture. Reads the live state, so
+	 *  scrubbing doesn't change it. */
+	mustCapture = $derived.by(() => {
+		const live = this.liveState;
+		if (!this.isMyTurn || live?.kind !== "checkers") return false;
+		const moves = computeLegalMoves(live.board, live.turn, live.mustContinueFrom);
+		return moves.length > 0 && moves.every((move) => move.captured !== null);
+	});
+
+	/** The step or jump from the position before the shown one: the square the mover's piece left and
+	 *  the one it landed on. Before the first history entry, the position before is the start. */
+	lastMove = $derived.by((): { from: number; to: number; seat: 0 | 1 } | null => {
+		const previous = this.previousDisplayState;
+		const before =
+			previous?.kind === "checkers" ? previous.board : checkersEngine.createInitialState().board;
+		const to = this.board.findIndex((square, index) => square !== null && before[index] === null);
+		const piece = this.board[to];
+		if (!piece) return null;
+		const from = before.findIndex(
+			(square, index) => square?.color === piece.color && this.board[index] === null
+		);
+		return from === -1 ? null : { from, to, seat: playerIndexOf(piece.color) };
+	});
+
+	/** What the viewer's piece on `index` can do this turn, for its label. */
+	abilityOf(index: number): "capture" | "move" | null {
+		if (!this.canMove) return null;
+		const moves = this.movesFrom(index);
+		if (moves.length === 0) return null;
+		return moves.some((move) => move.captured !== null) ? "capture" : "move";
+	}
+
 	movesFrom(index: number): Move[] {
 		return this.legalMoves.filter((move) => move.from === index);
 	}

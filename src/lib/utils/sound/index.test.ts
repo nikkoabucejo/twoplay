@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 class FakeParam {
+	value = 1;
 	values: number[] = [];
 	setValueAtTime(value: number) {
 		this.values.push(value);
@@ -13,7 +14,9 @@ class FakeNode {
 	frequency = new FakeParam();
 	gain = new FakeParam();
 	type = "";
+	outputs: FakeNode[] = [];
 	connect(node: FakeNode) {
+		this.outputs.push(node);
 		return node;
 	}
 	start() {}
@@ -26,6 +29,7 @@ class FakeAudioContext {
 	currentTime = 0;
 	destination = new FakeNode();
 	oscillators: FakeNode[] = [];
+	gains: FakeNode[] = [];
 
 	constructor() {
 		FakeAudioContext.created.push(this);
@@ -39,7 +43,9 @@ class FakeAudioContext {
 		return oscillator;
 	}
 	createGain() {
-		return new FakeNode();
+		const gain = new FakeNode();
+		this.gains.push(gain);
+		return gain;
 	}
 }
 
@@ -60,6 +66,10 @@ beforeEach(() => {
 afterEach(() => {
 	vi.unstubAllGlobals();
 });
+
+function reaches(from: FakeNode, target: FakeNode): boolean {
+	return from === target || from.outputs.some((node) => reaches(node, target));
+}
 
 function stubBrowserAudio() {
 	vi.stubGlobal("window", {});
@@ -149,5 +159,63 @@ describe("playTurnChime", () => {
 
 		expect(FakeAudioContext.created).toHaveLength(1);
 		expect(FakeAudioContext.created[0].oscillators.length).toBeGreaterThan(0);
+	});
+});
+
+describe("configureSound", () => {
+	test("sound off creates no context and starts no oscillator", async () => {
+		stubBrowserAudio();
+		const sound = await loadSound();
+
+		sound.configureSound({ isEnabled: false, volume: 1 });
+		sound.playMoveSound(0);
+		sound.playCaptureSound(1);
+		sound.playTurnChime();
+
+		expect(FakeAudioContext.created).toHaveLength(0);
+	});
+
+	test("volume 0 creates no context and starts no oscillator", async () => {
+		stubBrowserAudio();
+		const sound = await loadSound();
+
+		sound.configureSound({ isEnabled: true, volume: 0 });
+		sound.playMoveSound(0);
+		sound.playCaptureSound(1);
+		sound.playTurnChime();
+
+		expect(FakeAudioContext.created).toHaveLength(0);
+	});
+
+	test("routes every sound through a master gain set to the volume", async () => {
+		stubBrowserAudio();
+		const sound = await loadSound();
+
+		sound.configureSound({ isEnabled: true, volume: 0.4 });
+		sound.playMoveSound(0);
+		sound.playCaptureSound(1);
+		sound.playTurnChime();
+
+		const [context] = FakeAudioContext.created;
+		const masters = context.gains.filter((gain) => gain.outputs.includes(context.destination));
+		expect(masters).toHaveLength(1);
+		const [master] = masters;
+		expect(master.gain.value).toBe(0.4);
+		expect(context.oscillators.length).toBeGreaterThan(0);
+		for (const oscillator of context.oscillators) {
+			expect(reaches(oscillator, master)).toBe(true);
+		}
+	});
+
+	test("updates the master gain of a context that already exists", async () => {
+		stubBrowserAudio();
+		const sound = await loadSound();
+
+		sound.prepareSound();
+		sound.configureSound({ isEnabled: true, volume: 0.25 });
+
+		const [context] = FakeAudioContext.created;
+		const [master] = context.gains.filter((gain) => gain.outputs.includes(context.destination));
+		expect(master.gain.value).toBe(0.25);
 	});
 });

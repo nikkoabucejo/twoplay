@@ -2,12 +2,15 @@ import Root from "./popover.svelte";
 import Trigger from "./popover-trigger.svelte";
 import Content from "./popover-content.svelte";
 import Portal from "./popover-portal.svelte";
+import { floatingMotionClass, surfaceClass } from "./surface.js";
 
 export {
 	Root,
 	Trigger,
 	Content,
 	Portal,
+	floatingMotionClass,
+	surfaceClass,
 	//
 	Root as Popover,
 	Content as PopoverContent,

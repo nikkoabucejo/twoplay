@@ -395,4 +395,116 @@ describe("CheckersRoom", () => {
 		expect(room.board).toEqual([]);
 		expect(room.legalMoves).toEqual([]);
 	});
+
+	test("the first move's last move is its step from the starting position", () => {
+		const first = checkersEngine.applyMove(initial, 0, {
+			kind: "checkers",
+			from: FRONT,
+			to: FRONT_TO
+		});
+		const room = createRoom(roomSnapshot(first));
+		setQueryResult(api.models.games.index.history, historyOf([first]));
+
+		expect(room.lastMove).toEqual({ from: FRONT, to: FRONT_TO, seat: 0 });
+	});
+
+	test("a step is the last move of the seat that made it", () => {
+		const first = checkersEngine.applyMove(initial, 0, {
+			kind: "checkers",
+			from: FRONT,
+			to: FRONT_TO
+		});
+		const second = checkersEngine.applyMove(first, 1, {
+			kind: "checkers",
+			from: idx(2, 1),
+			to: idx(3, 0)
+		});
+		const room = createRoom(roomSnapshot(second));
+		setQueryResult(api.models.games.index.history, historyOf([first, second]));
+
+		expect(room.lastMove).toEqual({ from: idx(2, 1), to: idx(3, 0), seat: 1 });
+	});
+
+	test("a jump's last move is its from and landing squares, not the captured one", () => {
+		const jumped = checkersEngine.applyMove(mustCapture, 0, {
+			kind: "checkers",
+			from: CAPTURER,
+			to: CAPTURE_TO
+		});
+		const room = createRoom(roomSnapshot(jumped));
+		setQueryResult(api.models.games.index.history, historyOf([mustCapture, jumped]));
+
+		expect(room.lastMove).toEqual({ from: CAPTURER, to: CAPTURE_TO, seat: 0 });
+	});
+
+	test("a multi-jump's last move is its last hop", () => {
+		const hop = checkersEngine.applyMove(doubleJump, 0, {
+			kind: "checkers",
+			from: CAPTURER,
+			to: idx(3, 4)
+		});
+		const landed = checkersEngine.applyMove(hop, 0, {
+			kind: "checkers",
+			from: idx(3, 4),
+			to: idx(1, 6)
+		});
+		const room = createRoom(roomSnapshot(landed));
+		setQueryResult(api.models.games.index.history, historyOf([doubleJump, hop, landed]));
+
+		expect(room.lastMove).toEqual({ from: idx(3, 4), to: idx(1, 6), seat: 0 });
+	});
+
+	test("the starting position has no last move", () => {
+		const room = createRoom();
+		setQueryResult(api.models.games.index.history, []);
+		expect(room.lastMove).toBeNull();
+	});
+
+	test("the viewer must capture when every legal move on their turn is a capture", () => {
+		const room = createRoom(roomSnapshot(mustCapture));
+		expect(room.mustCapture).toBe(true);
+	});
+
+	test("the viewer needn't capture when a plain step is legal", () => {
+		const room = createRoom();
+		expect(room.mustCapture).toBe(false);
+	});
+
+	test("a forced capture on the opponent's turn isn't the viewer's", () => {
+		const room = createRoom(roomSnapshot(mustCapture, { myIndex: 1 }));
+		expect(room.mustCapture).toBe(false);
+	});
+
+	test("a spectator is never told to capture", () => {
+		const room = createRoom(roomSnapshot(mustCapture, { myIndex: null }));
+		expect(room.mustCapture).toBe(false);
+	});
+
+	test("the forced capture follows the live turn while scrubbing", () => {
+		const room = createRoom(roomSnapshot(mustCapture));
+		setQueryResult(api.models.games.index.history, historyOf([initial, mustCapture]));
+
+		room.stepBack();
+
+		expect(room.mustCapture).toBe(true);
+	});
+
+	test("a piece that can jump can capture, and one that can step can move", () => {
+		const room = createRoom();
+		expect(room.abilityOf(FRONT)).toBe("move");
+
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(mustCapture));
+		expect(room.abilityOf(CAPTURER)).toBe("capture");
+	});
+
+	test("a piece with no legal move this turn has no ability", () => {
+		const room = createRoom(roomSnapshot(mustCapture));
+		expect(room.abilityOf(BYSTANDER)).toBeNull();
+		expect(room.abilityOf(idx(4, 3))).toBeNull();
+	});
+
+	test("pieces have no ability off the viewer's turn", () => {
+		const room = createRoom(roomSnapshot(initial, { myIndex: 1 }));
+		expect(room.abilityOf(idx(2, 1))).toBeNull();
+	});
 });

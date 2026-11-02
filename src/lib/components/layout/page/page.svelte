@@ -44,8 +44,8 @@
 		</div>
 	{/if}
 	{#if sidebar}
-		<div class="grid flex-1 gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
-			<div class="flex min-w-0 flex-col gap-6">{@render children()}</div>
+		<div class="grid min-h-0 flex-1 gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
+			<div class="flex min-h-0 min-w-0 flex-col gap-6">{@render children()}</div>
 			<aside class="flex min-w-0 flex-col gap-6">{@render sidebar()}</aside>
 		</div>
 	{:else}

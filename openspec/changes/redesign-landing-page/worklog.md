@@ -1,0 +1,3 @@
+- PLAN done
+- QA pass (partial): signed-in with active room, / shows Resume banner linking to the room, 0 CLS; other 4.4 items not run
+- QA rerun: not run (out of slice). 4.4 left open

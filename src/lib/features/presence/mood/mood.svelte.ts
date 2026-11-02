@@ -5,6 +5,8 @@ const CONTEXT_KEY = Symbol("mood");
 
 export class MoodPresence {
 	status = $state<BoardStatus | null>(null);
+	// Set by the play page while queued for a quick match; ignored when a board status is set.
+	searching = $state(false);
 }
 
 // One instance per component tree, set once by the layout that owns the ambient background.

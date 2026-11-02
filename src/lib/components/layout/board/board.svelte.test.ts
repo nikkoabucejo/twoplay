@@ -1,8 +1,15 @@
-import { fireEvent, render, screen, within } from "@testing-library/svelte";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
 import { createRawSnippet, type ComponentProps } from "svelte";
 import { beforeAll, describe, expect, onTestFinished, test, vi } from "vitest";
-import { BOARD_SIZE } from "./board.svelte";
+import { TictactoeIcon } from "$lib/assets/icons/games";
+import { BOARD_SIZE, type BoardReplay, type BoardRoom } from "./board.svelte";
 import { Board, type BoardFooter, type BoardPlayer, type BoardStatus } from "./index.js";
+
+vi.mock("$lib/components/ui", async (importOriginal) => {
+	const ui = await importOriginal<typeof import("$lib/components/ui")>();
+	const toaster = new ui.Toaster();
+	return { ...ui, getToaster: () => toaster };
+});
 
 // vi.mock can't stub lottie-web here: concurrent dynamic imports of a manual mock fall through to
 // the real module. Instead keep the real one inert: it paints a 1x1 canvas on load, then fetches JSON.
@@ -34,8 +41,32 @@ function footer(overrides: Partial<BoardFooter> = {}): BoardFooter {
 		onRematch: vi.fn(),
 		onAbandon: vi.fn(),
 		onPlayAgain: vi.fn(),
+		onNewOpponent: vi.fn(),
+		onLobby: vi.fn(),
 		onGoLive: vi.fn(),
 		onGoToRound: vi.fn(),
+		...overrides
+	};
+}
+
+const ROOM: BoardRoom = {
+	type: "tictactoe",
+	name: "Tic-Tac-Toe",
+	code: "ABCD",
+	icon: TictactoeIcon
+};
+
+function replay(overrides: Partial<BoardReplay> = {}): BoardReplay {
+	return {
+		isViewingHistory: false,
+		moveNumber: 3,
+		moveCount: 3,
+		canStepBack: true,
+		canStepForward: false,
+		onFirst: vi.fn(),
+		onBack: vi.fn(),
+		onForward: vi.fn(),
+		onLive: vi.fn(),
 		...overrides
 	};
 }
@@ -51,6 +82,19 @@ function strip(seat: 0 | 1): HTMLElement {
 
 function strips(): HTMLElement[] {
 	return [...document.querySelectorAll<HTMLElement>("[data-slot=strip]")];
+}
+
+/** The game status region; the second status region is the disconnect announcement. */
+function gameStatus(): HTMLElement {
+	return screen.getAllByRole("status")[0];
+}
+
+function controls(): HTMLElement {
+	return document.querySelector<HTMLElement>("[data-slot=controls]")!;
+}
+
+function moveReadout(): HTMLElement {
+	return document.querySelector<HTMLElement>("[data-slot=move]")!;
 }
 
 function boardArea(): HTMLElement {
@@ -184,16 +228,17 @@ describe("Board", () => {
 			myIndex: 0,
 			status: { type: "turn", player: 0 },
 			footer: footer(),
+			replay: replay(),
 			clock: { remaining: [65_000, 600_000], activeSeat: 0 }
 		});
 		const controls = screen
-			.getByRole("button", { name: "Previous round" })
+			.getByRole("button", { name: "Previous move" })
 			.closest<HTMLElement>("[data-slot=controls]")!;
 		expect(within(controls).queryByText(/clock/)).not.toBeInTheDocument();
+		expect(within(controls).queryByText(/Round/)).not.toBeInTheDocument();
 		const lower = strip(0);
 		expect(follows(lower, controls)).toBe(true);
-		expect(follows(controls, screen.getByText("Round 2 of 3"))).toBe(true);
-		expect(follows(screen.getByText("Round 2 of 3"), screen.getByRole("alert"))).toBe(true);
+		expect(follows(controls, screen.getByRole("alert"))).toBe(true);
 	});
 
 	test("a player without a score shows no score", () => {
@@ -240,34 +285,14 @@ describe("Board", () => {
 		expect(visibleLayers(1)[0].textContent?.trim()).toBe("");
 	});
 
-	test("passing the turn changes only the strips' ring color", async () => {
+	test("passing the turn leaves the strips' boxes as they were", async () => {
 		const { rerender } = renderBoard({ status: { type: "turn", player: 0 }, myIndex: 0 });
-		const before = strips().map((element) => new Set(element.classList));
-		expect(strip(0)).toHaveClass("ring-2", "ring-seat-0");
-		expect(strip(1)).toHaveClass("ring-2", "ring-transparent");
+		const before = strips().map((element) => element.className);
 
 		await rerender({ status: { type: "turn", player: 1 } });
 
-		expect(strip(0)).toHaveClass("ring-2", "ring-transparent");
-		expect(strip(1)).toHaveClass("ring-2", "ring-seat-1");
-		const rings = new Set(["ring-seat-0", "ring-seat-1", "ring-transparent"]);
-		strips().forEach((element, index) => {
-			const after = new Set(element.classList);
-			const changed = [...before[index], ...after].filter(
-				(name) => before[index].has(name) !== after.has(name)
-			);
-			expect(changed.every((name) => rings.has(name))).toBe(true);
-		});
-	});
-
-	test.each([
-		{ type: "winner" as const, player: 0 as const },
-		{ type: "draw" as const },
-		{ type: "waiting" as const }
-	])("no strip is ringed when the status is %o", (status) => {
-		renderBoard({ status });
-		expect(strip(0)).toHaveClass("ring-transparent");
-		expect(strip(1)).toHaveClass("ring-transparent");
+		expect(strips().map((element) => element.className)).toEqual(before);
+		expect(visibleLayers(1)[0]).toHaveTextContent("To move");
 	});
 
 	test("the status is announced once and the strip labels are hidden from screen readers", () => {
@@ -276,8 +301,10 @@ describe("Board", () => {
 			status: { type: "turn", player: 1 },
 			myIndex: 0
 		});
-		expect(screen.getAllByRole("status")).toHaveLength(1);
-		expect(screen.getByRole("status")).toHaveTextContent("Blair's turn");
+		const [game, disconnect] = screen.getAllByRole("status");
+		expect(screen.getAllByRole("status")).toHaveLength(2);
+		expect(game).toHaveTextContent("Blair's turn");
+		expect(disconnect.textContent?.trim()).toBe("");
 		for (const seat of [0, 1] as const) {
 			for (const layer of lineLayers(seat)) {
 				expect(layer.closest("[aria-hidden=true]")).not.toBeNull();
@@ -291,7 +318,7 @@ describe("Board", () => {
 		[{ type: "waiting" as const, closed: true }, ""]
 	])("status %o reads %j to screen readers", (status, text) => {
 		renderBoard({ status });
-		expect(screen.getByRole("status").textContent?.trim()).toBe(text);
+		expect(gameStatus().textContent?.trim()).toBe(text);
 	});
 
 	test("every emoji renders inside a strip", () => {
@@ -335,14 +362,56 @@ describe("Board", () => {
 		expect(onTrashtalk).toHaveBeenCalledWith("1f480");
 	});
 
-	test("a disconnected opponent is flagged to a seated viewer", () => {
-		renderBoard({ status: { type: "turn", player: 0 }, myIndex: 0, opponentDisconnected: true });
-		expect(screen.getByRole("img", { name: "Opponent disconnected" })).toBeInTheDocument();
+	test("the emoji picker shows only its emoji, in a group named Trash talk", async () => {
+		renderBoard({ status: { type: "turn", player: 0 }, myIndex: 0 });
+		await fireEvent.click(screen.getByRole("button", { name: "Change your emoji" }));
+		const picker = screen.getByRole("group", { name: "Trash talk" });
+		expect(within(picker).getAllByRole("button")).toHaveLength(10);
+		expect(screen.queryByText("Trash talk")).not.toBeInTheDocument();
 	});
 
-	test("spectators don't see a disconnected flag", () => {
+	test("Left and Right move between the picker's emoji, wrapping at the ends", async () => {
+		renderBoard({ status: { type: "turn", player: 0 }, myIndex: 0 });
+		await fireEvent.click(screen.getByRole("button", { name: "Change your emoji" }));
+		const options = within(screen.getByRole("group", { name: "Trash talk" })).getAllByRole(
+			"button"
+		);
+
+		options[0].focus();
+		await fireEvent.keyDown(options[0], { key: "ArrowRight" });
+		expect(options[1]).toHaveFocus();
+		await fireEvent.keyDown(options[1], { key: "ArrowLeft" });
+		await fireEvent.keyDown(options[0], { key: "ArrowLeft" });
+		expect(options[9]).toHaveFocus();
+		await fireEvent.keyDown(options[9], { key: "ArrowRight" });
+		expect(options[0]).toHaveFocus();
+	});
+
+	test("picking an emoji closes the picker", async () => {
+		renderBoard({ status: { type: "turn", player: 0 }, myIndex: 0, onTrashtalk: vi.fn() });
+		await fireEvent.click(screen.getByRole("button", { name: "Change your emoji" }));
+		await fireEvent.click(screen.getByRole("button", { name: "Skull" }));
+		await waitFor(() =>
+			expect(screen.queryByRole("group", { name: "Trash talk" })).not.toBeInTheDocument()
+		);
+	});
+
+	test("a disconnected opponent's strip reads Reconnecting and is announced", () => {
+		renderBoard({ status: { type: "turn", player: 0 }, myIndex: 0, opponentDisconnected: true });
+		expect(visibleLayers(1)[0]).toHaveTextContent("Reconnecting…");
+		expect(visibleLayers(0)[0]).toHaveTextContent("Your turn");
+		expect(screen.getAllByRole("status")[1]).toHaveTextContent("Bob disconnected");
+	});
+
+	test("a finished round keeps the result in a disconnected opponent's strip", () => {
+		renderBoard({ status: { type: "winner", player: 0 }, myIndex: 0, opponentDisconnected: true });
+		expect(visibleLayers(1)[0]).toHaveTextContent("Lost");
+	});
+
+	test("spectators see no reconnecting line", () => {
 		renderBoard({ status: { type: "turn", player: 0 }, opponentDisconnected: true });
-		expect(screen.queryByLabelText("Opponent disconnected")).not.toBeInTheDocument();
+		expect(visibleLayers(1)[0]).not.toHaveTextContent("Reconnecting…");
+		expect(screen.getAllByRole("status")[1].textContent?.trim()).toBe("");
 	});
 
 	test("clocks read as minutes and seconds, spoken with the player's name", () => {
@@ -374,33 +443,77 @@ describe("Board", () => {
 		expect(bobClock).not.toHaveClass("text-destructive");
 	});
 
-	test("the footer shows which round is displayed", () => {
-		renderBoard({ footer: footer() });
-		expect(screen.getByText("Round 2 of 3")).toBeInTheDocument();
+	test("the room bar shows the room code and which round is displayed", () => {
+		renderBoard({ room: ROOM, footer: footer() });
+		const bar = document.querySelector<HTMLElement>("[data-slot=room-bar]")!;
+		expect(within(bar).getByText("ABCD")).toBeInTheDocument();
+		expect(within(bar).getByText("Round 2 of 3")).toBeInTheDocument();
+		expect(follows(bar, strip(1))).toBe(true);
 	});
 
 	test("previous round navigates one round back", async () => {
 		const onGoToRound = vi.fn();
-		renderBoard({ footer: footer({ onGoToRound }) });
+		renderBoard({ room: ROOM, footer: footer({ onGoToRound }) });
 		await fireEvent.click(screen.getByRole("button", { name: "Previous round" }));
 		expect(onGoToRound).toHaveBeenCalledWith(1);
 	});
 
 	test("next round navigates one round forward", async () => {
 		const onGoToRound = vi.fn();
-		renderBoard({ footer: footer({ onGoToRound }) });
+		renderBoard({ room: ROOM, footer: footer({ onGoToRound }) });
 		await fireEvent.click(screen.getByRole("button", { name: "Next round" }));
 		expect(onGoToRound).toHaveBeenCalledWith(3);
 	});
 
 	test("previous round is disabled on the first round", () => {
-		renderBoard({ footer: footer({ round: 1 }) });
+		renderBoard({ room: ROOM, footer: footer({ round: 1 }) });
 		expect(screen.getByRole("button", { name: "Previous round" })).toBeDisabled();
 	});
 
 	test("next round is disabled on the latest round", () => {
-		renderBoard({ footer: footer({ round: 3 }) });
+		renderBoard({ room: ROOM, footer: footer({ round: 3 }) });
 		expect(screen.getByRole("button", { name: "Next round" })).toBeDisabled();
+	});
+
+	test("the replay buttons step through the round's moves", async () => {
+		const moves = replay({ canStepForward: true, isViewingHistory: true, moveNumber: 2 });
+		renderBoard({ footer: footer(), replay: moves });
+		await fireEvent.click(screen.getByRole("button", { name: "First move" }));
+		await fireEvent.click(screen.getByRole("button", { name: "Previous move" }));
+		await fireEvent.click(screen.getByRole("button", { name: "Next move" }));
+		await fireEvent.click(screen.getByRole("button", { name: "Live" }));
+		expect(moves.onFirst).toHaveBeenCalledOnce();
+		expect(moves.onBack).toHaveBeenCalledOnce();
+		expect(moves.onForward).toHaveBeenCalledOnce();
+		expect(moves.onLive).toHaveBeenCalledOnce();
+	});
+
+	test("next move and live are disabled at the live position", () => {
+		renderBoard({ footer: footer(), replay: replay() });
+		expect(screen.getByRole("button", { name: "Next move" })).toBeDisabled();
+		expect(screen.getByRole("button", { name: "Live" })).toBeDisabled();
+	});
+
+	test("first and previous move are disabled before any move", () => {
+		renderBoard({ footer: footer(), replay: replay({ canStepBack: false, moveNumber: 0 }) });
+		expect(screen.getByRole("button", { name: "First move" })).toBeDisabled();
+		expect(screen.getByRole("button", { name: "Previous move" })).toBeDisabled();
+	});
+
+	test("scrubbing shows the move number under the replay buttons, not over the board", () => {
+		const moves = replay({ isViewingHistory: true, moveNumber: 2, canStepForward: true });
+		renderBoard({ footer: footer(), replay: moves });
+		expect(moveReadout()).toHaveTextContent("Move 2 of 3");
+		expect(follows(controls(), moveReadout())).toBe(true);
+		expect(within(boardArea()).queryByText(/Move/)).not.toBeInTheDocument();
+		expect(within(boardArea()).queryByRole("button")).not.toBeInTheDocument();
+		expect(within(controls()).getByRole("button", { name: "Live" })).toBeEnabled();
+	});
+
+	test("at the live position the move readout keeps its slot but stays empty", () => {
+		renderBoard({ footer: footer(), replay: replay() });
+		expect(moveReadout()).toBeInTheDocument();
+		expect(moveReadout().textContent?.trim()).toBe("");
 	});
 
 	test("a past round offers Go live", async () => {
@@ -413,11 +526,11 @@ describe("Board", () => {
 	test("a closed room offers Play again", async () => {
 		const onPlayAgain = vi.fn();
 		renderBoard({ myIndex: 0, footer: footer({ roomClosed: true, onPlayAgain }) });
-		await fireEvent.click(screen.getByRole("button", { name: "Play again" }));
+		await fireEvent.click(within(controls()).getByRole("button", { name: "Play again" }));
 		expect(onPlayAgain).toHaveBeenCalledOnce();
 	});
 
-	test("a host waiting for an opponent can abandon directly", async () => {
+	test("a host waiting for an opponent can abandon after confirming", async () => {
 		const onAbandon = vi.fn();
 		renderBoard({
 			myIndex: 0,
@@ -425,47 +538,61 @@ describe("Board", () => {
 			footer: footer({ waitingForOpponent: true, onAbandon })
 		});
 		await fireEvent.click(screen.getByRole("button", { name: "Abandon" }));
+		expect(await screen.findByText("Leave and close this room?")).toBeInTheDocument();
+		await fireEvent.click(screen.getByRole("button", { name: "Close room" }));
 		expect(onAbandon).toHaveBeenCalledOnce();
 	});
 
-	test("a spectator can't abandon someone else's waiting room", () => {
-		renderBoard({ status: { type: "waiting" }, footer: footer({ waitingForOpponent: true }) });
-		expect(screen.getByRole("button", { name: "Abandon" })).toBeDisabled();
+	test("a spectator sees a Spectating pill instead of the round action", () => {
+		renderBoard({ status: { type: "turn", player: 0 }, footer: footer() });
+		expect(screen.getByText("Spectating")).toBeInTheDocument();
+		for (const name of ["Resign", "Rematch", "Abandon"]) {
+			expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+		}
 	});
 
-	test("resigning from the Resign menu forfeits the round", async () => {
+	test("resigning asks for confirmation before forfeiting the round", async () => {
 		const onResign = vi.fn();
 		renderBoard({ myIndex: 0, status: { type: "turn", player: 0 }, footer: footer({ onResign }) });
 
 		await openMenu("Resign");
 		await fireEvent.click(screen.getByRole("menuitem", { name: "Resign" }));
+		expect(await screen.findByText("Resign this round?")).toBeInTheDocument();
+		expect(onResign).not.toHaveBeenCalled();
+		await fireEvent.click(screen.getByRole("button", { name: "Resign round" }));
 
 		expect(onResign).toHaveBeenCalledOnce();
 	});
 
-	test("the Resign menu also offers abandoning the room", async () => {
+	test("cancelling a resignation sends nothing", async () => {
+		const onResign = vi.fn();
+		renderBoard({ myIndex: 0, status: { type: "turn", player: 0 }, footer: footer({ onResign }) });
+
+		await openMenu("Resign");
+		await fireEvent.click(screen.getByRole("menuitem", { name: "Resign" }));
+		await fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
+
+		expect(onResign).not.toHaveBeenCalled();
+	});
+
+	test("the Resign menu also offers abandoning the room, after confirming", async () => {
 		const onAbandon = vi.fn();
 		renderBoard({ myIndex: 0, status: { type: "turn", player: 0 }, footer: footer({ onAbandon }) });
 
 		await openMenu("Resign");
 		await fireEvent.click(screen.getByRole("menuitem", { name: "Abandon" }));
+		await fireEvent.click(await screen.findByRole("button", { name: "Close room" }));
 
 		expect(onAbandon).toHaveBeenCalledOnce();
 	});
 
-	test("a finished round offers a rematch", async () => {
+	test("a finished round offers a rematch in one click", async () => {
 		const onRematch = vi.fn();
 		renderBoard({ myIndex: 0, status: { type: "draw" }, footer: footer({ onRematch }) });
 
-		await openMenu("Rematch");
-		await fireEvent.click(screen.getByRole("menuitem", { name: "Rematch" }));
+		await fireEvent.click(within(controls()).getByRole("button", { name: "Rematch" }));
 
 		expect(onRematch).toHaveBeenCalledOnce();
-	});
-
-	test("a spectator can't resign for a player", () => {
-		renderBoard({ status: { type: "turn", player: 0 }, footer: footer() });
-		expect(screen.getByRole("button", { name: "Resign" })).toBeDisabled();
 	});
 
 	test("a footer error is shown to the viewer", () => {
@@ -478,7 +605,302 @@ describe("Board", () => {
 		renderBoard({ footer: footer({ error: null }) });
 		const slot = screen.getByRole("alert");
 		expect(slot.textContent?.trim()).toBe("");
-		expect(slot).toHaveClass("h-5", "truncate", "opacity-0");
+		expect(slot).toHaveClass("h-5", "opacity-0");
+	});
+
+	test("the notice line holds only the room error, never the disconnect notice", () => {
+		renderBoard({
+			myIndex: 0,
+			status: { type: "turn", player: 1 },
+			opponentDisconnected: true,
+			footer: footer({ error: "Not your turn" })
+		});
+		expect(screen.getByRole("alert")).toHaveTextContent("Not your turn");
+		expect(screen.getByRole("alert")).not.toHaveTextContent("disconnected");
+	});
+
+	test("a finished round shows the result card over the board", () => {
+		renderBoard({
+			myIndex: 0,
+			status: { type: "winner", player: 0, reason: "resign" },
+			footer: footer()
+		});
+		const card = within(boardArea());
+		expect(card.getByRole("heading", { name: "You won" })).toBeInTheDocument();
+		expect(card.getByText("Bob resigned")).toBeInTheDocument();
+		expect(card.getByRole("button", { name: "Rematch" })).toBeInTheDocument();
+		expect(card.getByRole("button", { name: "New opponent" })).toBeInTheDocument();
+		expect(card.getByRole("button", { name: "Lobby" })).toBeInTheDocument();
+	});
+
+	test("the result card's rating line shows the round's settled change", () => {
+		renderBoard({
+			myIndex: 0,
+			status: { type: "winner", player: 0 },
+			footer: footer(),
+			rounds: [{ round: 2, result: "win", mmr: 8 }]
+		});
+		expect(within(boardArea()).getByText("+8 rating")).toBeInTheDocument();
+	});
+
+	test.each([
+		["Rematch", "onRematch"],
+		["New opponent", "onNewOpponent"],
+		["Lobby", "onLobby"]
+	] as const)("the result card's %s button calls %s", async (name, callback) => {
+		const actions = footer();
+		renderBoard({ myIndex: 0, status: { type: "draw" }, footer: actions });
+		await fireEvent.click(within(boardArea()).getByRole("button", { name }));
+		expect(actions[callback]).toHaveBeenCalledOnce();
+	});
+
+	test("the controls hide their round action while the result card shows it", () => {
+		renderBoard({ myIndex: 0, status: { type: "draw" }, footer: footer() });
+		const action = within(controls()).getByRole("button", { name: "Rematch" });
+		expect(action.closest("[data-slot=round-action]")).toHaveClass("invisible");
+	});
+
+	test("the side panel hides its round action while the result card shows it", () => {
+		renderBoard({ room: ROOM, myIndex: 0, status: { type: "draw" }, footer: footer() });
+		const panel = within(screen.getByRole("complementary", { name: "Room" }));
+		const action = panel.getByRole("button", { name: "Rematch" });
+		expect(action.closest("[data-slot=round-action]")).toHaveClass("invisible");
+	});
+
+	test("View board hides the result card and shows Rematch in the controls", async () => {
+		renderBoard({ myIndex: 0, status: { type: "draw" }, footer: footer() });
+		await fireEvent.click(screen.getByRole("button", { name: "View board" }));
+		await waitFor(() => expect(within(boardArea()).queryByRole("heading")).not.toBeInTheDocument());
+		const action = within(controls()).getByRole("button", { name: "Rematch" });
+		expect(action.closest("[data-slot=round-action]")).not.toHaveClass("invisible");
+	});
+
+	test("the result card leaves Lobby to the header nav from sm", () => {
+		renderBoard({ myIndex: 0, status: { type: "draw" }, footer: footer() });
+		const card = within(boardArea());
+		expect(card.getByRole("button", { name: "Lobby" })).toHaveClass("sm:hidden");
+		expect(card.getByRole("button", { name: "New opponent" })).toHaveClass("sm:col-span-2");
+	});
+
+	test("Escape hides the result card", async () => {
+		renderBoard({ myIndex: 0, status: { type: "draw" }, footer: footer() });
+		await fireEvent.keyDown(window, { key: "Escape" });
+		await waitFor(() => expect(within(boardArea()).queryByRole("heading")).not.toBeInTheDocument());
+	});
+
+	test("no result card shows while scrubbing", () => {
+		renderBoard({
+			myIndex: 0,
+			status: { type: "draw" },
+			footer: footer(),
+			replay: replay({ isViewingHistory: true })
+		});
+		expect(within(boardArea()).queryByRole("heading")).not.toBeInTheDocument();
+	});
+
+	test("a closed room's card offers Play again and the lobby", () => {
+		renderBoard({
+			myIndex: 0,
+			status: { type: "winner", player: 0, reason: "abandon" },
+			footer: footer({ roomClosed: true })
+		});
+		const card = within(boardArea());
+		expect(card.getByRole("heading", { name: "Bob left the room" })).toBeInTheDocument();
+		expect(card.getByRole("button", { name: "Play again" })).toBeInTheDocument();
+		expect(card.queryByRole("button", { name: "Rematch" })).not.toBeInTheDocument();
+	});
+
+	test("a waiting host sees the invite card with the code and Copy link", () => {
+		renderBoard({
+			room: ROOM,
+			myIndex: 0,
+			status: { type: "waiting" },
+			footer: footer({ waitingForOpponent: true })
+		});
+		const card = within(boardArea());
+		expect(card.getByRole("heading", { name: "Waiting for an opponent" })).toBeInTheDocument();
+		expect(card.getByText("ABCD")).toBeInTheDocument();
+		expect(card.getByRole("button", { name: "Copy link" })).toBeInTheDocument();
+	});
+
+	test("while the invite card shows, the room bar and side panel hide their Copy link", () => {
+		renderBoard({
+			room: ROOM,
+			myIndex: 0,
+			status: { type: "waiting" },
+			footer: footer({ waitingForOpponent: true })
+		});
+		const bar = document.querySelector<HTMLElement>("[data-slot=room-bar]")!;
+		const panel = screen.getByRole("complementary", { name: "Room" });
+		expect(within(bar).getByRole("button", { name: "Copy link" })).toHaveClass("invisible");
+		expect(within(panel).getByRole("button", { name: "Copy link" })).toHaveClass("invisible");
+	});
+
+	test("once a game is on, the room bar and side panel offer Copy link", () => {
+		renderBoard({ room: ROOM, myIndex: 0, status: { type: "turn", player: 0 }, footer: footer() });
+		const bar = document.querySelector<HTMLElement>("[data-slot=room-bar]")!;
+		const panel = screen.getByRole("complementary", { name: "Room" });
+		expect(within(bar).getByRole("button", { name: "Copy link" })).not.toHaveClass("invisible");
+		expect(within(panel).getByRole("button", { name: "Copy link" })).not.toHaveClass("invisible");
+	});
+
+	test("the invite card offers Share only where the browser can share", () => {
+		vi.stubGlobal("navigator", { ...navigator, share: vi.fn() });
+		onTestFinished(() => {
+			vi.unstubAllGlobals();
+		});
+		renderBoard({
+			room: ROOM,
+			myIndex: 0,
+			status: { type: "waiting" },
+			footer: footer({ waitingForOpponent: true })
+		});
+		expect(within(boardArea()).getByRole("button", { name: "Share" })).toBeInTheDocument();
+	});
+
+	test("the invite card has no Share without navigator.share", () => {
+		renderBoard({
+			room: ROOM,
+			myIndex: 0,
+			status: { type: "waiting" },
+			footer: footer({ waitingForOpponent: true })
+		});
+		expect(within(boardArea()).queryByRole("button", { name: "Share" })).not.toBeInTheDocument();
+	});
+
+	test("a spectator sees the invite card without its buttons", () => {
+		renderBoard({
+			room: ROOM,
+			status: { type: "waiting" },
+			footer: footer({ waitingForOpponent: true })
+		});
+		const card = within(boardArea());
+		expect(card.getByRole("heading", { name: "Waiting for an opponent" })).toBeInTheDocument();
+		expect(card.queryByRole("button")).not.toBeInTheDocument();
+	});
+
+	test("the side panel lists the viewer's rounds with results and rating changes", () => {
+		renderBoard({
+			room: ROOM,
+			myIndex: 0,
+			status: { type: "turn", player: 0 },
+			footer: footer({ round: 3 }),
+			rounds: [
+				{ round: 3, result: "playing", mmr: null },
+				{ round: 2, result: "loss", mmr: -8 },
+				{ round: 1, result: "win", mmr: 8 }
+			]
+		});
+		const panel = within(screen.getByRole("complementary", { name: "Room" }));
+		const links = panel.getAllByRole("link");
+		expect(links.map((link) => link.textContent?.replace(/\s+/g, " ").trim())).toEqual([
+			"Round 3 Playing —",
+			"Round 2 Loss −8",
+			"Round 1 Win +8"
+		]);
+		expect(links[2]).toHaveAttribute("href", "/tictactoe/ABCD/1");
+		expect(links[0]).toHaveAttribute("aria-current", "page");
+	});
+
+	test("the side panel holds the replay buttons, then the round action at its bottom", async () => {
+		const onResign = vi.fn();
+		const moves = replay();
+		renderBoard({
+			room: ROOM,
+			myIndex: 0,
+			status: { type: "turn", player: 0 },
+			footer: footer({ onResign }),
+			replay: moves
+		});
+		const panel = screen.getByRole("complementary", { name: "Room" });
+		const back = within(panel).getByRole("button", { name: "Previous move" });
+		const resign = within(panel).getByRole("button", { name: "Resign" });
+		expect(follows(back, resign)).toBe(true);
+		expect(panel.lastElementChild?.lastElementChild).toContainElement(resign);
+		await fireEvent.click(back);
+		expect(moves.onBack).toHaveBeenCalledOnce();
+	});
+
+	test("the side panel shows the move number between the replay buttons", () => {
+		renderBoard({
+			room: ROOM,
+			myIndex: 0,
+			status: { type: "turn", player: 0 },
+			footer: footer(),
+			replay: replay({ isViewingHistory: true, moveNumber: 2, canStepForward: true })
+		});
+		const panel = within(screen.getByRole("complementary", { name: "Room" }));
+		const readout = panel.getByText("Move 2 of 3");
+		expect(follows(panel.getByRole("button", { name: "Previous move" }), readout)).toBe(true);
+		expect(follows(readout, panel.getByRole("button", { name: "Next move" }))).toBe(true);
+	});
+
+	test("the side panel doesn't repeat the players, scores, or clocks", () => {
+		renderBoard({
+			room: ROOM,
+			myIndex: 0,
+			status: { type: "turn", player: 0 },
+			footer: footer(),
+			clock: { remaining: [65_000, 600_000], activeSeat: 0 }
+		});
+		const panel = within(screen.getByRole("complementary", { name: "Room" }));
+		expect(panel.queryByText("Alice")).not.toBeInTheDocument();
+		expect(panel.queryByText("Bob")).not.toBeInTheDocument();
+		expect(panel.queryByText(/Score/)).not.toBeInTheDocument();
+		expect(panel.queryByText("1:05")).not.toBeInTheDocument();
+	});
+
+	test("the board area describes its keys to screen readers", () => {
+		renderBoard();
+		expect(
+			within(boardArea()).getByText("Arrow keys move on the board. [ and ] step through moves.")
+		).toBeInTheDocument();
+	});
+
+	test("the side panel offers the keyboard shortcuts on hover or focus", async () => {
+		// jsdom has no ResizeObserver, which the tooltip uses to track its trigger.
+		vi.stubGlobal(
+			"ResizeObserver",
+			class {
+				observe() {}
+				unobserve() {}
+				disconnect() {}
+			}
+		);
+		onTestFinished(() => {
+			vi.unstubAllGlobals();
+		});
+		renderBoard({ room: ROOM, myIndex: 0, footer: footer() });
+		const panel = within(screen.getByRole("complementary", { name: "Room" }));
+		const trigger = panel.getByRole("button", { name: "Keyboard shortcuts" });
+		trigger.focus();
+		await fireEvent.focus(trigger);
+		expect(await screen.findAllByText("Step through moves")).not.toHaveLength(0);
+	});
+
+	test("a spectator's side panel has no round list", () => {
+		renderBoard({ room: ROOM, status: { type: "turn", player: 0 }, footer: footer() });
+		const panel = within(screen.getByRole("complementary", { name: "Room" }));
+		expect(panel.queryByRole("link")).not.toBeInTheDocument();
+		expect(panel.getByText("Spectating")).toBeInTheDocument();
+	});
+
+	test("the viewer's strip reads You must capture on a forced capture", () => {
+		renderBoard({ myIndex: 0, status: { type: "turn", player: 0 }, mustCapture: true });
+		expect(visibleLayers(0)[0]).toHaveTextContent("You must capture");
+	});
+
+	test("a rules snippet adds a Rules popover", async () => {
+		const rules = createRawSnippet(() => ({ render: () => "<p>Three in a row wins a board.</p>" }));
+		renderBoard({ room: ROOM, footer: footer(), rules });
+		const [trigger] = screen.getAllByRole("button", { name: "Rules" });
+		await fireEvent.click(trigger);
+		expect(await screen.findByText("Three in a row wins a board.")).toBeInTheDocument();
+	});
+
+	test("no Rules button without a rules snippet", () => {
+		renderBoard({ room: ROOM, footer: footer() });
+		expect(screen.queryByRole("button", { name: "Rules" })).not.toBeInTheDocument();
 	});
 
 	test.each([
@@ -489,13 +911,18 @@ describe("Board", () => {
 		[{ type: "winner" as const, player: 0 as const }, null, "Alice won"]
 	])("status %o seen by seat %s reads %s to screen readers", (status, myIndex, text) => {
 		renderBoard({ status, myIndex });
-		expect(screen.getByRole("status")).toHaveTextContent(text);
-		expect(screen.getByRole("status")).toHaveClass("sr-only");
+		expect(gameStatus()).toHaveTextContent(text);
+		expect(gameStatus()).toHaveClass("sr-only");
+	});
+
+	test("a forced capture on the viewer's turn is spoken with the turn", () => {
+		renderBoard({ myIndex: 0, status: { type: "turn", player: 0 }, mustCapture: true });
+		expect(gameStatus()).toHaveTextContent("Your turn. You must capture.");
 	});
 
 	test("status changes are announced politely", async () => {
 		const { rerender } = renderBoard({ status: { type: "turn", player: 0 } });
-		const region = screen.getByRole("status");
+		const region = gameStatus();
 		expect(region).toHaveTextContent("Alice's turn");
 
 		await rerender({ status: { type: "winner", player: 1 } });
@@ -510,9 +937,10 @@ describe("Board", () => {
 		["Go live", {}, { isLive: false }],
 		["Play again", { myIndex: 0 as const }, { roomClosed: true }],
 		["Abandon", { myIndex: 0 as const }, { waitingForOpponent: true }]
-	])("the %s button has a fixed width", (name, props, overrides) => {
+	])("the %s button sits in a fixed-width slot", (name, props, overrides) => {
 		renderBoard({ ...props, footer: footer(overrides) });
-		expect(screen.getByRole("button", { name })).toHaveClass("w-28", "sm:w-32");
+		const button = within(controls()).getByRole("button", { name });
+		expect(button.closest("[data-slot=round-action]")).toHaveClass("w-28", "sm:w-32");
 	});
 
 	test("the board takes the room's content width on phones", () => {

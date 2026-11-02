@@ -1,4 +1,11 @@
 export { Lobby } from "./lobby/index.js";
 export { History } from "./history/index.js";
 export { Play } from "./play/index.js";
-export { Leaderboard } from "./leaderboard/index.js";
+export { Leaderboard, RatingRules, RatingSummary } from "./leaderboard/index.js";
+export { Home } from "./home/index.js";
+export { Stats } from "./stats/index.js";
+export { Door, Lesson, RULES, type GameRules } from "./rules/index.js";
+export { Tour } from "./tour/index.js";
+export { About } from "./about/index.js";
+export { Legal, type LegalHighlight, type LegalSection } from "./legal/index.js";
+export { Settings } from "./settings/index.js";

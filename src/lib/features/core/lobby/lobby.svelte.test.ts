@@ -60,7 +60,7 @@ beforeEach(() => {
 });
 
 function isPlayingShown() {
-	return screen.queryByRole("link", { name: "Play" }) !== null;
+	return screen.queryByRole("button", { name: "Abandon" }) !== null;
 }
 
 describe("Lobby", () => {
@@ -76,7 +76,7 @@ describe("Lobby", () => {
 		render(Lobby);
 		expect(screen.getByRole("status")).toHaveTextContent("Loading");
 		expect(isPlayingShown()).toBe(false);
-		expect(screen.queryByText("Hosted by Bob Baker · 5 min")).not.toBeInTheDocument();
+		expect(screen.queryByText("Hosted by Bob Baker")).not.toBeInTheDocument();
 	});
 
 	test("shows the active room and the open rooms together once both load", () => {
@@ -85,15 +85,15 @@ describe("Lobby", () => {
 		render(Lobby);
 		expect(screen.queryByRole("status")).not.toBeInTheDocument();
 		expect(isPlayingShown()).toBe(true);
-		expect(screen.getByText("Hosted by Bob Baker · 5 min")).toBeInTheDocument();
+		expect(screen.getByText("Hosted by Bob Baker")).toBeInTheDocument();
 	});
 
 	test("puts the active room after the feed, so its arrival never pushes the list down", () => {
 		setQueryResult(api.models.rooms.index.lobbies, [OPEN_ROOM]);
 		setQueryResult(api.models.rooms.index.active, { code: "ABCD", type: "tictactoe" });
 		render(Lobby);
-		const list = screen.getByText("Hosted by Bob Baker · 5 min");
-		const card = screen.getByRole("link", { name: "Play" });
+		const list = screen.getByText("Hosted by Bob Baker");
+		const card = screen.getByRole("button", { name: "Abandon" });
 		expect(card.compareDocumentPosition(list)).toBe(Node.DOCUMENT_POSITION_PRECEDING);
 	});
 
@@ -105,16 +105,35 @@ describe("Lobby", () => {
 		expect(screen.getByRole("button", { name: "Join" })).toBeInTheDocument();
 	});
 
-	test("Sign in is disabled when the auth client failed to load", () => {
-		context.auth!.hydrate(null);
-		context.auth!.loadError = "Failed to load @clerk/ui bundle";
+	test("an empty lobby says so and leaves new games to the Play nav", () => {
+		setQueryResult(api.models.rooms.index.lobbies, []);
+		setQueryResult(api.models.rooms.index.active, null);
 		render(Lobby);
-		expect(screen.getByRole("button", { name: "Sign in" })).toBeDisabled();
+		expect(screen.getByText("No open rooms right now")).toBeInTheDocument();
+		expect(screen.queryByRole("link")).not.toBeInTheDocument();
 	});
 
-	test("Sign in is enabled while signed out", () => {
+	test("signed out, asks to sign in with a Sign in button", () => {
 		context.auth!.hydrate(null);
 		render(Lobby);
+		expect(screen.getByText("Sign in to browse open rooms.")).toBeInTheDocument();
 		expect(screen.getByRole("button", { name: "Sign in" })).toBeEnabled();
+	});
+
+	test("your own open room shows as waiting, with no link beside the header's live-game pill", () => {
+		setQueryResult(api.models.rooms.index.lobbies, [{ ...OPEN_ROOM, isOwn: true }]);
+		setQueryResult(api.models.rooms.index.active, null);
+		render(Lobby);
+		expect(screen.getByText("Waiting")).toBeInTheDocument();
+		expect(screen.queryByRole("link")).not.toBeInTheDocument();
+		expect(screen.queryByRole("button", { name: "Join" })).not.toBeInTheDocument();
+	});
+
+	test("keeps a room's clock beside the host name, so a long name truncates instead", () => {
+		setQueryResult(api.models.rooms.index.lobbies, [OPEN_ROOM]);
+		setQueryResult(api.models.rooms.index.active, null);
+		render(Lobby);
+		expect(screen.getByText("Hosted by Bob Baker")).toHaveClass("truncate");
+		expect(screen.getByText("5 min")).toHaveClass("whitespace-nowrap");
 	});
 });

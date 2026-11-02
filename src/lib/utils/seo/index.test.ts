@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { GAMES } from "$lib/features/play";
 import {
 	INDEXED_PATHS,
 	SITE_URL,
@@ -10,6 +11,18 @@ import {
 	sitemapXml
 } from "./index.js";
 
+const EXPECTED_PATHS = [
+	"/",
+	"/play",
+	"/how-to-play",
+	"/how-to-play/tictactoe",
+	"/how-to-play/checkers",
+	"/tour",
+	"/about",
+	"/privacy",
+	"/terms"
+];
+
 describe("SITE_URL", () => {
 	test("is the production origin", () => {
 		expect(SITE_URL).toBe("https://twoplay.xyz");
@@ -17,8 +30,14 @@ describe("SITE_URL", () => {
 });
 
 describe("INDEXED_PATHS", () => {
-	test("lists the landing and play pages", () => {
-		expect(INDEXED_PATHS).toEqual(["/", "/play"]);
+	test("lists the landing, play, rules, and info pages", () => {
+		expect(INDEXED_PATHS).toEqual(EXPECTED_PATHS);
+	});
+
+	test("has a rules page for every game", () => {
+		for (const game of Object.keys(GAMES)) {
+			expect(INDEXED_PATHS).toContain(`/how-to-play/${game}`);
+		}
 	});
 });
 
@@ -26,6 +45,17 @@ describe("isIndexable", () => {
 	test("accepts indexed paths on the production origin", () => {
 		expect(isIndexable(new URL("https://twoplay.xyz/"))).toBe(true);
 		expect(isIndexable(new URL("https://twoplay.xyz/play?game=checkers"))).toBe(true);
+	});
+
+	test("accepts rules and info pages", () => {
+		expect(isIndexable(new URL("/how-to-play/checkers", SITE_URL))).toBe(true);
+		expect(isIndexable(new URL("/privacy", SITE_URL))).toBe(true);
+	});
+
+	test("rejects stats, settings, and unknown rules pages", () => {
+		for (const path of ["/me", "/settings", "/how-to-play/chess"]) {
+			expect(isIndexable(new URL(path, SITE_URL))).toBe(false);
+		}
 	});
 
 	test("rejects rooms, history, lobby, and leaderboard", () => {
@@ -65,7 +95,7 @@ describe("sitemapXml", () => {
 		const body = sitemapXml();
 		expect(body).toContain('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">');
 		const locs = [...body.matchAll(/<loc>(.*?)<\/loc>/g)].map((match) => match[1]);
-		expect(locs).toEqual(["https://twoplay.xyz/", "https://twoplay.xyz/play"]);
+		expect(locs).toEqual(EXPECTED_PATHS.map((path) => `https://twoplay.xyz${path}`));
 	});
 });
 

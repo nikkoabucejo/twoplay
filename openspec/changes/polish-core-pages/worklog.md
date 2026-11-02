@@ -1,0 +1,3 @@
+- PLAN done
+- QA partial: lobby Abandon confirm + Cancel pass, no side panel on Lobby/History, leaderboard podium/table/ratings pass; tiny header CLS on load; pinned row unverified (500s mid-edit)
+- QA rerun: fail. Leaderboard at 360x640: Feed (ranks/podium/table) collapses to 0px under the sidebar, so pinned own row can't be reached. 5.6 left open

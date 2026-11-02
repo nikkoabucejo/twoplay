@@ -12,7 +12,7 @@
 	import { GAMES } from "$lib/features/play";
 	import { Mood, setupMood } from "$lib/features/presence";
 	import { setupClerkAuth } from "$lib/services/auth";
-	import { isGameRoomRoute, liveGameHref, showsDock } from "$lib/utils/navigation";
+	import { isGameRoomRoute, isGatedRoute, liveGameHref, showsDock } from "$lib/utils/navigation";
 	import { setupPreferences } from "$lib/utils/storage";
 	import { cn } from "$lib/utils/style";
 	import { api } from "../../convex/_generated/api.js";
@@ -55,8 +55,9 @@
 	let main = $state<HTMLElement>();
 
 	// `main` is the scroll container, so SvelteKit's window scroll restoration doesn't reach it.
-	afterNavigate(({ type }) => {
-		if (type !== "popstate" && main) main.scrollTop = 0;
+	// A URL with a hash keeps the spot the browser scrolled to.
+	afterNavigate(({ type, to }) => {
+		if (type !== "popstate" && !to?.url.hash && main) main.scrollTop = 0;
 	});
 </script>
 
@@ -69,7 +70,7 @@
 	<Mood {mood} />
 
 	<div class="relative z-40 shrink-0">
-		<Header pathname={page.url.pathname} {live} />
+		<Header pathname={page.url.pathname} {live} isGated={isGatedRoute(page.route.id)} />
 
 		{#if auth.loadError}
 			<Banner message="Sign-in is unavailable right now." tone="error">
@@ -88,10 +89,11 @@
 		)}
 	>
 		{@render children()}
-		{#if !isRoom}
-			<Footer />
-		{/if}
 	</main>
+
+	{#if !isRoom}
+		<Footer />
+	{/if}
 
 	{#if showDock}
 		<Dock pathname={page.url.pathname} />

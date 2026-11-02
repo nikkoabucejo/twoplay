@@ -13,3 +13,18 @@ export async function copyLink(url: string, { clipboard, toaster }: CopyLinkDeps
 		toaster.show("Couldn't copy the link", { tone: "error" });
 	}
 }
+
+type ShareLinkDeps = {
+	share: (data: ShareData) => Promise<void>;
+	toaster: Pick<Toaster, "show">;
+};
+
+export async function shareLink(url: string, { share, toaster }: ShareLinkDeps): Promise<void> {
+	try {
+		await share({ url });
+	} catch (err) {
+		// The user closed the share sheet.
+		if (err instanceof DOMException && err.name === "AbortError") return;
+		toaster.show("Couldn't share the link", { tone: "error" });
+	}
+}

@@ -1,6 +1,7 @@
 import {
 	hasOtherPlayableBoard,
 	markOf,
+	playerIndexOf,
 	WINNING_LINES
 } from "../../../../../convex/models/games/tictactoe/rules.js";
 import { tictactoeEngine } from "../../../../../convex/models/games/tictactoe/index.js";
@@ -112,6 +113,35 @@ export class TictactoeRoom extends Room {
 			!this.isForbidden(boardIndex)
 		);
 	}
+
+	/** True when the player to move may play that board now. The ring follows the mover, so it reads
+	 *  the same for every viewer; `canPlay` is the viewer's own gate. */
+	isPlayable(boardIndex: number): boolean {
+		return (
+			this.game.isLive &&
+			this.game.endedSeat === null &&
+			!this.isWaitingForOpponent &&
+			!this.isViewingHistory &&
+			!this.isOver &&
+			this.statuses[boardIndex]?.status === "playing" &&
+			!this.isForbidden(boardIndex)
+		);
+	}
+
+	/** The mark the shown position added to the one before it. Before the first history entry, the
+	 *  only mark on the board is the move. */
+	lastMove = $derived.by((): { boardIndex: number; cellIndex: number; seat: 0 | 1 } | null => {
+		const previous = this.previousDisplayState;
+		const before = previous?.kind === "tictactoe" ? previous.boards : null;
+		const marks = this.boards.flatMap((cells, boardIndex) =>
+			cells.flatMap((cell, cellIndex) =>
+				cell !== null && (before === null || before[boardIndex][cellIndex] === null)
+					? [{ boardIndex, cellIndex, seat: playerIndexOf(cell) }]
+					: []
+			)
+		);
+		return marks.length === 1 ? marks[0] : null;
+	});
 
 	isWinningCell(boardIndex: number, cellIndex: number): boolean {
 		return this.statuses[boardIndex]?.winningLine?.includes(cellIndex) ?? false;

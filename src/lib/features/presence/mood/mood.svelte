@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { prefersReducedMotion } from "svelte/motion";
 	import { cn } from "$lib/utils/style";
 	import type { MoodPresence } from "./mood.svelte.js";
 
@@ -11,8 +12,38 @@
 	const winnerSeat = $derived(mood.status?.type === "winner" ? mood.status.player : null);
 	// "waiting" (short a seat) gets the exact same treatment as "draw" — a neutral, no-one's-turn mood.
 	const isDraw = $derived(mood.status?.type === "draw" || mood.status?.type === "waiting");
+	const isSearching = $derived(mood.status === null && mood.searching);
+
+	let backdrop = $state<HTMLDivElement>();
+
+	// Changing the rate rather than animation-duration keeps every cloud where it is mid-drift.
+	$effect(() => {
+		const rate = isSearching ? 3 : 1;
+		// Turning reduced motion off starts fresh drift animations at the default rate.
+		void prefersReducedMotion.current;
+		for (const animation of backdrop?.getAnimations({ subtree: true }) ?? []) {
+			// Only the drift and float keyframes; the swell transition keeps its own pace.
+			if ("animationName" in animation) animation.updatePlaybackRate(rate);
+		}
+	});
+
+	// While searching, the seats take turns swelling, one beat per swell transition.
+	let searchLead = $state<0 | 1>(0);
+
+	$effect(() => {
+		if (!isSearching) return;
+		searchLead = 0;
+		const interval = setInterval(() => {
+			const isReduced =
+				prefersReducedMotion.current ||
+				document.documentElement.classList.contains("reduce-motion");
+			if (!isReduced) searchLead = searchLead === 0 ? 1 : 0;
+		}, 1400);
+		return () => clearInterval(interval);
+	});
 
 	function moodScale(seat: 0 | 1) {
+		if (isSearching) return searchLead === seat ? 1.4 : 0.8;
 		if (isDraw) return 1;
 		if (winnerSeat !== null) return winnerSeat === seat ? 1.9 : 0.2;
 		if (activeSeat === seat) return 1.3;
@@ -21,6 +52,7 @@
 	}
 
 	function moodOpacity(seat: 0 | 1) {
+		if (isSearching) return searchLead === seat ? 1 : 0.7;
 		if (isDraw) return 1;
 		if (winnerSeat !== null) return winnerSeat === seat ? 1 : 0;
 		if (activeSeat === seat) return 1;
@@ -39,7 +71,7 @@
 {#snippet cloud(seat: 0 | 1, color: string, position: string, anim: string)}
 	<div class={cn("absolute", position, anim)}>
 		<div
-			class="size-full transition-[scale,opacity] duration-1400 ease-out"
+			class="size-full motion-safe:transition-[scale,opacity] motion-safe:duration-1400 motion-safe:ease-out"
 			style="scale: {moodScale(seat)}; opacity: {moodOpacity(seat)}; --blob-speed: {moodSpeed(
 				seat
 			)}"
@@ -81,6 +113,7 @@
 {/snippet}
 
 <div
+	bind:this={backdrop}
 	class={cn(
 		"pointer-events-none absolute inset-0 -z-10 overflow-hidden transition-[filter] duration-1400 ease-out",
 		isDraw && "grayscale saturate-0"

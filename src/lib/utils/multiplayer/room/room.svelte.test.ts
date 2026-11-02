@@ -17,9 +17,10 @@ import {
 	mutationFor,
 	resetConvex,
 	roomSnapshot,
+	setQueryError,
 	setQueryResult
 } from "./fake-convex.svelte.js";
-import { Room, type ClientEngine } from "./room.svelte.js";
+import { Room, roomPath, type ClientEngine } from "./room.svelte.js";
 
 vi.mock("convex-svelte", () => import("./fake-convex.svelte.js"));
 
@@ -53,6 +54,10 @@ class SeatRoom extends Room {
 
 	get shownState() {
 		return this.displayState;
+	}
+
+	get previousState() {
+		return this.previousDisplayState;
 	}
 
 	move(move: GameMove = { kind: "tictactoe", boardIndex: 0, cellIndex: 0 }) {
@@ -582,6 +587,21 @@ describe("Room", () => {
 		expect(room.isViewingHistory).toBe(false);
 	});
 
+	test("a rematch names the round it follows", async () => {
+		const room = createRoom();
+		setQueryResult(
+			api.models.rooms.index.get,
+			roomSnapshot(afterThree, { game: { round: 2, latestRound: 2 } })
+		);
+
+		await room.rematch();
+
+		expect(mutationFor(api.models.rooms.index.rematch)).toHaveBeenCalledWith({
+			code: "ABCD",
+			round: 2
+		});
+	});
+
 	test("a rematch from a pinned past round does nothing", async () => {
 		const room = createRoom();
 		setQueryResult(
@@ -867,5 +887,137 @@ describe("Room", () => {
 		setQueryResult(api.models.rooms.index.get, roomSnapshot(afterOne));
 
 		expect(room.isMyTurnConfirmed).toBe(false);
+	});
+
+	test("the live outcome follows a pending move", () => {
+		const room = createRoom();
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(initial));
+		mutationFor(api.models.rooms.index.play).mockReturnValueOnce(deferred().promise);
+
+		void room.move();
+
+		expect(room.liveOutcome).toEqual({ turnIndex: 1, winnerIndex: null, isOver: false });
+	});
+
+	test("the live outcome ignores the scrub cursor", () => {
+		const room = createRoom();
+		playedThrough([afterOne, afterTwo, afterThree]);
+
+		room.stepBack();
+
+		expect(room.liveOutcome).toEqual({ turnIndex: 1, winnerIndex: null, isOver: false });
+	});
+
+	test("there is no live outcome while loading", () => {
+		const room = createRoom();
+		expect(room.liveOutcome).toBeNull();
+	});
+
+	test("a failed room query is reported as the load error", () => {
+		const room = createRoom();
+		setQueryError(api.models.rooms.index.get, new Error("Server Error"));
+
+		expect(room.loadError?.message).toBe("Server Error");
+		expect(room.isLoading).toBe(false);
+	});
+
+	test("a loaded room has no load error", () => {
+		const room = createRoom();
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(initial));
+		expect(room.loadError).toBeNull();
+	});
+
+	test("the previous position is the move before the live one", () => {
+		const room = createRoom();
+		playedThrough([afterOne, afterTwo, afterThree]);
+		expect(room.previousState).toEqual(afterTwo);
+	});
+
+	test("the previous position is the latest move while history is one push behind", () => {
+		const room = createRoom();
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(afterThree));
+		setQueryResult(api.models.games.index.history, historyOf([afterOne, afterTwo]));
+		expect(room.previousState).toEqual(afterTwo);
+	});
+
+	test("the previous position of a pending move is the position it was played on", () => {
+		const room = createRoom();
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(initial));
+		setQueryResult(api.models.games.index.history, []);
+		mutationFor(api.models.rooms.index.play).mockReturnValueOnce(deferred().promise);
+
+		void room.move();
+
+		expect(room.previousState).toEqual(initial);
+	});
+
+	test("while scrubbing, the previous position is the move before the shown one", () => {
+		const room = createRoom();
+		playedThrough([afterOne, afterTwo, afterThree]);
+
+		room.stepBack();
+
+		expect(room.previousState).toEqual(afterOne);
+	});
+
+	test("the first move has no previous position", () => {
+		const room = createRoom();
+		playedThrough([afterOne]);
+		expect(room.previousState).toBeNull();
+	});
+
+	test("rounds lists this room's rounds from the viewer's history", () => {
+		const room = createRoom();
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(initial));
+		setQueryResult(api.models.rooms.index.history, [
+			{
+				code: "WXYZ",
+				type: "checkers",
+				status: "closed",
+				opponentName: "Bob Baker",
+				games: [{ round: 1, createdAt: 3, result: "loss", mmr: -8 }]
+			},
+			{
+				code: "ABCD",
+				type: "tictactoe",
+				status: "active",
+				opponentName: "Bob Baker",
+				games: [
+					{ round: 2, createdAt: 2, result: "playing", mmr: null },
+					{ round: 1, createdAt: 1, result: "win", mmr: 8 }
+				]
+			}
+		]);
+
+		expect(room.rounds).toEqual([
+			{ round: 2, result: "playing", mmr: null },
+			{ round: 1, result: "win", mmr: 8 }
+		]);
+	});
+
+	test("a spectator has no rounds", () => {
+		const room = createRoom();
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(initial, { myIndex: null }));
+		setQueryResult(api.models.rooms.index.history, [
+			{
+				code: "ABCD",
+				type: "tictactoe",
+				status: "active",
+				opponentName: "Bob Baker",
+				games: [{ round: 1, createdAt: 1, result: "win", mmr: 8 }]
+			}
+		]);
+
+		expect(room.rounds).toEqual([]);
+	});
+});
+
+describe("roomPath", () => {
+	test("a round goes after the code", () => {
+		expect(roomPath("checkers", "ABCD", 2)).toBe("/checkers/ABCD/2");
+	});
+
+	test("without a round the path is the live room", () => {
+		expect(roomPath("checkers", "ABCD")).toBe("/checkers/ABCD");
 	});
 });
