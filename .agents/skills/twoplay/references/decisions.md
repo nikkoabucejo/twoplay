@@ -13,6 +13,17 @@ Template:
 **Follow-ups:** <existing code that now violates it, or "—">
 ```
 
+## 2026-11-02 — Room predicts the viewer's moves
+**Decision:** `Room` takes a `ClientEngine` (`applyMove`, `status`) in its constructor and owns
+`activeSeat`; subclasses don't override it. The viewer's moves show as a pending queue in
+`displayState`, `activeSeat`, and `isMyTurn`. `isMyTurnConfirmed` (server only) feeds `TurnAlert`,
+and `rejection` drives the toast and the `Board` `rejectionId` shake. The client imports a game's
+own barrel and `rules.ts`, never `convex/models/games/index.ts`.
+**Why:** Moves showed only after a server round-trip. One shared prediction path replaces each
+subclass's own turn derivation.
+**Supersedes:** subclasses overriding the abstract `activeSeat`.
+**Follow-ups:** —
+
 ## 2026-11-02 — `components/layout` holds page regions only
 **Decision:** `components/layout` holds only page regions (`board`, `dock`, `feed`, `footer`, `header`, `page`),
 each named in one word. Generic pieces live in `components/ui`: `Banner` (message, tone, action), `Link`

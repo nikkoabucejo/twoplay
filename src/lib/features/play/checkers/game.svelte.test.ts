@@ -10,6 +10,7 @@ import { tictactoeEngine } from "../../../../../convex/models/games/tictactoe/in
 import {
 	ALICE,
 	createRooted,
+	deferred,
 	historyOf,
 	mutationFor,
 	resetConvex,
@@ -64,6 +65,15 @@ const midChain = position(
 	],
 	{ mustContinueFrom: CHAIN_FROM }
 );
+
+/** Cyan at (5,2) jumps pink at (4,3), then must jump pink at (2,5) to land on (1,6). */
+const doubleJump = position([
+	[CAPTURER, CYAN],
+	[idx(4, 3), PINK],
+	[idx(2, 5), PINK],
+	[BYSTANDER, CYAN],
+	[idx(0, 1), PINK]
+]);
 
 let destroy: () => void;
 
@@ -254,6 +264,71 @@ describe("CheckersRoom", () => {
 		await room.select(CHAIN_TO);
 		const move: CheckersMove = { kind: "checkers", from: CHAIN_FROM, to: CHAIN_TO };
 		expect(submittedMoves()).toEqual([move]);
+	});
+
+	test("a move shows the piece on its new square while the server has not answered", () => {
+		const room = createRoom();
+		mutationFor(api.models.rooms.index.play).mockReturnValueOnce(deferred().promise);
+
+		void room.select(FRONT);
+		void room.select(FRONT_TO);
+
+		expect(room.board[FRONT]).toBeNull();
+		expect(room.board[FRONT_TO]).toEqual(CYAN);
+		expect(room.turn).toBe("pink");
+		expect(room.activeSeat).toBe(1);
+		expect(room.canMove).toBe(false);
+	});
+
+	test("a pending capture that must continue keeps the piece selected", () => {
+		const room = createRoom(roomSnapshot(doubleJump));
+		mutationFor(api.models.rooms.index.play).mockReturnValueOnce(deferred().promise);
+
+		void room.select(CAPTURER);
+		void room.select(CAPTURE_TO);
+
+		expect(room.board[idx(4, 3)]).toBeNull();
+		expect(room.mustContinueFrom).toBe(CAPTURE_TO);
+		expect(room.effectiveSelected).toBe(CAPTURE_TO);
+		expect(room.canMove).toBe(true);
+		expect(room.legalMoves).toEqual([{ from: CAPTURE_TO, to: CHAIN_TO, captured: idx(2, 5) }]);
+	});
+
+	test("the second jump of a pending capture is sent after the first", () => {
+		const room = createRoom(roomSnapshot(doubleJump));
+		const play = mutationFor(api.models.rooms.index.play);
+		play.mockReturnValueOnce(deferred().promise).mockReturnValueOnce(deferred().promise);
+
+		void room.select(CAPTURER);
+		void room.select(CAPTURE_TO);
+		void room.select(CHAIN_TO);
+
+		const firstJump: CheckersMove = { kind: "checkers", from: CAPTURER, to: CAPTURE_TO };
+		const secondJump: CheckersMove = { kind: "checkers", from: CAPTURE_TO, to: CHAIN_TO };
+		expect(submittedMoves()).toEqual([firstJump, secondJump]);
+		expect(room.board[CHAIN_TO]).toEqual(CYAN);
+		expect(room.turn).toBe("pink");
+	});
+
+	test("rejecting the first jump of a capture drops both jumps", async () => {
+		const room = createRoom(roomSnapshot(doubleJump));
+		const first = deferred();
+		const second = deferred();
+		const play = mutationFor(api.models.rooms.index.play);
+		play.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+		void room.select(CAPTURER);
+		const firstJump = room.select(CAPTURE_TO);
+		const secondJump = room.select(CHAIN_TO);
+
+		first.reject(new Error("Not your turn"));
+		await firstJump;
+		second.reject(new Error("Not your turn"));
+		await secondJump;
+
+		expect(room.board).toEqual(doubleJump.board);
+		expect(room.mustContinueFrom).toBeNull();
+		expect(room.canSelect(CAPTURER)).toBe(true);
+		expect(room.rejection?.message).toBe("Move not accepted");
 	});
 
 	test("a selection is dropped once the board changes and that piece can no longer move", async () => {

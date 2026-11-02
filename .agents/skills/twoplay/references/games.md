@@ -21,18 +21,28 @@ half mirrors it so the UI responds instantly. Both share a discriminated union t
 
 ## Client: `src/lib/features/play/<game>/`
 - `types.ts` — re-export server-inferred types; derive client aliases locally.
-- `game.svelte.ts` — `<Game>Room extends Room` (`$lib/utils/multiplayer`). The base already owns
-  the live room query (`data`, `isLoading`), seats (`players`, `myIndex`, `isMyTurn` from the abstract
-  `activeSeat`), room state
+- `game.svelte.ts` — `<Game>Room extends Room` (`$lib/utils/multiplayer`). It defines a
+  `ClientEngine` (`applyMove`, `status`) that narrows to its `kind` and delegates to `<game>Engine`,
+  and calls `super(kind, engine, getCode, getRound)`. It doesn't override `activeSeat`. Values come
+  from `convex/models/games/<game>/index.js` and `rules.js`, never the registry
+  `convex/models/games/index.ts` (it imports `_generated/server`). The base already owns
+  the live room query (`data`, `isLoading`), seats (`players`, `myIndex`), room state
   (`wrongGameType`, `isWaitingForOpponent`, `isRoomClosed`, `opponentDisconnected`), clocks
   (`clock`, `now`), history scrubbing (`isViewingHistory`, `viewedMoveNumber`, `historyLength`,
   `protected displayState`), and actions (`protected submitMove`, `rematch`, `resign`, `abandon`,
   `trashtalk`, `timeout`). The subclass adds only `$derived` views of `displayState` narrowed to its
   `kind`, plus a `play/select` method that pre-validates locally and calls `submitMove({ kind, … })`.
+- Prediction: `submitMove` runs the engine on the live state and queues the viewer's move as
+  pending. `displayState`, `activeSeat`, `isMyTurn`, and `clock` include pending moves.
+  `isMyTurnConfirmed` and the timeout claim use the server state only. A rejected move drops itself
+  and every later pending move, and sets `rejection` (`{ id, message }`). A move the engine can't
+  predict reports through `error`.
 - `<game>.svelte` — UI composing `<Board players status clock footer>` with its own grid as
   `children`, usually wrapped in `Cursor` from `$lib/features/presence`. Renders `BoardPlaceholder`
   while `room.isLoading` or `room.wrongGameType`, and creates
-  `new TurnAlert(() => (room.isLoading ? null : room.isMyTurn))` next to the Room.
+  `new TurnAlert(() => (room.isLoading ? null : room.isMyTurnConfirmed))` next to the Room. A
+  `$effect` on `room.rejection` shows a `getToaster()` error toast, and
+  `<Board rejectionId={room.rejection?.id}>` shakes the board.
 - `index.ts` — barrel (component under its display name, Room class, types).
 
 ## Registration
@@ -46,5 +56,5 @@ half mirrors it so the UI responds instantly. Both share a discriminated union t
 
 ## Recipe order
 Server first (types flow client-ward): schema → rules → engine → barrel → registry.
-Then client: types → Room subclass → component → barrel → `features/play/index.ts` → icon → `GAMES` → route.
+Then client: types → `ClientEngine` + Room subclass → component → barrel → `features/play/index.ts` → icon → `GAMES` → route.
 Don't invent abilities/power-ups or per-game history logic the base `Room` already provides.

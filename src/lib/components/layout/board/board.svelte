@@ -100,7 +100,7 @@
 		PopoverTrigger
 	} from "$lib/components/ui";
 	import { ACCENTS, cn } from "$lib/utils/style";
-	import type { Snippet } from "svelte";
+	import { untrack, type Snippet } from "svelte";
 	import { getMood } from "$lib/features/presence";
 	import { ringSeat, stripLine, stripSeats, type StripLine } from "./strips.js";
 
@@ -115,6 +115,7 @@
 		opponentDisconnected = false,
 		onTrashtalk,
 		markIcon,
+		rejectionId = null,
 		children
 	}: {
 		/** The two players, shown in the strips above and below the board. */
@@ -138,9 +139,20 @@
 		/** Draws a seat's mark in the strip, in `currentColor` at `size-full` of a `size-3.5` box.
 		 *  Decorative; that player's `mark`, if any, is its spoken label. */
 		markIcon?: Snippet<[seat: 0 | 1]>;
+		/** Changes to a new value each time the viewer's move is rejected, which shakes the board. */
+		rejectionId?: number | null;
 		/** The game itself. Fills the square board area — use `size-full`. */
 		children: Snippet;
 	} = $props();
+
+	const SHAKE_KEYFRAMES: Keyframe[] = [
+		{ transform: "translateX(0)" },
+		{ transform: "translateX(-6px)" },
+		{ transform: "translateX(6px)" },
+		{ transform: "translateX(-4px)" },
+		{ transform: "translateX(4px)" },
+		{ transform: "translateX(0)" }
+	];
 
 	/** Clock digits turn destructive-colored at or below this remaining time. */
 	const LOW_TIME_MS = 10_000;
@@ -163,6 +175,7 @@
 	const ringed = $derived(status ? ringSeat(status) : null);
 
 	let pickerOpen = $state(false);
+	let boardArea: HTMLDivElement;
 
 	function emojiLabel(codepoint: string): string {
 		return EMOJI_OPTIONS.find((option) => option.codepoint === codepoint)?.label ?? "Player emoji";
@@ -227,6 +240,16 @@
 		const minutes = Math.floor(totalSeconds / 60);
 		return `${minutes}:${(totalSeconds % 60).toString().padStart(2, "0")}`;
 	}
+
+	/** The last rejection this board shook for, seeded with the one it mounted with. */
+	let shakenRejectionId = untrack(() => rejectionId);
+
+	$effect(() => {
+		if (rejectionId === null || rejectionId === shakenRejectionId) return;
+		shakenRejectionId = rejectionId;
+		if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+		boardArea.animate(SHAKE_KEYFRAMES, { duration: 300, easing: "ease-out" });
+	});
 
 	$effect(() => {
 		if (!mood) return;
@@ -391,7 +414,7 @@
 >
 	{@render playerStrip(seats.top)}
 
-	<div class="aspect-square w-(--board-size)">
+	<div bind:this={boardArea} class="aspect-square w-(--board-size)">
 		{@render children()}
 	</div>
 

@@ -1,0 +1,3 @@
+- PLAN done
+- QA 4.3 pass: browser-a/b, 1.2-4s WebSocket send delay on A; ttt mark/ring/sound at once, 1 sound, 0 layout shifts over 3 turns; resign mid-flight rolls back with 1 toast and shake; checkers pending move at once; reduced motion: toast, no shake
+- 2026-11-02T08:09:21Z VERIFY done: 1018 tests, check 0/0, QA pass 4/4 (instant paint 2-14ms, rollback+toast+shake, 0 layout shift), security pass, review nits fixed

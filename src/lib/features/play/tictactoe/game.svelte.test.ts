@@ -9,6 +9,7 @@ import {
 import {
 	ALICE,
 	createRooted,
+	deferred,
 	historyOf,
 	mutationFor,
 	resetConvex,
@@ -201,6 +202,28 @@ describe("TictactoeRoom", () => {
 		await room.play(4, 8);
 		const move: TictactoeMove = { kind: "tictactoe", boardIndex: 4, cellIndex: 8 };
 		expect(submittedMoves()).toEqual([move]);
+	});
+
+	test("a move shows its mark while the server has not answered", () => {
+		const room = createRoom();
+		mutationFor(api.models.rooms.index.play).mockReturnValueOnce(deferred().promise);
+
+		void room.play(4, 8);
+
+		expect(room.boards[4][8]).toBe("X");
+		expect(room.turn).toBe("O");
+		expect(room.activeSeat).toBe(1);
+	});
+
+	test("no board can be played while a move is pending", () => {
+		const room = createRoom();
+		mutationFor(api.models.rooms.index.play).mockReturnValueOnce(deferred().promise);
+
+		void room.play(4, 8);
+
+		expect(room.boards.map((_, boardIndex) => room.canPlay(boardIndex))).toEqual(
+			Array(9).fill(false)
+		);
 	});
 
 	test("playing an occupied cell submits nothing", async () => {

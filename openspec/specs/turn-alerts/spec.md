@@ -8,7 +8,7 @@ Tells a seated player that it has become their turn while the game's browser tab
 
 ### Requirement: Detect the viewer's turn arriving
 
-The alert SHALL fire only on a transition from not-the-viewer's-turn to the viewer's turn in the live round while the tab is hidden. It SHALL NOT fire for spectators, on first load, or when the tab is visible.
+The alert SHALL fire only on a transition from not-the-viewer's-turn to the viewer's turn in the live round while the tab is hidden. It SHALL NOT fire for spectators, on first load, or when the tab is visible. The turn SHALL be the server-confirmed turn: a pending move of the viewer's, and its rollback, SHALL NOT count as a turn change.
 
 #### Scenario: Opponent moves while tab hidden
 
@@ -29,6 +29,11 @@ The alert SHALL fire only on a transition from not-the-viewer's-turn to the view
 
 - **WHEN** the room first loads in a hidden tab and it is already the viewer's turn
 - **THEN** no alert fires
+
+#### Scenario: Rejected move while tab hidden
+
+- **WHEN** the viewer moves, the tab becomes hidden, and the server rejects the pending move
+- **THEN** no alert fires, because the confirmed turn stayed with the viewer
 
 ### Requirement: Title flash
 

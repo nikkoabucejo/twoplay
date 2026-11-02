@@ -1,10 +1,10 @@
 import {
 	hasOtherPlayableBoard,
 	markOf,
-	playerIndexOf,
 	WINNING_LINES
 } from "../../../../../convex/models/games/tictactoe/rules.js";
-import { Room } from "$lib/utils/multiplayer";
+import { tictactoeEngine } from "../../../../../convex/models/games/tictactoe/index.js";
+import { Room, type ClientEngine } from "$lib/utils/multiplayer";
 import type { Board, GameStatus, Player } from "./types.js";
 
 function findWinningLine(board: Board): readonly [number, number, number] | null {
@@ -43,6 +43,19 @@ function turnOf(boards: Board[]): Player {
 	return markOf(totalFilled % 2);
 }
 
+const tictactoeClientEngine: ClientEngine = {
+	applyMove(state, seat, move) {
+		if (state.kind !== "tictactoe" || move.kind !== "tictactoe") {
+			throw new Error("Move does not match this room's game");
+		}
+		return tictactoeEngine.applyMove(state, seat, move);
+	},
+	status(state) {
+		if (state.kind !== "tictactoe") throw new Error("State does not match this room's game");
+		return tictactoeEngine.status(state);
+	}
+};
+
 /**
  * Rune-backed multiplayer state for a room of nine synced tic-tac-toe boards.
  * Wraps a live Convex subscription (convex/models/rooms is the source of truth
@@ -51,20 +64,8 @@ function turnOf(boards: Board[]): Player {
  */
 export class TictactoeRoom extends Room {
 	constructor(getCode: () => string, getRound: () => number | undefined = () => undefined) {
-		super("tictactoe", getCode, getRound);
+		super("tictactoe", tictactoeClientEngine, getCode, getRound);
 	}
-
-	#state = $derived(
-		this.data && this.data.game.state.kind === "tictactoe" ? this.data.game.state : null
-	);
-	#liveBoards = $derived(this.#state?.boards ?? []);
-	#liveBoardStatuses = $derived(this.#liveBoards.map(statusOf));
-	#liveMetaStatus = $derived(statusOf(this.#liveBoardStatuses.map((s) => s.winner)));
-	#liveIsOver = $derived(
-		this.#liveMetaStatus.winner !== null ||
-			this.#liveBoardStatuses.every((s) => s.status !== "playing")
-	);
-	#liveTurn = $derived(turnOf(this.#liveBoards));
 
 	/** The board snapshot currently shown: the cursor's historical snapshot, or the live state when live. */
 	#displayState = $derived(this.displayState?.kind === "tictactoe" ? this.displayState : null);
@@ -86,12 +87,6 @@ export class TictactoeRoom extends Room {
 
 	/** Whose mark lands next across the whole room, derived from total filled cells — no state to fall out of sync. */
 	turn = $derived(turnOf(this.boards));
-
-	override activeSeat = $derived<0 | 1 | null>(
-		this.game.isLive && this.#state !== null && this.game.endedSeat === null && !this.#liveIsOver
-			? playerIndexOf(this.#liveTurn)
-			: null
-	);
 
 	/** Board the currently active player (whoever's turn it is) last played on — visible to both
 	 *  browsers alike, so you can see your opponent's restricted board while it's their turn too. */

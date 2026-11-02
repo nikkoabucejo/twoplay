@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/svelte";
 import { createRawSnippet, type ComponentProps } from "svelte";
-import { beforeAll, describe, expect, test, vi } from "vitest";
+import { beforeAll, describe, expect, onTestFinished, test, vi } from "vitest";
 import { BOARD_SIZE } from "./board.svelte";
 import { Board, type BoardFooter, type BoardPlayer, type BoardStatus } from "./index.js";
 
@@ -517,6 +517,53 @@ describe("Board", () => {
 
 	test("the board takes the room's content width on phones", () => {
 		expect(BOARD_SIZE.startsWith("min(calc(100vw - 1.5rem)")).toBe(true);
+	});
+
+	test("a new rejectionId shakes the board area with transform-only keyframes", async () => {
+		const animate = vi.spyOn(Element.prototype, "animate");
+		onTestFinished(() => animate.mockRestore());
+		const { rerender } = renderBoard({ rejectionId: null });
+		expect(animate).not.toHaveBeenCalled();
+
+		await rerender({ rejectionId: 1 });
+		await rerender({ rejectionId: 2 });
+
+		expect(animate).toHaveBeenCalledTimes(2);
+		expect(animate.mock.contexts).toEqual([boardArea(), boardArea()]);
+		const keyframes = animate.mock.calls[0][0] as Keyframe[];
+		expect(keyframes.length).toBeGreaterThan(1);
+		for (const frame of keyframes) expect(Object.keys(frame)).toEqual(["transform"]);
+	});
+
+	test("a board mounted with an earlier rejectionId shakes only for a later one", async () => {
+		const animate = vi.spyOn(Element.prototype, "animate");
+		onTestFinished(() => animate.mockRestore());
+		const { rerender } = renderBoard({ rejectionId: 1 });
+		expect(animate).not.toHaveBeenCalled();
+
+		await rerender({ rejectionId: 2 });
+
+		expect(animate).toHaveBeenCalledOnce();
+	});
+
+	test("a rejection doesn't shake the board under reduced motion", async () => {
+		const animate = vi.spyOn(Element.prototype, "animate");
+		const matchMedia = vi.spyOn(window, "matchMedia").mockImplementation(
+			(query) =>
+				({
+					matches: query === "(prefers-reduced-motion: reduce)",
+					media: query
+				}) as MediaQueryList
+		);
+		onTestFinished(() => {
+			animate.mockRestore();
+			matchMedia.mockRestore();
+		});
+		const { rerender } = renderBoard({ rejectionId: null });
+
+		await rerender({ rejectionId: 1 });
+
+		expect(animate).not.toHaveBeenCalled();
 	});
 
 	test("the board size defaults to BOARD_SIZE", () => {

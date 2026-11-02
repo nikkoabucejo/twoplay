@@ -2,18 +2,51 @@ import { useMutation, useQuery, type UseQueryReturn } from "convex-svelte";
 import type { GameMove, GameState, GameType } from "../../../../../convex/models/games/index.js";
 import { api } from "../../../../../convex/_generated/api.js";
 
+/** A game's pure engine, narrowed to its own `kind` by each subclass. `Room` uses it to predict the
+ *  viewer's own moves and to read whose turn a state is. */
+export type ClientEngine = {
+	/** Throws like the server's engine does for an illegal move. */
+	applyMove(state: GameState, seat: 0 | 1, move: GameMove): GameState;
+	status(state: GameState): { turnIndex: number; isOver: boolean };
+};
+
+/** One of the viewer's moves, shown before the server has confirmed it. */
+type PendingMove = {
+	id: number;
+	round: number;
+	seat: 0 | 1;
+	move: GameMove;
+	predicted: GameState;
+	queuedAt: number;
+	/** The clocks at `queuedAt`, set when this move passes the turn. */
+	handoff: { frozen: [number, number] } | null;
+};
+
+/** Compares boards only: every pending move starts from the server's state, so the board settles the
+ *  rest. Checkers squares are compared by value, so their field order doesn't matter. */
+function isSameState(a: GameState, b: GameState): boolean {
+	const boardKey = (state: GameState) =>
+		state.kind === "tictactoe"
+			? JSON.stringify(state.boards)
+			: JSON.stringify(state.board.map((square) => square && [square.color, square.king]));
+	return boardKey(a) === boardKey(b);
+}
+
 /**
  * Shared multiplayer-room plumbing: the live Convex subscription, move/rematch/resign/timeout
- * mutations, the round/live/players/clock state, and local move-history scrubbing every game's room
- * class needs. Subclasses (`TictactoeRoom`, `CheckersRoom`) add only their own game-specific derived
- * state (board, legal moves, turn, winner, …) — narrowing `displayState`/`data.game.state` to their own
- * `kind` the way the base class can't — implement `activeSeat` by mapping that state to a generic seat
- * index, and call `submitMove` after validating a move is theirs to make.
+ * mutations, the round/live/players/clock state, the viewer's pending (predicted) moves, and local
+ * move-history scrubbing every game's room class needs. Subclasses (`TictactoeRoom`, `CheckersRoom`)
+ * pass their `ClientEngine`, add only their own game-specific derived state (board, legal moves,
+ * turn, winner, …) — narrowing `displayState` to their own `kind` the way the base class can't — and
+ * call `submitMove` after validating a move is theirs to make.
  */
 export abstract class Room {
 	error = $state<string | null>(null);
+	/** The latest move the server rejected. A new object per rejection, for the toast and the shake. */
+	rejection = $state.raw<{ id: number; message: string } | null>(null);
 
 	#kind: GameType;
+	#engine: ClientEngine;
 	#getCode: () => string;
 	#room: UseQueryReturn<typeof api.models.rooms.index.get>;
 	#history: UseQueryReturn<typeof api.models.games.index.history>;
@@ -43,14 +76,20 @@ export abstract class Room {
 	 *  Purely a per-browser viewing cursor — never sent to the server and never affects the real game. */
 	#cursor = $state<number | null>(null);
 
+	/** The viewer's moves sent but not yet confirmed, oldest first. */
+	#pending = $state.raw<PendingMove[]>([]);
+	#nextPendingId = 0;
+
 	/** `getRound` pins the room to a specific past round (e.g. from a `/:round` URL segment) instead of
 	 *  always following the live one. Omit it, or have it return undefined, to always track the live round. */
 	constructor(
 		kind: GameType,
+		engine: ClientEngine,
 		getCode: () => string,
 		getRound: () => number | undefined = () => undefined
 	) {
 		this.#kind = kind;
+		this.#engine = engine;
 		this.#getCode = getCode;
 		this.#room = useQuery(api.models.rooms.index.get, () => ({
 			code: this.#getCode(),
@@ -81,12 +120,19 @@ export abstract class Room {
 			if (this.#historyMoves.length === 0) this.#cursor = null;
 		});
 
-		// Auto-claims the timeout as soon as this browser's live countdown reaches zero for the active
-		// seat — shared by every game rather than duplicated per `*Room` subclass. A failed claim
-		// (see `timeout()`) just means another client resolved the round first, which is fine.
 		$effect(() => {
-			const seat = this.activeSeat;
-			if (seat === null || this.#isClaimingTimeout || this.#liveRemaining[seat] > 0) return;
+			// Confirmed moves and moves from an earlier round no longer fold into the live state.
+			const unsettled = this.#roundPending.slice(this.#confirmedCount);
+			if (unsettled.length < this.#pending.length) this.#pending = unsettled;
+		});
+
+		// Auto-claims the timeout as soon as this browser's countdown of the server's clock reaches zero
+		// for the server's active seat — never a predicted one. Shared by every game rather than
+		// duplicated per `*Room` subclass. A failed claim (see `timeout()`) just means another client
+		// resolved the round first, which is fine.
+		$effect(() => {
+			const seat = this.#confirmedActiveSeat;
+			if (seat === null || this.#isClaimingTimeout || this.#serverRemaining[seat] > 0) return;
 			this.#isClaimingTimeout = true;
 			this.timeout().finally(() => (this.#isClaimingTimeout = false));
 		});
@@ -122,10 +168,18 @@ export abstract class Room {
 	 *  has nothing stopping them from playing both sides of an empty board. */
 	isWaitingForOpponent = $derived(this.players.some((seat) => seat === null));
 
-	/** True while the live round waits on the viewer's seat. Follows the live state, so scrubbing
-	 *  history doesn't change it. */
+	/** True while the live round waits on the viewer's seat. Follows the live state, including pending
+	 *  moves, so scrubbing history doesn't change it. */
 	isMyTurn = $derived.by(
 		() => this.myIndex !== null && !this.isWaitingForOpponent && this.activeSeat === this.myIndex
+	);
+
+	/** `isMyTurn` as the server last confirmed it, ignoring pending moves. */
+	isMyTurnConfirmed = $derived.by(
+		() =>
+			this.myIndex !== null &&
+			!this.isWaitingForOpponent &&
+			this.#confirmedActiveSeat === this.myIndex
 	);
 
 	/** True once the room has closed for good — a player abandoned it, it never filled, or every seat
@@ -166,9 +220,56 @@ export abstract class Room {
 	 *  or a round with no first move yet). */
 	#turnedAt = $derived(this.data?.clock.turnedAt ?? null);
 
-	/** Which seat is currently burning clock, or null while frozen (not live, waiting for an opponent,
-	 *  or the round is over) — each `*Room` subclass maps its own turn/winner state to a seat index. */
-	abstract get activeSeat(): 0 | 1 | null;
+	#serverState = $derived(this.data?.game.state ?? null);
+
+	#roundPending = $derived(this.#pending.filter((entry) => entry.round === this.game.round));
+
+	/** How many leading pending moves the server state already reflects. */
+	#confirmedCount = $derived.by(() => {
+		const server = this.#serverState;
+		if (server === null) return 0;
+		return this.#roundPending.findLastIndex((entry) => isSameState(entry.predicted, server)) + 1;
+	});
+
+	/** The server state with the unconfirmed pending moves applied, and the moves that applied. A move
+	 *  that no longer applies stops the fold, since every later move was predicted on top of it. */
+	#fold = $derived.by(() => {
+		let state = this.#serverState;
+		const applied: PendingMove[] = [];
+		if (state === null || !this.game.isLive) return { state, applied };
+		for (const entry of this.#roundPending.slice(this.#confirmedCount)) {
+			const next = this.#predict(state, entry.seat, entry.move);
+			if (next === null) break;
+			state = next;
+			applied.push(entry);
+		}
+		return { state, applied };
+	});
+
+	#liveState = $derived(this.#fold.state);
+
+	/** The state after `move`, or null when the engine rejects it or it changes nothing. */
+	#predict(state: GameState, seat: 0 | 1, move: GameMove): GameState | null {
+		try {
+			const next = this.#engine.applyMove(state, seat, move);
+			return next === state ? null : next;
+		} catch {
+			return null;
+		}
+	}
+
+	#seatOf(state: GameState | null): 0 | 1 | null {
+		if (state === null || state.kind !== this.#kind) return null;
+		if (!this.game.isLive || this.game.endedSeat !== null) return null;
+		const { turnIndex, isOver } = this.#engine.status(state);
+		return isOver ? null : (turnIndex as 0 | 1);
+	}
+
+	/** Which seat is currently burning clock, or null while frozen (not live, or the round is over).
+	 *  Follows pending moves. */
+	activeSeat = $derived(this.#seatOf(this.#liveState));
+
+	#confirmedActiveSeat = $derived(this.#seatOf(this.#serverState));
 
 	/** Frozen (not ticking) while reviewing history by default — a subclass can override for its own
 	 *  additional freeze conditions, but every game freezes the clock display while scrubbing. */
@@ -191,10 +292,10 @@ export abstract class Room {
 	historyLength = $derived(this.#historyMoves.length);
 
 	/** The live game state, or the historical snapshot at the scrub cursor. Subclasses narrow this to
-	 *  their own game's `kind` the same way they narrow the live state off `data.game.state`. */
+	 *  their own game's `kind`. */
 	protected displayState = $derived.by((): GameState | null => {
-		if (this.#cursor === null) return this.data?.game.state ?? null;
-		return this.#historyMoves[this.#cursor]?.state ?? this.data?.game.state ?? null;
+		if (this.#cursor === null) return this.#liveState;
+		return this.#historyMoves[this.#cursor]?.state ?? this.#serverState;
 	});
 
 	/** Step one move back in this round's history. A no-op past the first move. Local only. */
@@ -221,14 +322,31 @@ export abstract class Room {
 		this.#cursor = 0;
 	}
 
-	#liveRemaining = $derived.by((): [number, number] => {
+	/** The server's clocks as of `now`, counting down the server's active seat. */
+	#remainingAt(now: number): [number, number] {
 		const banked = this.#bankedRemaining;
 		if (!banked) return [0, 0];
 		const turnedAt = this.#turnedAt;
-		const seat = this.activeSeat;
+		const seat = this.#confirmedActiveSeat;
 		return banked.map((ms, i) =>
-			i === seat && turnedAt !== null ? Math.max(0, ms - (this.now - turnedAt)) : ms
+			i === seat && turnedAt !== null ? Math.max(0, ms - (now - turnedAt)) : ms
 		) as [number, number];
+	}
+
+	#serverRemaining = $derived(this.#remainingAt(this.now));
+
+	/** The server's clocks, or, while a pending move passes the turn, the viewer's clock stopped at
+	 *  that move and the opponent's counting down from it. */
+	#liveRemaining = $derived.by((): [number, number] => {
+		for (const { seat, queuedAt, handoff } of this.#fold.applied) {
+			if (handoff === null) continue;
+			const elapsed = Math.max(0, this.now - queuedAt);
+			return handoff.frozen.map((ms, i) => (i === seat ? ms : Math.max(0, ms - elapsed))) as [
+				number,
+				number
+			];
+		}
+		return this.#serverRemaining;
 	});
 
 	/** Live, per-seat remaining time and which seat is burning it — ticking down, or a frozen
@@ -247,12 +365,51 @@ export abstract class Room {
 		return this.#getCode();
 	}
 
+	/** Adds the viewer's move to `#pending` when the engine can predict it, returning its id. */
+	#queue(move: GameMove): number | null {
+		const live = this.#liveState;
+		const seat = this.myIndex;
+		if (live === null || seat === null || !this.game.isLive) return null;
+		const predicted = this.#predict(live, seat, move);
+		if (predicted === null) return null;
+
+		const id = this.#nextPendingId++;
+		const queuedAt = Date.now();
+		const nextSeat = this.#seatOf(predicted);
+		const passesTurn = nextSeat !== null && nextSeat !== seat;
+		this.#pending = [
+			...this.#pending,
+			{
+				id,
+				round: this.game.round,
+				seat,
+				move,
+				predicted,
+				queuedAt,
+				handoff: passesTurn ? { frozen: this.#remainingAt(queuedAt) } : null
+			}
+		];
+		return id;
+	}
+
+	/** Shows the move as pending at once when the engine can predict it, then sends it. A rejected
+	 *  pending move rolls back with every move queued after it and sets `rejection`; a move that
+	 *  couldn't be predicted reports its failure through `error`. */
 	protected async submitMove(move: GameMove): Promise<void> {
 		this.error = null;
+		const id = this.#queue(move);
 		try {
 			await this.#play({ code: this.#getCode(), move });
+			if (id !== null) this.#pending = this.#pending.filter((entry) => entry.id !== id);
 		} catch (err) {
-			this.error = err instanceof Error ? err.message : "Something went wrong";
+			if (id === null) {
+				this.error = err instanceof Error ? err.message : "Something went wrong";
+				return;
+			}
+			const index = this.#pending.findIndex((entry) => entry.id === id);
+			if (index === -1) return;
+			this.#pending = this.#pending.slice(0, index);
+			this.rejection = { id, message: "Move not accepted" };
 		}
 	}
 
@@ -261,6 +418,7 @@ export abstract class Room {
 		if (!this.game.isLive) return;
 
 		this.#cursor = null;
+		this.#pending = [];
 		this.error = null;
 		try {
 			await this.#rematch({ code: this.#getCode() });

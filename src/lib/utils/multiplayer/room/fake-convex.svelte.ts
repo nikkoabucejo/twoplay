@@ -49,6 +49,12 @@ export function mutationFor(mutation: FunctionReference<"mutation">): MutationMo
 	return mock;
 }
 
+/** A promise the test settles by hand, e.g. `mutationFor(play).mockReturnValueOnce(held.promise)`
+ *  to keep a move in flight. */
+export function deferred<T>() {
+	return Promise.withResolvers<T>();
+}
+
 export function resetConvex() {
 	results.clear();
 	mutations.clear();

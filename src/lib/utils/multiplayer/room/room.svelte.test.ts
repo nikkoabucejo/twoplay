@@ -1,39 +1,62 @@
 import { flushSync } from "svelte";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { api } from "../../../../../convex/_generated/api.js";
-import type { GameState } from "../../../../../convex/models/games/index.js";
+import {
+	checkersEngine,
+	type CheckersState
+} from "../../../../../convex/models/games/checkers/index.js";
+import { idx } from "../../../../../convex/models/games/checkers/rules.js";
+import type { GameMove, GameState, GameType } from "../../../../../convex/models/games/index.js";
 import { tictactoeEngine } from "../../../../../convex/models/games/tictactoe/index.js";
 import {
 	ALICE,
 	BOB,
 	createRooted,
+	deferred,
 	historyOf,
 	mutationFor,
 	resetConvex,
 	roomSnapshot,
 	setQueryResult
 } from "./fake-convex.svelte.js";
-import { Room } from "./room.svelte.js";
+import { Room, type ClientEngine } from "./room.svelte.js";
 
 vi.mock("convex-svelte", () => import("./fake-convex.svelte.js"));
 
-class SeatRoom extends Room {
-	seat = $state<0 | 1 | null>(null);
-
-	constructor() {
-		super("tictactoe", () => "ABCD");
+const clientEngines: Record<GameType, ClientEngine> = {
+	tictactoe: {
+		applyMove(state, seat, move) {
+			if (state.kind !== "tictactoe" || move.kind !== "tictactoe") throw new Error("Wrong game");
+			return tictactoeEngine.applyMove(state, seat, move);
+		},
+		status(state) {
+			if (state.kind !== "tictactoe") throw new Error("Wrong game");
+			return tictactoeEngine.status(state);
+		}
+	},
+	checkers: {
+		applyMove(state, seat, move) {
+			if (state.kind !== "checkers" || move.kind !== "checkers") throw new Error("Wrong game");
+			return checkersEngine.applyMove(state, seat, move);
+		},
+		status(state) {
+			if (state.kind !== "checkers") throw new Error("Wrong game");
+			return checkersEngine.status(state);
+		}
 	}
+};
 
-	override get activeSeat() {
-		return this.seat;
+class SeatRoom extends Room {
+	constructor(kind: GameType) {
+		super(kind, clientEngines[kind], () => "ABCD");
 	}
 
 	get shownState() {
 		return this.displayState;
 	}
 
-	move() {
-		return this.submitMove({ kind: "tictactoe", boardIndex: 0, cellIndex: 0 });
+	move(move: GameMove = { kind: "tictactoe", boardIndex: 0, cellIndex: 0 }) {
+		return this.submitMove(move);
 	}
 }
 
@@ -55,10 +78,22 @@ const afterThree = tictactoeEngine.applyMove(afterTwo, 0, {
 	cellIndex: 0
 });
 
+/** Cyan at (6,1) jumps pink at (5,2), then must jump pink at (3,4). */
+const doubleJump: CheckersState = {
+	kind: "checkers",
+	board: Array.from({ length: 64 }, (_, index) => {
+		if (index === idx(6, 1)) return { color: "cyan", king: false };
+		if ([idx(5, 2), idx(3, 4), idx(0, 7)].includes(index)) return { color: "pink", king: false };
+		return null;
+	}),
+	turn: "cyan",
+	mustContinueFrom: null
+};
+
 let destroy: () => void;
 
-function createRoom() {
-	const rooted = createRooted(() => new SeatRoom());
+function createRoom(kind: GameType = "tictactoe") {
+	const rooted = createRooted(() => new SeatRoom(kind));
 	destroy = () => {
 		rooted.instance.dispose();
 		rooted.destroy();
@@ -123,28 +158,24 @@ describe("Room", () => {
 
 	test("it is the viewer's turn when their seat is the active seat", () => {
 		const room = createRoom();
-		room.seat = 1;
-		setQueryResult(api.models.rooms.index.get, roomSnapshot(initial, { myIndex: 1 }));
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(afterOne, { myIndex: 1 }));
 		expect(room.isMyTurn).toBe(true);
 	});
 
 	test("it isn't the viewer's turn while the opponent's seat is active", () => {
 		const room = createRoom();
-		room.seat = 1;
-		setQueryResult(api.models.rooms.index.get, roomSnapshot(initial, { myIndex: 0 }));
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(afterOne, { myIndex: 0 }));
 		expect(room.isMyTurn).toBe(false);
 	});
 
 	test("a spectator never has the turn", () => {
 		const room = createRoom();
-		room.seat = 0;
 		setQueryResult(api.models.rooms.index.get, roomSnapshot(initial, { myIndex: null }));
 		expect(room.isMyTurn).toBe(false);
 	});
 
 	test("the host has no turn while waiting for an opponent", () => {
 		const room = createRoom();
-		room.seat = 0;
 		setQueryResult(api.models.rooms.index.get, roomSnapshot(initial, { players: [ALICE, null] }));
 		expect(room.isMyTurn).toBe(false);
 	});
@@ -254,7 +285,6 @@ describe("Room", () => {
 
 	test("the clock shows banked time while no countdown has started", () => {
 		const room = createRoom();
-		room.seat = 0;
 		setQueryResult(
 			api.models.rooms.index.get,
 			roomSnapshot(initial, { clock: { remaining: [45_000, 50_000], turnedAt: null } })
@@ -265,10 +295,9 @@ describe("Room", () => {
 
 	test("only the active seat's clock ticks down", () => {
 		const room = createRoom();
-		room.seat = 1;
 		setQueryResult(
 			api.models.rooms.index.get,
-			roomSnapshot(initial, { clock: { remaining: [45_000, 50_000], turnedAt: NOW } })
+			roomSnapshot(afterOne, { clock: { remaining: [45_000, 50_000], turnedAt: NOW } })
 		);
 		vi.advanceTimersByTime(5_000);
 		expect(room.clock.remaining).toEqual([45_000, 45_000]);
@@ -277,7 +306,6 @@ describe("Room", () => {
 
 	test("a running clock never shows less than zero", () => {
 		const room = createRoom();
-		room.seat = 0;
 		setQueryResult(
 			api.models.rooms.index.get,
 			roomSnapshot(initial, { clock: { remaining: [2_000, 50_000], turnedAt: NOW } })
@@ -288,7 +316,6 @@ describe("Room", () => {
 
 	test("the clock display freezes while reviewing history", () => {
 		const room = createRoom();
-		room.seat = 0;
 		setQueryResult(
 			api.models.rooms.index.get,
 			roomSnapshot(afterTwo, { clock: { remaining: [45_000, 50_000], turnedAt: NOW } })
@@ -305,7 +332,6 @@ describe("Room", () => {
 
 	test("the clock resumes from live time when returning from history", () => {
 		const room = createRoom();
-		room.seat = 0;
 		setQueryResult(
 			api.models.rooms.index.get,
 			roomSnapshot(afterTwo, { clock: { remaining: [45_000, 50_000], turnedAt: NOW } })
@@ -322,8 +348,7 @@ describe("Room", () => {
 	});
 
 	test("the timeout is claimed once the active seat's clock runs out", () => {
-		const room = createRoom();
-		room.seat = 0;
+		createRoom();
 		setQueryResult(
 			api.models.rooms.index.get,
 			roomSnapshot(initial, { clock: { remaining: [1_000, 50_000], turnedAt: NOW } })
@@ -336,8 +361,7 @@ describe("Room", () => {
 	});
 
 	test("no timeout is claimed while the active seat has time left", () => {
-		const room = createRoom();
-		room.seat = 0;
+		createRoom();
 		setQueryResult(
 			api.models.rooms.index.get,
 			roomSnapshot(initial, { clock: { remaining: [10_000, 50_000], turnedAt: NOW } })
@@ -351,8 +375,7 @@ describe("Room", () => {
 
 	test.fails("a timeout claim the server ignores is not immediately re-sent", async () => {
 		// Bug: the claim effect re-runs as soon as #isClaimingTimeout resets, so an unchanged server state retries forever.
-		const room = createRoom();
-		room.seat = 0;
+		createRoom();
 		setQueryResult(
 			api.models.rooms.index.get,
 			roomSnapshot(initial, { clock: { remaining: [1_000, 50_000], turnedAt: NOW } })
@@ -571,5 +594,278 @@ describe("Room", () => {
 		await room.rematch();
 
 		expect(room.isViewingHistory).toBe(true);
+	});
+	test("a pending move shows before the server answers", () => {
+		const room = createRoom();
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(initial));
+		mutationFor(api.models.rooms.index.play).mockReturnValueOnce(deferred().promise);
+
+		void room.move();
+
+		expect(room.shownState).toEqual(afterOne);
+		expect(room.activeSeat).toBe(1);
+		expect(room.isMyTurn).toBe(false);
+	});
+
+	test("a spectator's room shows only the server state", () => {
+		const room = createRoom();
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(initial, { myIndex: null }));
+		mutationFor(api.models.rooms.index.play).mockReturnValueOnce(deferred().promise);
+
+		void room.move();
+
+		expect(room.shownState).toEqual(initial);
+	});
+
+	test("a pending move is confirmed once the room state reflects it", () => {
+		const room = createRoom();
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(initial));
+		const held = deferred();
+		mutationFor(api.models.rooms.index.play).mockReturnValueOnce(held.promise);
+		void room.move();
+
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(afterOne));
+		flushSync();
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(afterTwo));
+		flushSync();
+
+		expect(room.shownState).toEqual(afterTwo);
+		expect(room.isMyTurn).toBe(true);
+	});
+
+	test("a resolved request clears the pending move", async () => {
+		const room = createRoom();
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(initial));
+		const held = deferred();
+		mutationFor(api.models.rooms.index.play).mockReturnValueOnce(held.promise);
+		const moving = room.move();
+
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(afterOne));
+		held.resolve(null);
+		await moving;
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(afterTwo));
+
+		expect(room.shownState).toEqual(afterTwo);
+	});
+
+	test("a request that leaves the state unchanged clears the move without an error", async () => {
+		const room = createRoom();
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(initial));
+		const held = deferred();
+		mutationFor(api.models.rooms.index.play).mockReturnValueOnce(held.promise);
+		const moving = room.move();
+
+		held.resolve(null);
+		await moving;
+
+		expect(room.shownState).toEqual(initial);
+		expect(room.isMyTurn).toBe(true);
+		expect(room.error).toBeNull();
+		expect(room.rejection).toBeNull();
+	});
+
+	test("a room update with an unchanged game state keeps the pending move", () => {
+		const room = createRoom();
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(initial));
+		mutationFor(api.models.rooms.index.play).mockReturnValueOnce(deferred().promise);
+		void room.move();
+
+		setQueryResult(
+			api.models.rooms.index.get,
+			roomSnapshot(initial, { players: [ALICE, { ...BOB, seenAt: NOW }] })
+		);
+		flushSync();
+
+		expect(room.shownState).toEqual(afterOne);
+	});
+
+	test("a rejected pending move rolls back without setting the error", async () => {
+		const room = createRoom();
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(initial));
+		const held = deferred();
+		mutationFor(api.models.rooms.index.play).mockReturnValueOnce(held.promise);
+		const moving = room.move();
+
+		held.reject(new Error("This round is already over"));
+		await moving;
+
+		expect(room.shownState).toEqual(initial);
+		expect(room.isMyTurn).toBe(true);
+		expect(room.rejection?.message).toBe("Move not accepted");
+		expect(room.error).toBeNull();
+	});
+
+	test("each rejected move gets its own rejection", async () => {
+		const room = createRoom();
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(initial));
+		const play = mutationFor(api.models.rooms.index.play);
+		play.mockRejectedValueOnce(new Error("Time's up"));
+		await room.move();
+		const first = room.rejection;
+
+		play.mockRejectedValueOnce(new Error("Time's up"));
+		await room.move();
+
+		expect(room.rejection).not.toBeNull();
+		expect(room.rejection?.id).not.toBe(first?.id);
+	});
+
+	test("rejecting a pending jump also drops the jumps queued after it", async () => {
+		const room = createRoom("checkers");
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(doubleJump));
+		const first = deferred();
+		const second = deferred();
+		const play = mutationFor(api.models.rooms.index.play);
+		play.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+
+		const firstJump = room.move({ kind: "checkers", from: idx(6, 1), to: idx(4, 3) });
+		const secondJump = room.move({ kind: "checkers", from: idx(4, 3), to: idx(2, 5) });
+		expect(room.shownState).toMatchObject({ mustContinueFrom: null, turn: "pink" });
+
+		first.reject(new Error("Not your turn"));
+		await firstJump;
+		const rejection = room.rejection;
+		second.reject(new Error("Not your turn"));
+		await secondJump;
+
+		expect(room.shownState).toEqual(doubleJump);
+		expect(room.rejection).toBe(rejection);
+	});
+
+	test("a new round drops pending moves from the earlier round without a rejection", async () => {
+		const room = createRoom();
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(initial));
+		const held = deferred();
+		mutationFor(api.models.rooms.index.play).mockReturnValueOnce(held.promise);
+		const moving = room.move();
+
+		setQueryResult(
+			api.models.rooms.index.get,
+			roomSnapshot(initial, { game: { round: 2, latestRound: 2 } })
+		);
+		flushSync();
+		expect(room.shownState).toEqual(initial);
+
+		held.reject(new Error("This round is already over"));
+		await moving;
+
+		expect(room.rejection).toBeNull();
+	});
+
+	test("a rematch drops pending moves", async () => {
+		const room = createRoom();
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(initial));
+		const held = deferred();
+		mutationFor(api.models.rooms.index.play).mockReturnValueOnce(held.promise);
+		const moving = room.move();
+
+		await room.rematch();
+		held.reject(new Error("This round is already over"));
+		await moving;
+
+		expect(room.shownState).toEqual(initial);
+		expect(room.rejection).toBeNull();
+	});
+
+	test("history ignores a pending move, and returning to live shows it again", () => {
+		const room = createRoom();
+		playedThrough([afterOne, afterTwo]);
+		mutationFor(api.models.rooms.index.play).mockReturnValueOnce(deferred().promise);
+		void room.move({ kind: "tictactoe", boardIndex: 2, cellIndex: 0 });
+
+		room.stepBack();
+		expect(room.shownState).toEqual(afterOne);
+
+		room.jumpToLatest();
+		expect(room.shownState).toEqual(afterThree);
+	});
+
+	test("a pending move freezes the viewer's clock and starts the opponent's", () => {
+		const room = createRoom();
+		setQueryResult(
+			api.models.rooms.index.get,
+			roomSnapshot(initial, { clock: { remaining: [60_000, 60_000], turnedAt: NOW - 10_000 } })
+		);
+		mutationFor(api.models.rooms.index.play).mockReturnValueOnce(deferred().promise);
+
+		void room.move();
+		vi.advanceTimersByTime(5_000);
+
+		expect(room.clock.remaining).toEqual([50_000, 55_000]);
+		expect(room.clock.activeSeat).toBe(1);
+	});
+
+	test("a move queued between clock ticks never raises the opponent's clock above its banked time", () => {
+		const room = createRoom();
+		setQueryResult(
+			api.models.rooms.index.get,
+			roomSnapshot(initial, { clock: { remaining: [60_000, 60_000], turnedAt: NOW } })
+		);
+		mutationFor(api.models.rooms.index.play).mockReturnValueOnce(deferred().promise);
+		vi.setSystemTime(NOW + 500);
+
+		void room.move();
+
+		expect(room.clock.remaining[1]).toBe(60_000);
+	});
+
+	test("the server's clock replaces the local handoff once the move is confirmed", () => {
+		const room = createRoom();
+		setQueryResult(
+			api.models.rooms.index.get,
+			roomSnapshot(initial, { clock: { remaining: [60_000, 60_000], turnedAt: NOW - 10_000 } })
+		);
+		mutationFor(api.models.rooms.index.play).mockReturnValueOnce(deferred().promise);
+		void room.move();
+		vi.advanceTimersByTime(5_000);
+
+		setQueryResult(
+			api.models.rooms.index.get,
+			roomSnapshot(afterOne, { clock: { remaining: [49_000, 60_000], turnedAt: NOW + 5_000 } })
+		);
+		flushSync();
+
+		expect(room.clock.remaining).toEqual([49_000, 60_000]);
+	});
+
+	test("the opponent's locally ticking clock running out claims no timeout", () => {
+		const room = createRoom();
+		setQueryResult(
+			api.models.rooms.index.get,
+			roomSnapshot(initial, { clock: { remaining: [60_000, 1_000], turnedAt: NOW } })
+		);
+		mutationFor(api.models.rooms.index.play).mockReturnValueOnce(deferred().promise);
+
+		void room.move();
+		vi.advanceTimersByTime(3_000);
+		flushSync();
+
+		expect(room.clock.remaining[1]).toBe(0);
+		expect(mutationFor(api.models.games.index.timeout)).not.toHaveBeenCalled();
+	});
+
+	test("the confirmed turn stays with the viewer through a pending move and its rejection", async () => {
+		const room = createRoom();
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(initial));
+		const held = deferred();
+		mutationFor(api.models.rooms.index.play).mockReturnValueOnce(held.promise);
+		const moving = room.move();
+		expect(room.isMyTurnConfirmed).toBe(true);
+
+		held.reject(new Error("Not your turn"));
+		await moving;
+
+		expect(room.isMyTurnConfirmed).toBe(true);
+	});
+
+	test("the confirmed turn passes once the server reflects the move", () => {
+		const room = createRoom();
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(initial));
+		mutationFor(api.models.rooms.index.play).mockReturnValueOnce(deferred().promise);
+		void room.move();
+
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(afterOne));
+
+		expect(room.isMyTurnConfirmed).toBe(false);
 	});
 });

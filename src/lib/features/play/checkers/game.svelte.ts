@@ -4,8 +4,22 @@ import {
 	otherPlayer,
 	playerIndexOf
 } from "../../../../../convex/models/games/checkers/rules.js";
-import { Room } from "$lib/utils/multiplayer";
+import { checkersEngine } from "../../../../../convex/models/games/checkers/index.js";
+import { Room, type ClientEngine } from "$lib/utils/multiplayer";
 import type { Board, Move, PieceColor } from "./types.js";
+
+const checkersClientEngine: ClientEngine = {
+	applyMove(state, seat, move) {
+		if (state.kind !== "checkers" || move.kind !== "checkers") {
+			throw new Error("Move does not match this room's game");
+		}
+		return checkersEngine.applyMove(state, seat, move);
+	},
+	status(state) {
+		if (state.kind !== "checkers") throw new Error("State does not match this room's game");
+		return checkersEngine.status(state);
+	}
+};
 
 /**
  * Rune-backed multiplayer state for a room of checkers. Wraps a live Convex subscription
@@ -16,27 +30,8 @@ export class CheckersRoom extends Room {
 	selected = $state<number | null>(null);
 
 	constructor(getCode: () => string, getRound: () => number | undefined = () => undefined) {
-		super("checkers", getCode, getRound);
+		super("checkers", checkersClientEngine, getCode, getRound);
 	}
-
-	#state = $derived(
-		this.data && this.data.game.state.kind === "checkers" ? this.data.game.state : null
-	);
-	#liveTurn = $derived<PieceColor>(this.#state?.turn ?? colorOfPlayer(0));
-	#liveLegalMoves = $derived(
-		computeLegalMoves(
-			this.#state?.board ?? [],
-			this.#liveTurn,
-			this.#state?.mustContinueFrom ?? null
-		)
-	);
-	/** No legal moves for player 1 or player 2 (whichever is to move) means they're out of moves or
-	 *  pieces — the other player wins. */
-	#liveWinner = $derived<PieceColor | null>(
-		this.#state !== null && this.#liveLegalMoves.length === 0
-			? colorOfPlayer(otherPlayer(playerIndexOf(this.#liveTurn)))
-			: null
-	);
 
 	/** The board snapshot currently shown: the cursor's historical snapshot, or the live state when live. */
 	#displayState = $derived(this.displayState?.kind === "checkers" ? this.displayState : null);
@@ -62,12 +57,6 @@ export class CheckersRoom extends Room {
 	winner = $derived<PieceColor | null>(
 		this.#displayState !== null && this.legalMoves.length === 0
 			? colorOfPlayer(otherPlayer(playerIndexOf(this.turn)))
-			: null
-	);
-
-	override activeSeat = $derived<0 | 1 | null>(
-		this.game.isLive && this.game.endedSeat === null && this.#liveWinner === null
-			? playerIndexOf(this.#liveTurn)
 			: null
 	);
 

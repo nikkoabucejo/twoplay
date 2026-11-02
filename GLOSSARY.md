@@ -2,33 +2,33 @@
 
 ## Game
 
-| Term         | Meaning                                                                                                                                |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Game type    | `tictactoe` or `checkers`. Server: `gameEngines`. Client: `GAMES`.                                                                     |
-| Room         | A lobby joined by code. Holds the game type and two seats. Spans many rounds.                                                          |
-| Room code    | 6-character shareable code. Not an authorization.                                                                                      |
-| Visibility   | `private` or `public`. Public waiting rooms appear in `/lobby`.                                                                        |
-| Room status  | `active` or `closed`. Closed reasons are `abandoned`, `empty`, and `inactive`.                                                         |
-| Seat         | Index `0` or `1` in `rooms.players`. Sets the game role (e.g. X/O).                                                                    |
-| Accent       | Seat color. Seat 0 is cyan, seat 1 is pink. Tokens `--seat-N`, classes in `ACCENTS`, hex in `SEAT_COLORS`.                             |
-| User         | Account row linked to Clerk (`users.clerk__userId`).                                                                                   |
-| Player       | One user in one room. Holds a name snapshot, score, emoji, `leftAt`, and `seenAt`.                                                     |
-| Spectator    | A signed-in user viewing a room without a seat.                                                                                        |
-| Round        | One game in a room (`games.round`). The current round is the highest.                                                                  |
-| Rematch      | Starts the next round in the same room.                                                                                                |
-| Move         | One played move (`moves`). `turn` is its 0-based order. Stores the state after the move.                                               |
-| Time control | Starting clock per player. Default 5 min, clamped to 10 s–60 min.                                                                      |
-| Clock        | Remaining ms per player per round. `turnedAt` is set while it is running.                                                              |
-| Result       | Per player per round. `state` is `timeout`, `resign`, or `abandon`. `mmr` is the rating change.                                        |
-| Rating (MMR) | One rating per user across all games. Starts at 400, ±8 per decisive round, floor 100. Draws don't change it.                          |
-| Pairing      | Quick-match queue entry. Deleted when paired, expires after 5 min.                                                                     |
-| Heartbeat    | `players.heartbeat`. Updates `seenAt`.                                                                                                 |
-| Sweep        | Cron, every 2 min. Closes a room whose second seat stayed empty for 45 min. Abandons a seat silent for 4 min. Clears expired pairings. |
-| Trashtalk    | A player's strip emoji.                                                                                                                |
-| Cursor       | Live pointer position, normalized to 0–1.                                                                                              |
-| Mood         | Ambient background driven by the board status.                                                                                         |
-| Turn alert   | Title flash and chime when your turn arrives in a hidden tab (`TurnAlert`, `Room.isMyTurn`). Sound follows the `sound` preference.     |
-| Live game    | Header pill linking to your active room (`rooms.active`), hidden while you are in it.                                                  |
+| Term         | Meaning                                                                                                                                     |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Game type    | `tictactoe` or `checkers`. Server: `gameEngines`. Client: `GAMES`.                                                                          |
+| Room         | A lobby joined by code. Holds the game type and two seats. Spans many rounds.                                                               |
+| Room code    | 6-character shareable code. Not an authorization.                                                                                           |
+| Visibility   | `private` or `public`. Public waiting rooms appear in `/lobby`.                                                                             |
+| Room status  | `active` or `closed`. Closed reasons are `abandoned`, `empty`, and `inactive`.                                                              |
+| Seat         | Index `0` or `1` in `rooms.players`. Sets the game role (e.g. X/O).                                                                         |
+| Accent       | Seat color. Seat 0 is cyan, seat 1 is pink. Tokens `--seat-N`, classes in `ACCENTS`, hex in `SEAT_COLORS`.                                  |
+| User         | Account row linked to Clerk (`users.clerk__userId`).                                                                                        |
+| Player       | One user in one room. Holds a name snapshot, score, emoji, `leftAt`, and `seenAt`.                                                          |
+| Spectator    | A signed-in user viewing a room without a seat.                                                                                             |
+| Round        | One game in a room (`games.round`). The current round is the highest.                                                                       |
+| Rematch      | Starts the next round in the same room.                                                                                                     |
+| Move         | One played move (`moves`). `turn` is its 0-based order. Stores the state after the move.                                                    |
+| Time control | Starting clock per player. Default 5 min, clamped to 10 s–60 min.                                                                           |
+| Clock        | Remaining ms per player per round. `turnedAt` is set while it is running.                                                                   |
+| Result       | Per player per round. `state` is `timeout`, `resign`, or `abandon`. `mmr` is the rating change.                                             |
+| Rating (MMR) | One rating per user across all games. Starts at 400, ±8 per decisive round, floor 100. Draws don't change it.                               |
+| Pairing      | Quick-match queue entry. Deleted when paired, expires after 5 min.                                                                          |
+| Heartbeat    | `players.heartbeat`. Updates `seenAt`.                                                                                                      |
+| Sweep        | Cron, every 2 min. Closes a room whose second seat stayed empty for 45 min. Abandons a seat silent for 4 min. Clears expired pairings.      |
+| Trashtalk    | A player's strip emoji.                                                                                                                     |
+| Cursor       | Live pointer position, normalized to 0–1.                                                                                                   |
+| Mood         | Ambient background driven by the board status.                                                                                              |
+| Turn alert   | Title flash and chime when your turn arrives in a hidden tab (`TurnAlert`, `Room.isMyTurnConfirmed`). Sound follows the `sound` preference. |
+| Live game    | Header pill linking to your active room (`rooms.active`), hidden while you are in it.                                                       |
 
 ## Code
 
@@ -38,6 +38,8 @@
 | Rules           | Pure board functions per game (`rules.ts`). No turn or player logic.                                          |
 | Registry        | `convex/models/games/index.ts`: `gameEngines`, union validators, and switch dispatch.                         |
 | `Room`          | Client base class (`$lib/utils/multiplayer`). Subclassed per game (`TictactoeRoom`, `CheckersRoom`).          |
+| Client engine   | `ClientEngine` (`applyMove`, `status`) a `Room` subclass passes to `super`, narrowed to its game.             |
+| Pending move    | The viewer's move shown before the server confirms it. Rolls back with a `rejection` if refused.              |
 | `Board`         | Shared layout component: player strips, board, round controls.                                                |
 | `requireUser`   | Resolves the caller from `ctx.auth`, or throws.                                                               |
 | `requirePlayer` | Resolves the caller's seat in a room, or throws.                                                              |

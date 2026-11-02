@@ -1,1 +1,1 @@
-export { Room } from "./room.svelte.js";
+export { Room, type ClientEngine } from "./room.svelte.js";

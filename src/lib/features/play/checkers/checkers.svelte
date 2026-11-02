@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { useMutation } from "convex-svelte";
+	import { untrack } from "svelte";
 	import { backOut } from "svelte/easing";
 	import { fade } from "svelte/transition";
 	import { goto } from "$app/navigation";
 	import { resolve } from "$app/paths";
 	import { Board, BoardPlaceholder, type BoardStatus } from "$lib/components/layout";
-	import { Button } from "$lib/components/ui";
+	import { Button, getToaster } from "$lib/components/ui";
 	import { Cursor, TurnAlert } from "$lib/features/presence";
 	import { getClerkAuth } from "$lib/services/auth";
 	import { playCaptureSound, playMoveSound, prepareSound } from "$lib/utils/sound";
@@ -39,12 +40,13 @@
 	}: { roomCode: string; round?: number; class?: string } = $props();
 
 	const auth = getClerkAuth();
+	const toaster = getToaster();
 	const joinRoom = useMutation(api.models.rooms.index.join);
 	const room = new CheckersRoom(
 		() => roomCode,
 		() => round
 	);
-	new TurnAlert(() => (room.isLoading ? null : room.isMyTurn));
+	new TurnAlert(() => (room.isLoading ? null : room.isMyTurnConfirmed));
 	const data = $derived(room.data);
 
 	let joinError = $state<string | null>(null);
@@ -67,6 +69,12 @@
 	$effect(() => {
 		if (room.wrongGameType && data)
 			goto(resolve(`/${data.type}/${roomCode}`), { replaceState: true });
+	});
+
+	$effect(() => {
+		const rejection = room.rejection;
+		// `show` reads the toast list, which would otherwise re-run this effect.
+		if (rejection) untrack(() => toaster.show(rejection.message, { tone: "error" }));
 	});
 
 	$effect(() => () => room.dispose());
@@ -257,6 +265,7 @@
 				opponentDisconnected={room.opponentDisconnected}
 				onTrashtalk={(emoji) => room.trashtalk(emoji)}
 				markIcon={stripMark}
+				rejectionId={room.rejection?.id}
 				footer={{
 					isLive: room.game.isLive,
 					round: room.game.round,
