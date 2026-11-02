@@ -38,7 +38,7 @@ beforeEach(() => {
 });
 
 function ratingCardSkeleton(container: HTMLElement) {
-	return container.querySelector("[data-slot='rating-card-skeleton']");
+	return container.querySelector("[data-loading='rating']");
 }
 
 describe("RatingSummary", () => {

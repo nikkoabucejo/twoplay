@@ -9,6 +9,7 @@
 		Emblem,
 		Playing,
 		Gate,
+		Skeleton,
 		Spinner,
 		Tabs,
 		getToaster,
@@ -59,6 +60,9 @@
 	);
 	const openRooms = useQuery(api.models.rooms.index.lobbies, () => (auth.isSignedIn ? {} : "skip"));
 	const ids = $props.id();
+
+	// Shared with the loading skeleton so its cards take the same boxes as the real choices.
+	const CHOICE_CLASS = "flex items-center gap-3 rounded-lg px-3 py-2";
 
 	// Seeds the choices once; later changes to `initialGame` shouldn't override the user's own picks.
 	const lastPlay = preferences.lastPlay;
@@ -272,7 +276,7 @@
 			disabled={isSetupLocked}
 			aria-labelledby="{ids}-game"
 			class="grid grid-cols-1 gap-2 sm:grid-cols-2"
-			itemClass="flex items-center gap-3 rounded-lg px-3 py-2"
+			itemClass={CHOICE_CLASS}
 		>
 			{#snippet choice(type, { labelId, hintId })}
 				{@render gameCard(type, labelId, hintId)}
@@ -296,7 +300,7 @@
 			disabled={isSetupLocked}
 			aria-labelledby="{ids}-opponent"
 			class="flex flex-col gap-2"
-			itemClass="flex items-center gap-3 rounded-lg px-3 py-2"
+			itemClass={CHOICE_CLASS}
 		>
 			{#snippet choice(value, { labelId, hintId })}
 				{@render opponentRow(value, labelId, hintId)}
@@ -432,6 +436,55 @@
 	</div>
 {/snippet}
 
+{#snippet setupSkeleton()}
+	<!-- The setup controls' boxes, shown while checking for an active room. Same blocks, gaps,
+	     and line boxes as gameChoice and setup, so the controls replace it in place. -->
+	<div role="status" data-loading="play" class="col-start-1 row-start-1 flex flex-col gap-4">
+		<span class="sr-only">Loading</span>
+		<div class="flex flex-col gap-2" aria-hidden="true">
+			<Skeleton variant="text" class="h-4 w-12" />
+			<div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+				{#each GAME_TYPES as type (type)}
+					<div class={cn("rounded-xl border bg-muted/30", CHOICE_CLASS)}>
+						<Skeleton class="size-9 shrink-0 rounded-full" />
+						<div class="flex min-w-0 flex-1 flex-col">
+							<Skeleton variant="text" class="h-5 w-24 max-w-full" />
+							<Skeleton variant="text" class="h-4 w-36 max-w-full" />
+						</div>
+					</div>
+				{/each}
+			</div>
+		</div>
+		<div class="flex flex-col gap-2" aria-hidden="true">
+			<Skeleton variant="text" class="h-4 w-16" />
+			<div class="flex flex-col gap-2">
+				{#each OPPONENT_TYPES as value (value)}
+					<div class={cn("rounded-xl border bg-muted/30", CHOICE_CLASS)}>
+						<Skeleton class="size-4 shrink-0 rounded-full" />
+						<div class="flex min-w-0 flex-col">
+							<Skeleton variant="text" class="h-5 w-24" />
+							<Skeleton variant="text" class="h-4 w-40 max-w-full" />
+						</div>
+					</div>
+				{/each}
+			</div>
+		</div>
+		<div class="flex flex-col gap-2" aria-hidden="true">
+			<Skeleton variant="text" class="h-4 w-28" />
+			<Skeleton class="h-7.5 w-full rounded-lg" />
+		</div>
+		<div class="flex flex-col gap-2" aria-hidden="true">
+			<Skeleton class="h-9 w-full rounded-lg" />
+			<Skeleton variant="text" class="mx-auto h-4 w-40" />
+		</div>
+		<div class="flex items-center gap-2 border-t pt-4" aria-hidden="true">
+			<Skeleton variant="text" class="h-4 w-20 shrink-0" />
+			<Skeleton class="h-8 min-w-0 flex-1" />
+			<Skeleton class="h-8 w-13 shrink-0" />
+		</div>
+	</div>
+{/snippet}
+
 {#snippet controls()}
 	{#if !auth.showsMemberNav}
 		<Gate message="Sign in to create or join a room." class="rounded-2xl border bg-muted/40 p-6" />
@@ -446,13 +499,16 @@
 			     so switching views never moves the page, and the other views center in the whole card. -->
 			<div class="grid grid-cols-1">
 				<div
+					data-loaded="play"
 					class={cn("col-start-1 row-start-1 flex flex-col gap-4", isSetupHidden && "invisible")}
 				>
 					{@render gameChoice()}
 					{@render setup()}
 				</div>
 
-				{#if room && viewKind === "waiting"}
+				{#if viewKind === "checking"}
+					{@render setupSkeleton()}
+				{:else if room && viewKind === "waiting"}
 					<div class="col-start-1 row-start-1">{@render waiting(room.code)}</div>
 				{:else if viewKind === "queued"}
 					<div class="col-start-1 row-start-1">{@render queued()}</div>
@@ -467,12 +523,6 @@
 				<p class="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
 					Can't reach sign-in. Reload to play.
 				</p>
-			{/if}
-
-			{#if viewKind === "checking"}
-				<div class="absolute inset-0 flex items-center justify-center">
-					<Spinner size="lg" />
-				</div>
 			{/if}
 		</div>
 	{/if}

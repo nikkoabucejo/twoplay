@@ -22,6 +22,9 @@
 	const PODIUM_CARD_CLASS =
 		"flex min-w-0 flex-col items-center gap-1.5 rounded-xl border p-3 text-center backdrop-blur-sm";
 
+	const TABLE_CLASS = "w-full table-fixed border-separate border-spacing-y-2 text-left";
+	const SKELETON_ROWS = 5;
+
 	const auth = getClerkAuth();
 	const leaderboard = useQuery(api.models.ratings.index.top, () => (auth.isSignedIn ? {} : "skip"));
 	// One batched call for every row's stats rather than one query per row — keyed by userId so each
@@ -82,37 +85,69 @@
 	</td>
 {/snippet}
 
+{#snippet tableHead()}
+	<thead>
+		<tr class="text-caption text-muted-foreground">
+			<th scope="col" class="w-16 pl-3 font-medium">Rank</th>
+			<th scope="col" class="px-3 font-medium">Player</th>
+			<th scope="col" class="hidden w-20 px-3 text-right font-medium lg:table-cell">Games</th>
+			<th scope="col" class="hidden w-20 px-3 text-right font-medium lg:table-cell">Win rate</th>
+			<th scope="col" class="w-16 pr-3 text-right font-medium">Rating</th>
+		</tr>
+	</thead>
+{/snippet}
+
 <div
 	class="flex min-h-0 w-full flex-1 flex-col items-center gap-3 overflow-hidden max-lg:overflow-visible lg:items-stretch"
 >
 	{#if !auth.isSignedIn}
 		<Gate message="Sign in to see the leaderboard." class="shrink-0" />
 	{:else if leaderboard.isLoading}
-		<!-- Takes the Feed's box, with the podium's cards and the table's rows. -->
-		<div role="status" class="min-h-0 w-full max-w-2xl flex-1 overflow-hidden lg:max-w-none">
-			<span class="sr-only">Loading</span>
+		<!-- Takes the Feed's box: the podium's cards, then the real table head over rows of the same
+		     cells. -->
+		<div
+			role="status"
+			data-loading="leaderboard"
+			class="min-h-0 w-full max-w-2xl flex-1 overflow-hidden lg:max-w-none"
+		>
+			<span class="sr-only">Loading the leaderboard</span>
 			<div class="flex flex-col gap-3 py-1" aria-hidden="true">
 				<div class="grid grid-cols-3 gap-2">
 					{#each { length: 3 }, index (index)}
 						<div class={cn(PODIUM_CARD_CLASS, "bg-muted/40")}>
 							<Skeleton class="size-9 rounded-full" />
-							<Skeleton class="h-5 w-16 max-w-full" />
-							<Skeleton class="h-5 w-10" />
+							<Skeleton variant="text" class="h-5 w-16 max-w-full" />
+							<Skeleton variant="text" class="h-5 w-10" />
 						</div>
 					{/each}
 				</div>
-				<div class="flex flex-col gap-2 pt-6">
-					{#each { length: 5 }, index (index)}
-						<div class="flex h-14 items-center gap-3 rounded-xl bg-muted/40 px-3">
-							<Skeleton class="size-9 shrink-0 rounded-full" />
-							<div class="flex flex-1 flex-col gap-1.5">
-								<Skeleton class="h-3.5 w-24" />
-								<Skeleton class="h-3 w-32 max-w-full" />
-							</div>
-							<Skeleton class="h-4 w-8" />
-						</div>
-					{/each}
-				</div>
+				<table class={TABLE_CLASS}>
+					{@render tableHead()}
+					<tbody>
+						{#each { length: SKELETON_ROWS }, index (index)}
+							<tr>
+								<td class="rounded-l-xl bg-muted/40 py-2.5 pl-3">
+									<Skeleton class="size-9 rounded-full" />
+								</td>
+								<td class="bg-muted/40 px-3 py-2.5">
+									<div class="flex min-w-0 flex-col">
+										<Skeleton variant="text" class="h-5 w-24 max-w-full" />
+										<Skeleton variant="text" class="h-4 w-32 max-w-full lg:hidden" />
+									</div>
+								</td>
+								<td class="hidden bg-muted/40 px-3 py-2.5 lg:table-cell">
+									<Skeleton variant="text" class="ml-auto h-5 w-8" />
+								</td>
+								<td class="hidden bg-muted/40 px-3 py-2.5 lg:table-cell">
+									<Skeleton variant="text" class="ml-auto h-5 w-10" />
+								</td>
+								<td class="rounded-r-xl bg-muted/40 py-2.5 pr-3">
+									<Skeleton variant="text" class="ml-auto h-5 w-10" />
+								</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
 			</div>
 		</div>
 	{:else if leaderboard.error}
@@ -126,7 +161,7 @@
 	{:else}
 		<!-- No edge fade: it would wash out the pinned row at the bottom. Below lg the page scrolls
 		     instead of the Feed, so the pinned row sticks to the bottom of <main>. -->
-		<Feed class="mask-none max-lg:overflow-visible lg:max-w-none">
+		<Feed data-loaded="leaderboard" class="mask-none max-lg:overflow-visible lg:max-w-none">
 			<div class="flex flex-col gap-3 py-1">
 				<ol aria-label="Top three" class="grid grid-cols-3 gap-2">
 					{#each standings.podium as entry, index (entry.userId)}
@@ -164,20 +199,8 @@
 				</ol>
 
 				{#if standings.rest.length}
-					<table class="w-full table-fixed border-separate border-spacing-y-2 text-left">
-						<thead>
-							<tr class="text-caption text-muted-foreground">
-								<th scope="col" class="w-16 pl-3 font-medium">Rank</th>
-								<th scope="col" class="px-3 font-medium">Player</th>
-								<th scope="col" class="hidden w-20 px-3 text-right font-medium lg:table-cell"
-									>Games</th
-								>
-								<th scope="col" class="hidden w-20 px-3 text-right font-medium lg:table-cell"
-									>Win rate</th
-								>
-								<th scope="col" class="w-16 pr-3 text-right font-medium">Rating</th>
-							</tr>
-						</thead>
+					<table class={TABLE_CLASS}>
+						{@render tableHead()}
 						<tbody>
 							{#each standings.rest as entry, index (entry.userId)}
 								<tr {@attach entry.isMe && watchOwnRow}>

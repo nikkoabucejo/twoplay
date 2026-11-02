@@ -108,9 +108,11 @@ function radio(name: string) {
 }
 
 describe("Play", () => {
-	test("shows a spinner while checking for an active room", () => {
-		render(Play);
+	test("shows the setup skeleton while checking for an active room", () => {
+		const { container } = render(Play);
 		expect(screen.getByRole("status")).toHaveTextContent("Loading");
+		expect(container.querySelector("[data-loading='play']")).toBeInTheDocument();
+		expect(container.querySelector("[data-slot='spinner']")).not.toBeInTheDocument();
 	});
 
 	test("signed out, asks to sign in with a Sign in button", () => {

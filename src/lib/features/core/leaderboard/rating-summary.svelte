@@ -18,27 +18,27 @@
 </script>
 
 {#if leaderboard.isLoading || myRating.isLoading || myStats.isLoading}
-	<div data-slot="rating-card-skeleton" class={RATING_CARD_CLASS} aria-hidden="true">
+	<div data-loading="rating" class={RATING_CARD_CLASS} aria-hidden="true">
 		<div class="flex flex-col items-center gap-1.5">
-			<Skeleton class="h-4 w-24" />
-			<Skeleton class="h-10 w-20" />
-			<Skeleton class="h-4 w-32" />
+			<Skeleton variant="text" class="h-4 w-24" />
+			<Skeleton variant="text" class="h-10 w-20" />
+			<Skeleton variant="text" class="h-4 w-32" />
 
 			<div class="mt-2 flex items-center gap-4 border-t border-border/60 pt-3">
 				<div class="flex flex-col items-center gap-0.5">
-					<Skeleton class="h-5 w-6" />
-					<Skeleton class="h-4 w-10" />
+					<Skeleton variant="text" class="h-5 w-6" />
+					<Skeleton variant="text" class="h-4 w-10" />
 				</div>
 				<div class="h-6 w-px bg-border"></div>
 				<div class="flex flex-col items-center gap-0.5">
-					<Skeleton class="h-5 w-8" />
-					<Skeleton class="h-4 w-12" />
+					<Skeleton variant="text" class="h-5 w-8" />
+					<Skeleton variant="text" class="h-4 w-12" />
 				</div>
 			</div>
 		</div>
 	</div>
 {:else if leaderboard.data && myRating.data !== undefined && myStats.data}
-	<div class={RATING_CARD_CLASS}>
+	<div data-loaded="rating" class={RATING_CARD_CLASS}>
 		<Sparkle colors={SEAT_COLORS} variant="title" class="opacity-70" />
 		<div class="relative z-10 flex flex-col items-center gap-1.5">
 			<h2

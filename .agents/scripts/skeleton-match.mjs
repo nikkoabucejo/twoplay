@@ -6,7 +6,7 @@
 //   leaves  a skeleton leaf's top or height differs from the loaded leaf on its row, or a loaded
 //           leaf has no skeleton leaf on its row (missing placeholder)
 //   around  an element outside both regions moved between the two pages
-// Writes <name>-<viewport>-{loading,loaded,overlay}.png to OUT; overlay is the loaded page with the
+// Writes <route>-<viewport>-{loading,loaded,overlay}.png to OUT; overlay is the loaded page with the
 // skeleton at 50% on top, so any misfit shows as a double edge.
 // Usage: node .agents/scripts/skeleton-match.mjs /history,/leaderboard,/play [--signed-out]
 // Env: BASE (http://localhost:5173), PROFILE (player-d), OUT (os tmpdir/skeleton-match),
@@ -73,9 +73,10 @@ function snapshot(attribute) {
 		return parts.join("/");
 	};
 	// Ambient motion (the mood backdrop, pulses) moves on its own, so it never counts as a shift.
+	const animated = new Set(document.getAnimations().map((a) => a.effect?.target));
 	const isAnimated = (el) => {
 		for (let node = el; node; node = node.parentElement) {
-			if (node.getAnimations().length > 0) return true;
+			if (animated.has(node)) return true;
 		}
 		return false;
 	};
@@ -173,7 +174,7 @@ async function capture(context, route, attribute, holdSocket) {
 		await page
 			.locator(`[${attribute}]`)
 			.first()
-			.waitFor({ state: "visible", timeout: 15_000 })
+			.waitFor({ state: "visible", timeout: 60_000 })
 			.catch(() => {});
 		await page.evaluate(() => document.fonts.ready);
 		await page.waitForTimeout(holdSocket ? 1500 : 3000);
@@ -211,22 +212,19 @@ try {
 					loading,
 					loaded: live.regions.find((r) => r.name === loading.name)
 				}));
+				const stem = join(OUT, `${route.replace(/\W+/g, "_")}-${viewport}`);
+				writeFileSync(`${stem}-loading.png`, held.png);
+				writeFileSync(`${stem}-loaded.png`, live.png);
+				await overlay(context, live.png, held.png, `${stem}-overlay.png`);
 				const issues = [];
 				for (const { loading, loaded } of pairs) {
 					if (!loaded) {
-						issues.push({ kind: "unpaired", name: loading.name, hint: "no [data-loaded] after loading: empty or error state, or the account has no data" });
+						issues.push({ kind: "unpaired", name: loading.name, hint: `no [data-loaded] after loading: empty or error state, or the account has no data; see ${stem}-loaded.png` });
 						continue;
 					}
 					issues.push(...compare(loading, loaded).map((issue) => ({ name: loading.name, ...issue })));
-					const stem = join(OUT, `${loading.name}-${viewport}`);
-					writeFileSync(`${stem}-loading.png`, held.png);
-					writeFileSync(`${stem}-loaded.png`, live.png);
-					await overlay(context, live.png, held.png, `${stem}-overlay.png`);
 				}
 				if (pairs.length === 0) {
-					const stem = join(OUT, `${route.replaceAll("/", "_")}-${viewport}`);
-					writeFileSync(`${stem}-loading.png`, held.png);
-					writeFileSync(`${stem}-loaded.png`, live.png);
 					issues.push({ kind: "unpaired", hint: `no [data-loading] while queries were held; see ${stem}-loading.png` });
 				}
 				issues.push(...moved(held.around, live.around).slice(0, 8));

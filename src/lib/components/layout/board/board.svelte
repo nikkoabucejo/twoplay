@@ -553,6 +553,7 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div
+	data-loaded="board"
 	class={cn(
 		"mx-auto flex w-fit items-stretch gap-4",
 		hasSidePanel ? BOARD_CHROME : "[--board-chrome:20.75rem]",

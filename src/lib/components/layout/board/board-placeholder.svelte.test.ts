@@ -9,15 +9,18 @@ describe("BoardPlaceholder", () => {
 		expect(screen.getByRole("status")).toHaveTextContent("Loading game");
 	});
 
-	test("holds the spinner in a square area the board's width", () => {
-		render(BoardPlaceholder);
-		const area = screen.getByRole("status").parentElement;
-		expect(area).toHaveClass("aspect-square", "w-(--board-size)");
+	test("shows a skeleton, not a spinner", () => {
+		const { container } = render(BoardPlaceholder);
+		expect(container.querySelector("[data-slot='spinner']")).not.toBeInTheDocument();
+		expect(
+			container.querySelector("[data-slot='board-area'] [data-slot='skeleton']")
+		).toBeInTheDocument();
 	});
 
-	test("reserves the room bar, a strip slot above and below the board area, then the round controls and notice line", () => {
+	test("reserves the room bar, a strip above and below a square board area, then the round controls and notice line", () => {
 		const { container } = render(BoardPlaceholder);
-		const area = screen.getByRole("status").parentElement!;
+		const area = container.querySelector("[data-slot='board-area']")!;
+		expect(area).toHaveClass("aspect-square", "w-(--board-size)");
 		const column = area.parentElement!;
 		const [roomBar, upper, board, lower, footer] = column.children;
 		expect(column.children).toHaveLength(5);
@@ -29,12 +32,11 @@ describe("BoardPlaceholder", () => {
 		expect(footer.children).toHaveLength(2);
 		expect(controls).toHaveClass("h-8");
 		expect(notice).toHaveClass("h-5");
-		expect(container.querySelector(".size-10")).not.toBeInTheDocument();
 	});
 
 	test("reserves the side panel's box beside the board column", () => {
-		render(BoardPlaceholder);
-		const column = screen.getByRole("status").parentElement!.parentElement!;
+		const { container } = render(BoardPlaceholder);
+		const column = container.querySelector("[data-slot='board-area']")!.parentElement!;
 		expect(column.nextElementSibling).toHaveAttribute("data-slot", "side-panel");
 	});
 
