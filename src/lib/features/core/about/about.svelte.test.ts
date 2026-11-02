@@ -114,6 +114,15 @@ describe("About", () => {
 		expect(nikkos).toEqual([steps[PIPELINE_STEPS.indexOf("Approval")]]);
 	});
 
+	test("logs one request's run, with the failing tests fixed before commit", () => {
+		render(About);
+		const pipeline = screen.getByRole("region", { name: "How it's built" });
+		expect(within(pipeline).getByText('/dev:work "rework the about page"')).toBeInTheDocument();
+		expect(within(pipeline).getByText("17 failing")).toBeInTheDocument();
+		expect(within(pipeline).getByText("107/107")).toBeInTheDocument();
+		expect(within(pipeline).getByText("bbb17c6")).toBeInTheDocument();
+	});
+
 	describe("during a build", () => {
 		beforeEach(() => {
 			sessionStorage.clear();

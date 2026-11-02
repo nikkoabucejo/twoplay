@@ -210,6 +210,55 @@
 		{ step: "Commit", owner: "steward", isEngineer: false }
 	];
 
+	/** The run that built this page, in `/dev:work`'s progress-line format. */
+	const RUN: readonly {
+		mark: "▸" | "⏸" | "✓";
+		step: string;
+		agent: string;
+		result: readonly { sign?: "✓" | "✗"; text: string }[];
+	}[] = [
+		{
+			mark: "▸",
+			step: "triage",
+			agent: "triage",
+			result: [{ sign: "✓", text: "large feature, route ff" }]
+		},
+		{
+			mark: "▸",
+			step: "plan",
+			agent: "architect",
+			result: [{ sign: "✓", text: "13 requirements" }]
+		},
+		{ mark: "⏸", step: "approval", agent: "Nikko", result: [{ sign: "✓", text: "approved" }] },
+		{
+			mark: "▸",
+			step: "apply",
+			agent: "engineer + designer",
+			result: [{ sign: "✓", text: "30 tasks" }]
+		},
+		{
+			mark: "▸",
+			step: "verify",
+			agent: "verifier",
+			result: [
+				{ sign: "✗", text: "17 failing" },
+				{ text: "→ fix →" },
+				{ sign: "✓", text: "107/107" }
+			]
+		},
+		{ mark: "▸", step: "qa", agent: "qa", result: [{ sign: "✓", text: "desktop + phone" }] },
+		{
+			mark: "▸",
+			step: "review",
+			agent: "reviewer",
+			result: [{ sign: "✓", text: "9 findings fixed" }]
+		},
+		{ mark: "✓", step: "commit", agent: "steward", result: [{ text: "bbb17c6" }] }
+	];
+
+	/** The steps Tests, Live QA, and Review loop back to Build from, as spans of the line. */
+	const LOOPS = [1, 2, 3];
+
 	const QUOTE =
 		"The job shifted from writing code to designing the system that writes it, and deciding what good means.";
 
@@ -302,9 +351,6 @@
 	const CREW = `co-authored by ${TEAM.map((agent) => agent.name).join(", ")}`;
 	const DIFF_ROW =
 		"relative isolate grid grid-cols-[1.75rem_1.75rem_1.25rem_minmax(0,1fr)] px-2 sm:px-3";
-	/** The pipeline's rail, through the node centers: vertical below `md`, horizontal from it. */
-	const RAIL =
-		"pointer-events-none absolute top-7 bottom-7 left-5.5 w-px [container-type:size] md:top-5.5 md:right-[6.25%] md:bottom-auto md:left-[6.25%] md:h-px md:w-auto";
 	const GUTTER = "deco pr-2 text-right text-muted-foreground/50 tabular-nums select-none";
 
 	function formatDate(date: string): string {
@@ -563,26 +609,42 @@
 		class="relative flex flex-col gap-8"
 	>
 		{@render heading("about-how", "How it's built", "/dev:work <request>")}
-		<div class="relative">
-			<div class={RAIL} aria-hidden="true">
-				<span data-build="line" class="absolute inset-0 bg-foreground/20"></span>
+		<div class="metro relative">
+			<div class="pointer-events-none absolute inset-0" aria-hidden="true">
+				<span data-build="line" class="rail absolute"></span>
+				{#each LOOPS as span (span)}
+					<span data-build="line" class="loop absolute" style:--span={span}></span>
+				{/each}
 			</div>
-			<ol data-build="pop" class="relative grid md:grid-cols-8">
-				{#each PIPELINE as step, index (step.step)}
+			<ol data-build="pop" class="relative flex flex-col md:grid md:grid-cols-8">
+				{#each PIPELINE as step (step.step)}
 					<li
-						class="flex h-14 min-w-0 items-center gap-4 md:h-auto md:flex-col md:gap-2.5 md:text-center"
+						class="relative flex h-12 min-w-0 items-center gap-3 pl-16 md:h-auto md:flex-col md:gap-1 md:pt-18 md:pl-0 md:text-center"
 					>
-						<span
-							class={cn(
-								"grid size-11 shrink-0 place-items-center rounded-full border font-mono text-xs font-medium tabular-nums",
-								step.isEngineer
-									? cn("border-transparent text-background", ACCENTS[1].bg)
-									: "bg-background text-muted-foreground"
-							)}
-							aria-hidden="true"
-						>
-							{pad(index + 1)}
-						</span>
+						{#if step.isEngineer}
+							<span
+								data-build-item
+								class={cn(
+									"absolute top-1/2 left-10 flex size-6 -translate-1/2 items-center justify-center gap-0.5 rounded-md ring-4 ring-background md:top-12 md:left-1/2",
+									ACCENTS[1].bg
+								)}
+								aria-hidden="true"
+							>
+								<span class="h-2.5 w-0.5 rounded-full bg-background"></span>
+								<span class="h-2.5 w-0.5 rounded-full bg-background"></span>
+							</span>
+						{:else}
+							<span
+								data-build-item
+								class={cn(
+									"absolute top-1/2 left-10 size-4 -translate-1/2 rounded-full border-2 md:top-12 md:left-1/2",
+									step.step === "Commit"
+										? cn("border-transparent", ACCENTS[0].bg)
+										: "border-foreground/50 bg-background"
+								)}
+								aria-hidden="true"
+							></span>
+						{/if}
 						<span class="text-sm font-semibold whitespace-nowrap">{step.step}</span>
 						<span
 							class={cn(
@@ -595,8 +657,8 @@
 					</li>
 				{/each}
 			</ol>
-			<!-- Above the nodes, so it shows while it waits on Approval. -->
-			<div class={RAIL} aria-hidden="true">
+			<!-- Above the stations, so it shows while it waits on Approval. -->
+			<div class="pointer-events-none absolute inset-0 @container" aria-hidden="true">
 				<span
 					class={cn(
 						"token absolute top-0 left-0 -mt-1.5 -ml-1.5 size-3 rounded-full ring-2 ring-background",
@@ -606,15 +668,85 @@
 				></span>
 			</div>
 		</div>
-		<p
-			data-build="code"
-			data-build-code={'/dev:work "rework the about page"'}
-			class="max-w-2xl text-sm/7 text-muted-foreground sm:text-base/7"
-		>
-			<Typed
-				text="Every request takes the same path. I approve every plan. Reviewers can't edit, builders can't approve their own work, and agents never push or deploy."
-			/>
-		</p>
+		<div class="grid gap-8 lg:grid-cols-[minmax(0,7fr)_minmax(0,4fr)] lg:gap-12">
+			<div
+				data-build="fill radius"
+				class="surface surface-code relative isolate min-w-0 self-start overflow-hidden rounded-2xl border pb-3 font-mono text-xs/6 sm:text-sm/7"
+			>
+				<p
+					data-build="code"
+					data-build-code={'/dev:work "rework the about page"'}
+					class="rule-b relative grid grid-cols-[1.25rem_minmax(0,1fr)] px-4 py-2.5"
+				>
+					<span class={ACCENTS[0].text} aria-hidden="true">▶</span>
+					<span>/dev:work "rework the about page"</span>
+				</p>
+				<div class="flex flex-col pt-3">
+					{#each RUN as line, index (line.step)}
+						{@const isNikko = line.agent === "Nikko"}
+						<div data-build="type">
+							<p class="replay grid grid-cols-[1.25rem_minmax(0,1fr)] px-4" style:--line={index}>
+								<span
+									class={cn(
+										"deco",
+										isNikko
+											? ACCENTS[1].text
+											: line.mark === "✓"
+												? ACCENTS[0].text
+												: "text-muted-foreground/60"
+									)}
+									aria-hidden="true">{line.mark}</span
+								>
+								<span class="flex min-w-0 flex-wrap gap-x-3">
+									<span class="w-16 shrink-0 sm:w-20"><Typed text={line.step} /></span>
+									<span class={isNikko ? ACCENTS[1].text : "text-muted-foreground"}>
+										<Typed text={line.agent} />
+									</span>
+									<span
+										class="flex basis-full flex-wrap justify-end gap-x-2 sm:ml-auto sm:basis-auto"
+									>
+										{#each line.result as part (part.text)}
+											<span
+												class={cn(
+													"whitespace-nowrap",
+													part.sign === "✗" || !part.sign
+														? "text-muted-foreground"
+														: "text-foreground/85"
+												)}
+											>
+												{#if part.sign}
+													<span
+														class={cn(
+															"deco",
+															part.sign === "✗"
+																? "text-destructive/80"
+																: isNikko
+																	? ACCENTS[1].text
+																	: ACCENTS[0].text
+														)}
+														aria-hidden="true">{part.sign}</span
+													>
+												{/if}
+												<Typed text={part.text} />
+											</span>
+										{/each}
+									</span>
+								</span>
+							</p>
+						</div>
+					{/each}
+					<p class="grid grid-cols-[1.25rem_minmax(0,1fr)] px-4" aria-hidden="true">
+						<span class="deco text-muted-foreground/60">▶</span>
+						<span class="deco prompt-caret"></span>
+					</p>
+				</div>
+			</div>
+			<p data-build="type" class="max-w-prose text-sm/7 text-muted-foreground sm:text-base/7">
+				<Typed
+					text="Every request takes the same path. I approve every plan. Reviewers can't edit, builders can't approve their own work, and agents never push or deploy."
+				/>
+			</p>
+		</div>
 	</section>
 
 	<section
@@ -1071,26 +1203,68 @@
 		line-height: 1;
 	}
 
-	/* The approval step's share of the rail: the token waits there. */
+	/* The pipeline map. Below md it runs down at x = 2.5rem with a station every 3rem; from md it
+	   runs across at y = 3rem with a station centered in each eighth. Loops return to Build. */
+	.rail {
+		top: 1.5rem;
+		left: calc(2.5rem - 1px);
+		width: 2px;
+		height: 21rem;
+		background: color-mix(in oklab, var(--foreground) 22%, transparent);
+	}
+
+	.loop {
+		--reach: calc(0.25rem + var(--span) * 0.625rem);
+		top: calc(10.5rem - 1px);
+		left: calc(2.5rem - var(--reach));
+		width: var(--reach);
+		height: calc(var(--span) * 3rem + 2px);
+		border: 2px dashed color-mix(in oklab, var(--muted-foreground) 45%, transparent);
+		border-right: 0;
+		border-radius: 0.5rem 0 0 0.5rem;
+	}
+
+	@media (min-width: 48rem) {
+		.rail {
+			top: calc(3rem - 1px);
+			left: 6.25%;
+			width: 87.5%;
+			height: 2px;
+		}
+
+		.loop {
+			--rise: calc(0.5rem + var(--span) * 0.75rem);
+			--inset: calc((var(--span) - 1) * 0.5rem);
+			top: calc(3rem - var(--rise));
+			left: calc(43.75% - 1px - var(--inset));
+			width: calc(var(--span) * 12.5% + 2px + var(--inset));
+			height: var(--rise);
+			border-right: 2px dashed color-mix(in oklab, var(--muted-foreground) 45%, transparent);
+			border-bottom: 0;
+			border-radius: 0.5rem 0.5rem 0 0;
+		}
+	}
+
+	/* The token rests on Approval; with motion it rides the line, takes the Tests loop once, and
+	   waits at the gate. */
 	.token {
-		--approval: calc(2 / 7);
-		translate: 0 calc(var(--approval) * 100cqh);
+		translate: 2.5rem 7.5rem;
 	}
 
 	@media (min-width: 48rem) {
 		.token {
-			translate: calc(var(--approval) * 100cqw) 0;
+			translate: 31.25cqw 3rem;
 		}
 	}
 
 	@media (prefers-reduced-motion: no-preference) {
 		:global(html:not(.reduce-motion)) .token {
-			animation: travel-y 7s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+			animation: ride-y 11s linear infinite;
 		}
 
 		@media (min-width: 48rem) {
 			:global(html:not(.reduce-motion)) .token {
-				animation-name: travel-x;
+				animation-name: ride-x;
 			}
 		}
 	}
@@ -1100,46 +1274,121 @@
 		animation: none;
 	}
 
-	@keyframes travel-x {
+	@keyframes ride-x {
 		0% {
-			translate: 0 0;
+			translate: 6.25cqw 3rem;
 			opacity: 0;
+			animation-timing-function: ease-out;
 		}
-		6% {
+		5% {
 			opacity: 1;
 		}
-		24%,
-		52% {
-			translate: calc(var(--approval) * 100cqw) 0;
+		18% {
+			translate: 31.25cqw 3rem;
 		}
-		90% {
-			translate: 100cqw 0;
+		36% {
+			translate: 31.25cqw 3rem;
+			animation-timing-function: ease-in;
+		}
+		44% {
+			translate: 43.75cqw 3rem;
+		}
+		50% {
+			translate: 56.25cqw 3rem;
+		}
+		53% {
+			translate: 56.25cqw 1.75rem;
+		}
+		59% {
+			translate: 43.75cqw 1.75rem;
+		}
+		62% {
+			translate: 43.75cqw 3rem;
+		}
+		88% {
+			translate: 93.75cqw 3rem;
 			opacity: 1;
 		}
+		95%,
 		100% {
-			translate: 100cqw 0;
+			translate: 93.75cqw 3rem;
 			opacity: 0;
 		}
 	}
 
-	@keyframes travel-y {
+	@keyframes ride-y {
 		0% {
-			translate: 0 0;
+			translate: 2.5rem 1.5rem;
+			opacity: 0;
+			animation-timing-function: ease-out;
+		}
+		5% {
+			opacity: 1;
+		}
+		18% {
+			translate: 2.5rem 7.5rem;
+		}
+		36% {
+			translate: 2.5rem 7.5rem;
+			animation-timing-function: ease-in;
+		}
+		44% {
+			translate: 2.5rem 10.5rem;
+		}
+		50% {
+			translate: 2.5rem 13.5rem;
+		}
+		53% {
+			translate: 1.625rem 13.5rem;
+		}
+		59% {
+			translate: 1.625rem 10.5rem;
+		}
+		62% {
+			translate: 2.5rem 10.5rem;
+		}
+		88% {
+			translate: 2.5rem 22.5rem;
+			opacity: 1;
+		}
+		95%,
+		100% {
+			translate: 2.5rem 22.5rem;
 			opacity: 0;
 		}
-		6% {
-			opacity: 1;
+	}
+
+	/* Once built, the run log retypes itself line by line every 16 seconds; at rest it is whole. */
+	@media (prefers-reduced-motion: no-preference) {
+		:global(html:not(.reduce-motion)) .about-root:not([data-phase="building"]) .replay {
+			animation: replay 16s calc(2s + var(--line) * 0.7s) infinite;
 		}
-		24%,
-		52% {
-			translate: 0 calc(var(--approval) * 100cqh);
+
+		:global(html:not(.reduce-motion)) .about-root:not([data-phase="building"]) .prompt-caret {
+			animation: caret 1s steps(1) infinite;
 		}
-		90% {
-			translate: 0 100cqh;
-			opacity: 1;
+	}
+
+	@keyframes replay {
+		0% {
+			clip-path: inset(0 100% 0 0);
+			animation-timing-function: steps(16, end);
 		}
+		4%,
 		100% {
-			translate: 0 100cqh;
+			clip-path: inset(0);
+		}
+	}
+
+	.prompt-caret {
+		width: 0.55em;
+		height: 1.1em;
+		align-self: center;
+		background: var(--muted-foreground);
+	}
+
+	@keyframes caret {
+		50% {
 			opacity: 0;
 		}
 	}

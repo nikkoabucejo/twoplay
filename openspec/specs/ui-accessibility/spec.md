@@ -54,7 +54,7 @@ Keyboard focus rings on interactive controls SHALL have at least 3:1 contrast ag
 
 ### Requirement: Reduced motion
 
-When the user requests reduced motion, the landing wordmark glow, the mood blobs, the tic-tac-toe icon's wobble, the checkers icon's bouncing pieces, the chess icon's motion, the board shake, and the About pipeline token and hero board SHALL stop animating, keeping their static appearance. The About build SHALL NOT start on its own under the OS or app setting and SHALL run only on Replay, without follow-scroll.
+When the user requests reduced motion, the landing wordmark glow, the mood blobs, the tic-tac-toe icon's wobble, the checkers icon's bouncing pieces, the chess icon's motion, the board shake, and the About pipeline token, run log replay, and hero board SHALL stop animating, keeping their static appearance. The About build SHALL NOT start on its own under the OS or app setting and SHALL run only on Replay, without follow-scroll.
 
 #### Scenario: Wordmark and blobs hold still
 
@@ -99,4 +99,4 @@ When the user requests reduced motion, the landing wordmark glow, the mood blobs
 #### Scenario: About ambient motion holds still
 
 - **WHEN** `prefers-reduced-motion: reduce` is emulated and `/about` shows its final page
-- **THEN** the pipeline token and the hero board have no running animation and are still visible
+- **THEN** the pipeline token, the run log, and the hero board have no running animation and are still visible
