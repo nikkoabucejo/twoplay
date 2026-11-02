@@ -1,6 +1,6 @@
 ---
 name: triage
-description: First stop for any incoming request in twoplay (feature, bug, refactor, chore, question). Classifies it, sizes it, maps the affected code areas and risks, surfaces blocking ambiguities, and recommends the route through the /dev:work flow. Read-only — never edits files. Use at the start of /dev:work, or on its own when you want a quick "what is this and how big is it" read before committing to work.
+description: First stop for any incoming request in twoplay (feature, bug, refactor, chore, question). Classifies it, sizes it, maps the affected code areas and risks, surfaces blocking ambiguities, and recommends the OpenSpec route (none, explore, new, ff, propose) for /dev:work. Read-only — never edits files. Use at the start of /dev:work, or on its own when you want a quick "what is this and how big is it" read before committing to work.
 tools: Read, Grep, Glob, Bash, mcp__codegraph__codegraph_explore
 ---
 
@@ -24,22 +24,31 @@ not design solutions and you never edit files. Bash is for read-only commands on
   Skips OpenSpec.
 - **small** — one feature area, no schema change, ≤ ~5 files, clear acceptance criteria.
 - **large** — schema/auth/trust-boundary change, a new game, cross-cutting refactor, more than one
-  area, or unclear requirements. Gets brainstorming before the spec.
+  area, or unclear requirements.
 
 Anything touching `convex/schema.ts`, `convex/models/*/schema.ts`, `rooms/auth.ts`, `ctx.auth`,
 ratings/MMR, clocks, or results is **at least small** and flags `security`.
+
+## Route rubric
+The OpenSpec route `/dev:work` recommends to the user:
+- **none** — trivial, or a question.
+- **explore** — the problem or the approach is unclear; think it through before any artifact.
+- **new** — large or risky; each artifact is reviewed before the next.
+- **ff** — clear scope and no blocking questions; all artifacts in one go.
+- **propose** — clear goal, but blocking questions to settle before the artifacts.
 
 ## Output (exactly this shape, no preamble)
 ```
 TYPE: feature | bug | refactor | chore | question
 SIZE: trivial | small | large
+ROUTE: none | explore | new | ff | propose — <one-line reason>
 CHANGE_ID: <kebab-case verb-led id, e.g. add-connectfour, fix-clock-timeout-race>
 COMMIT_TYPE: feature | bug | refactor | chore | docs
 SUMMARY: <one sentence restating the request precisely>
 AREAS:
 - <path or folder> — <why it's involved>
 RISKS: <comma list from: schema, auth, trust-boundary, realtime, clocks, mmr, ui, a11y, perf, migration, none>
-AGENTS: <which of architect, engineer, designer, security, verifier, reviewer are needed>
+AGENTS: <which of engineer, designer, security, verifier, reviewer are needed>
 OVERLAPS: <existing openspec change/spec ids, or none>
 BLOCKING_QUESTIONS:
 - <only questions whose answer changes scope or behavior; "none" if none>
@@ -47,4 +56,4 @@ ASSUMPTIONS:
 - <defaults you'd take for non-blocking ambiguities>
 NOTES: <repro steps for bugs, gotchas, anything the planner must know>
 ```
-If TYPE is `question`, answer it under NOTES and set SIZE to trivial. No work is needed.
+If TYPE is `question`, answer it under NOTES, set SIZE to trivial and ROUTE to none. No work is needed.

@@ -1,6 +1,6 @@
 ---
 name: architect
-description: Turns a triaged request into an OpenSpec change for twoplay — proposal.md, delta specs with Requirements/Scenarios, design.md when warranted, and an ordered tasks.md — then validates it with `openspec validate --strict`. Writes ONLY under openspec/. Use in the Spec phase of /dev:work, or directly when you want a spec/plan for a change without implementing it.
+description: Turns a triaged request into an OpenSpec change for twoplay — proposal.md, delta specs with Requirements/Scenarios, design.md when warranted, and an ordered tasks.md — then validates it with `openspec validate --strict`. Writes ONLY under openspec/. Use directly when you want a subagent to write a change without implementing it. /dev:work plans through the OpenSpec skills instead.
 tools: Read, Grep, Glob, Bash, Write, Edit, mcp__codegraph__codegraph_explore
 ---
 

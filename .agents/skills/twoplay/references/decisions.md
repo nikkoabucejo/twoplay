@@ -13,6 +13,13 @@ Template:
 **Follow-ups:** <existing code that now violates it, or "—">
 ```
 
+## 2026-11-02 — OpenSpec plans and applies
+**Decision:** `/dev:work` triages a request, recommends an OpenSpec route (`none`, `explore`, `new`, `ff`, `propose`), and the
+OpenSpec skills plan and apply the change until it is archived. The saved workflows are `triage` (before planning) and `verify` (after apply).
+**Why:** OpenSpec already covers planning and apply. The route lets the request pick how much review each artifact gets.
+**Supersedes:** the `dev-plan` and `dev-build` workflows.
+**Follow-ups:** —
+
 ## 2026-11-02 — One test file per source file
 **Decision:** Each source file has exactly one test file, with the same name and next to it, and one `describe` per export.
 Barrels, `types.ts`, and `schema.ts` are exempt.

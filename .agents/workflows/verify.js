@@ -1,9 +1,8 @@
 export const meta = {
-	name: 'dev-build',
-	description: 'twoplay: implement an approved OpenSpec change, verify (tests), live QA in two browsers, deslop, CodeGraph impact, review with adversarial checks, docs sync',
-	whenToUse: 'Called by /dev:work after plan approval. args: { changeId, groups, risks, base, qa }',
+	name: 'verify',
+	description: 'twoplay: verify an applied OpenSpec change (tests), live QA in two browsers, deslop, CodeGraph impact, review with adversarial checks, docs sync',
+	whenToUse: 'Called by /dev:work after OpenSpec apply, before archive. args: { changeId, risks, base, qa }',
 	phases: [
-		{ title: 'Implement', detail: 'engineer/designer per task group' },
 		{ title: 'Verify', detail: 'vitest, check, build, scenarios; fix loop (max 3)' },
 		{ title: 'QA', detail: 'qa drives browser-a/browser-b against the dev server; fix loop (max 2)' },
 		{ title: 'Conform', detail: 'steward deslop + conventions' },
@@ -14,7 +13,7 @@ export const meta = {
 }
 
 const a = args || {}
-if (!a.changeId || !Array.isArray(a.groups)) throw new Error('dev-build needs args.changeId and args.groups')
+if (!a.changeId) throw new Error('verify needs args.changeId')
 const ID = a.changeId
 const BASE = a.base || 'HEAD'
 const RISKS = a.risks || []
@@ -88,36 +87,6 @@ const VERDICT = {
 	type: 'object',
 	properties: { real: { type: 'boolean' }, reason: { type: 'string' } },
 	required: ['real', 'reason']
-}
-
-const ownerPrompt = (g) =>
-	`Implement OpenSpec change \`${ID}\`, task group ${g.n} "${g.title}": tasks ${g.taskIds.join(', ')}.
-Follow .agents/skills/openspec-apply-change/SKILL.md steps 3–6 (\`openspec instructions apply --change ${ID} --json\`, read the context files) for these tasks only. Tick them in tasks.md,
-follow anti-slop, check blast radius with \`codegraph impact\` before editing shared symbols, run pnpm check.`
-
-async function runGroup(g) {
-	const out = []
-	for (const owner of g.owners) {
-		const r = await agent(ownerPrompt(g), { label: `${owner}:g${g.n}`, phase: 'Implement', agentType: owner, schema: IMPL })
-		if (!r) throw new Error(`${owner} failed on group ${g.n}`)
-		if (r.tasksBlocked.length) return { blocked: true, group: g.n, owner, tasksBlocked: r.tasksBlocked, deviations: r.deviations }
-		out.push(r)
-	}
-	return { blocked: false, results: out }
-}
-
-// Consecutive parallel-safe groups run together; everything else runs in order.
-phase('Implement')
-const batches = []
-for (const g of a.groups) {
-	const last = batches[batches.length - 1]
-	if (g.parallelSafe && last && last.every((x) => x.parallelSafe)) last.push(g)
-	else batches.push([g])
-}
-for (const batch of batches) {
-	const res = await parallel(batch.map((g) => () => runGroup(g)))
-	const blocked = res.find((r) => !r || r.blocked)
-	if (blocked) return { stage: 'blocked', detail: blocked || 'agent failure' }
 }
 
 async function verifyLoop(label) {
@@ -211,7 +180,7 @@ phase('Sync')
 const sync = await agent(`Knowledge-sync mode. Diff base ${BASE}. OpenSpec change \`${ID}\`.`, { label: 'steward:sync', agentType: 'steward', schema: CONFORM })
 
 return {
-	stage: accepted.length ? 'review-unresolved' : 'built',
+	stage: accepted.length ? 'review-unresolved' : 'verified',
 	verify: ver,
 	qa,
 	conform,

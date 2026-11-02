@@ -1,45 +1,57 @@
 # Workflow
 
-Entry point: `/dev:work <request>`. The command orchestrates. Two saved workflows do the multi-agent work.
+Entry point: `/dev:work <request>`. The command orchestrates. OpenSpec plans and applies. Two saved workflows do the multi-agent work around it.
 
 ```
 /dev:work
   1 Preflight       git state · codegraph init/sync · dev server
-  2 dev-plan        Map → Spec
-  3 Gate            user approves the plan (skipped with --auto)
-  4 dev-build       Implement → Verify → QA → Conform → Impact → Review → Sync
-  5 Finish          validate · archive · commit · push (--push)
+  2 triage          Map → Reproduce (bugs)
+  3 Route           user picks the OpenSpec route (recommended one first)
+  4 Plan            OpenSpec artifacts via the chosen route
+  5 Gate            user approves the change (skipped with --auto)
+  6 Apply           openspec-apply-change, task groups to engineer/designer
+  7 verify          Verify → QA → Conform → Impact → Review → Sync
+  8 Archive         validate · archive · commit · push (--push)
 ```
+
+The flow ends when the change is archived or the user stops it.
+
+## Routes
+
+| Route     | When                                                  | Skill                                                    |
+| --------- | ----------------------------------------------------- | -------------------------------------------------------- |
+| `none`    | Trivial. No behavior or data-model change.            | Trivial path, no OpenSpec                                |
+| `explore` | The problem or approach is unclear.                   | `openspec-explore`, `superspec-brainstorm`, then a route |
+| `new`     | Large or risky. Review each artifact before the next. | `openspec-new-change`, `openspec-continue-change`        |
+| `ff`      | Clear scope. All artifacts in one go.                 | `openspec-ff-change`                                     |
+| `propose` | Clear goal with blocking questions.                   | `openspec-propose`                                       |
+
+`triage` recommends one. `--auto` takes it without asking.
 
 ## OpenSpec lifecycle
 
-| OpenSpec step  | Where in `/dev:work`              | Skill followed                             |
-| -------------- | --------------------------------- | ------------------------------------------ |
-| Explore        | Large changes, before the spec    | `openspec-explore`, `superspec-brainstorm` |
-| Propose        | dev-plan → Spec                   | `openspec-propose`                         |
-| Update         | Gate → Revise, or build `blocked` | `openspec-update-change`                   |
-| Apply          | dev-build → Implement             | `openspec-apply-change`                    |
-| Verify         | dev-build → Verify                | `openspec-verify-change`                   |
-| Sync + Archive | Finish                            | `openspec-archive-change`                  |
-| Status         | `/dev:status`, Resume             | `openspec status`                          |
+| OpenSpec step  | Where in `/dev:work`             | Skill followed            |
+| -------------- | -------------------------------- | ------------------------- |
+| Plan           | Plan, by route                   | see Routes                |
+| Update         | Gate → Revise, or a blocked task | `openspec-update-change`  |
+| Apply          | Apply                            | `openspec-apply-change`   |
+| Verify         | verify → Verify                  | `openspec-verify-change`  |
+| Sync + Archive | Archive                          | `openspec-archive-change` |
+| Status         | `/dev:status`, Resume            | `openspec status`         |
 
 `/opsx:*` commands remain available but are not needed.
 
-## dev-plan (`.agents/workflows/dev-plan.js`)
+## triage (`.agents/workflows/triage.js`)
 
-| Phase      | Agent       | Output                                                           |
-| ---------- | ----------- | ---------------------------------------------------------------- |
-| Map        | `triage`    | Type, size, change id, areas, CodeGraph impact, risks, questions |
-| Map (bugs) | `qa`        | Reproduction steps, console and network evidence                 |
-| Spec       | `architect` | OpenSpec change, validated with `--strict`, and its task groups  |
+| Phase     | Agent    | Output                                                                  |
+| --------- | -------- | ----------------------------------------------------------------------- |
+| Map       | `triage` | Type, size, route, change id, areas, CodeGraph impact, risks, questions |
+| Reproduce | `qa`     | Bugs only. Reproduction steps, console and network evidence             |
 
-Returns early on: `question`, `trivial`, `needs-input` (blocking questions), and `needs-brainstorm` (large changes).
-
-## dev-build (`.agents/workflows/dev-build.js`)
+## verify (`.agents/workflows/verify.js`)
 
 | Phase           | Agent                              | Rule                                                                                              |
 | --------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------- |
-| Implement       | `engineer`, `designer`             | Task groups in order, tests first. Consecutive `(parallel-safe)` groups run together.             |
 | Verify          | `verifier` → `engineer`            | `pnpm test`, check, format, build, and a test per scenario. Max 3 fix loops.                      |
 | QA              | `qa` → `engineer`                  | User-visible scenarios in `browser-a` + `browser-b`. Max 2 fix loops. `blocked` if no dev server. |
 | Conform         | `steward`                          | Anti-slop and conventions on the changed lines. Behavior unchanged.                               |
@@ -48,7 +60,7 @@ Returns early on: `question`, `trivial`, `needs-input` (blocking questions), and
 | Verify findings | skeptic per finding                | Only critical, high, and important findings are verified. Real ones are fixed. Max 2 rounds.      |
 | Sync            | `steward`                          | Updates the `twoplay` references and `decisions.md`.                                              |
 
-End states: `built`, `blocked`, `verify-failed`, `qa-failed`, and `review-unresolved`.
+End states: `verified`, `verify-failed`, `qa-failed`, and `review-unresolved`.
 
 ## Testing
 
@@ -60,14 +72,6 @@ End states: `built`, `blocked`, `verify-failed`, `qa-failed`, and `review-unreso
 | Live app          | `qa` agent, chrome-devtools MCP     | `browser-a`, `browser-b`  |
 
 QA sign-in (Clerk dev instance): `player-a+clerk_test@example.com` / `player-b+clerk_test@example.com`, code `424242`.
-
-## Paths
-
-| Size    | Path                                                                                       |
-| ------- | ------------------------------------------------------------------------------------------ |
-| trivial | engineer or designer → scan → `pnpm test` → `pnpm check` → reviewer → commit. No OpenSpec. |
-| small   | dev-plan → gate → dev-build → finish                                                       |
-| large   | dev-plan → brainstorm with the user → dev-plan → gate → dev-build → finish                 |
 
 ## Commands
 
@@ -87,7 +91,7 @@ QA sign-in (Clerk dev instance): `player-a+clerk_test@example.com` / `player-b+c
 | Agent       | Role                            | Edits                    |
 | ----------- | ------------------------------- | ------------------------ |
 | `triage`    | Classify, size, CodeGraph map   | No                       |
-| `architect` | Write the OpenSpec change       | `openspec/` only         |
+| `architect` | Write a change as a subagent    | `openspec/` only         |
 | `engineer`  | Logic, Convex, runes            | Yes                      |
 | `designer`  | UI, Tailwind, accessibility     | Yes                      |
 | `steward`   | Conventions, architecture, docs | Yes, behavior-preserving |

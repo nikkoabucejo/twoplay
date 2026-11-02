@@ -50,6 +50,7 @@
 | Spec                  | A capability's requirements in `openspec/specs/`. The source of truth after archive.       |
 | Delta                 | A change's ADDED/MODIFIED/REMOVED requirements.                                            |
 | Scenario              | A WHEN/THEN case under a requirement. Each one needs evidence.                             |
+| Route                 | The OpenSpec entry `/dev:work` takes: `none`, `explore`, `new`, `ff`, or `propose`.        |
 | Task group            | A `## N.` section of `tasks.md`, owned by `engineer` and/or `designer`.                    |
 | Archive               | `openspec archive`: merges the deltas into specs and moves the change to `archive/`.       |
 | Impact                | A CodeGraph list of symbols affected by changing a symbol (`codegraph impact`).            |

@@ -30,7 +30,7 @@ Real-time two-player games. SvelteKit, Svelte 5 runes, Tailwind v4, shadcn-svelt
   skills/<name>/         project, OpenSpec, SuperSpec, stack, anti-slop
   agents/<name>.md       triage architect engineer designer steward verifier qa reviewer security
   commands/{dev,opsx}/   slash commands
-  workflows/*.js         dev-plan, dev-build
+  workflows/*.js         triage, verify
   link.sh                recreate .claude symlinks after adding or renaming
   SOURCES.md             upstream origin of third-party skills
 openspec/                specs (truth) and changes (proposals)
