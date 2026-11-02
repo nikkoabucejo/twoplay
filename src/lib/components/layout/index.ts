@@ -5,6 +5,7 @@ export {
 	type BoardFooter,
 	type BoardPlayer,
 	type BoardStatus,
+	MOVE_DOT,
 	resultView,
 	ResultCard,
 	type ResultAction,
@@ -12,7 +13,9 @@ export {
 	roomStatus,
 	rovingStep,
 	scrubCommand,
-	type ScrubCommand
+	type ScrubCommand,
+	SELECTED_RING,
+	squareClass
 } from "./board/index.js";
 export { Dock, type DockProps } from "./dock/index.js";
 export { Feed, FeedSkeleton, type FeedProps, type FeedSkeletonProps } from "./feed/index.js";

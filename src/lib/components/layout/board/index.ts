@@ -9,6 +9,7 @@ import { rovingStep, scrubCommand, type ScrubCommand } from "./keys.js";
 import { resultView, type ResultAction, type ResultView } from "./outcome.js";
 import ResultCard from "./result-card.svelte";
 import { roomStatus } from "./status.js";
+import { MOVE_DOT, SELECTED_RING, squareClass } from "./squares.js";
 
 export {
 	Root,
@@ -19,6 +20,7 @@ export {
 	type BoardFooter,
 	type BoardPlayer,
 	type BoardStatus,
+	MOVE_DOT,
 	resultView,
 	ResultCard,
 	type ResultAction,
@@ -26,5 +28,7 @@ export {
 	roomStatus,
 	rovingStep,
 	scrubCommand,
-	type ScrubCommand
+	type ScrubCommand,
+	SELECTED_RING,
+	squareClass
 };

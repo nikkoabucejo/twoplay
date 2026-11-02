@@ -8,9 +8,12 @@
 	import {
 		Board,
 		BoardPlaceholder,
+		MOVE_DOT,
 		roomStatus,
 		rovingStep,
-		scrubCommand
+		scrubCommand,
+		SELECTED_RING,
+		squareClass
 	} from "$lib/components/layout";
 	import { Button, getToaster, Gate } from "$lib/components/ui";
 	import { Cursor, TurnAlert } from "$lib/features/presence";
@@ -316,12 +319,12 @@
 							type="button"
 							data-slot-index={slot}
 							tabindex={slot === focusedSlot ? 0 : -1}
-							class={cn(
-								"relative flex items-center justify-center outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset",
-								isDark ? "bg-foreground/15" : "bg-background",
-								isLastMove && room.lastMove && ACCENTS[room.lastMove.seat].tintBg,
-								isInCheck && "bg-destructive/20"
-							)}
+							class={squareClass({
+								dark: isDark,
+								tint: isLastMove && room.lastMove ? room.lastMove.seat : null,
+								mark: isInCheck,
+								interactive: true
+							})}
 							aria-label={squareLabel(index, cell, {
 								isInCheck,
 								canMove: room.canSelect(index),
@@ -333,7 +336,7 @@
 						>
 							{#if room.effectiveSelected === name}
 								<div
-									class="absolute inset-[12%] rounded-full ring-2 ring-white"
+									class={cn("absolute inset-[12%]", SELECTED_RING)}
 									in:fade={{ duration: 150 }}
 								></div>
 							{/if}
@@ -352,11 +355,7 @@
 										in:fade={{ duration: 150 }}
 									></span>
 								{:else}
-									<span
-										data-hint="move"
-										class="absolute size-1/4 rounded-full bg-emerald-400/70"
-										in:fade={{ duration: 150 }}
-									></span>
+									<span data-hint="move" class={MOVE_DOT} in:fade={{ duration: 150 }}></span>
 								{/if}
 							{/if}
 						</button>

@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { fade } from "svelte/transition";
-	import { rovingStep } from "$lib/components/layout";
+	import { MOVE_DOT, rovingStep, SELECTED_RING, squareClass } from "$lib/components/layout";
 	import { ChessPiece, ChessPromotion, pieceName } from "$lib/features/play";
-	import { ACCENTS, cn } from "$lib/utils/style";
+	import { cn } from "$lib/utils/style";
 	import { seatOfColor, squareName } from "../../../../../convex/models/games/chess/rules.js";
 	import type {
 		Piece,
@@ -72,8 +72,7 @@
 {#snippet contents(index: number, name: Square)}
 	{@const piece = board[index]}
 	{#if selected === name}
-		<span class="absolute inset-[12%] rounded-full ring-2 ring-white" in:fade={{ duration: 150 }}
-		></span>
+		<span class={cn("absolute inset-[12%]", SELECTED_RING)} in:fade={{ duration: 150 }}></span>
 	{/if}
 	{#if rejected === name}
 		<span class="absolute inset-[6%] rounded-full ring-2 ring-destructive"></span>
@@ -91,11 +90,7 @@
 				in:fade={{ duration: 150 }}
 			></span>
 		{:else}
-			<span
-				data-hint="move"
-				class="absolute size-1/4 rounded-full bg-emerald-400/70"
-				in:fade={{ duration: 150 }}
-			></span>
+			<span data-hint="move" class={MOVE_DOT} in:fade={{ duration: 150 }}></span>
 		{/if}
 	{/if}
 {/snippet}
@@ -111,25 +106,18 @@
 	>
 		{#each board as _, index (index)}
 			{@const name = squareName(index)}
-			{@const isDark = (Math.floor(index / 8) + (index % 8)) % 2 === 1}
-			{@const squareClass = cn(
-				"relative flex items-center justify-center",
-				isDark ? "bg-foreground/15" : "bg-background",
-				lastMove &&
-					(lastMove.from === name || lastMove.to === name) &&
-					ACCENTS[lastMove.seat].tintBg,
-				checkSquare === name && "bg-destructive/20"
-			)}
+			{@const square = {
+				dark: (Math.floor(index / 8) + (index % 8)) % 2 === 1,
+				tint: lastMove && (lastMove.from === name || lastMove.to === name) ? lastMove.seat : null,
+				mark: checkSquare === name
+			}}
 			{#if onselect}
 				<button
 					type="button"
 					data-slot-index={index}
 					tabindex={index === focusedSlot ? 0 : -1}
 					aria-label={labelOf(index)}
-					class={cn(
-						squareClass,
-						"outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset"
-					)}
+					class={squareClass({ ...square, interactive: true })}
 					onfocus={() => (focusedSlot = index)}
 					onclick={(event) => {
 						anchor = event.currentTarget;
@@ -139,7 +127,7 @@
 					{@render contents(index, name)}
 				</button>
 			{:else}
-				<div data-slot-index={index} class={squareClass}>
+				<div data-slot-index={index} class={squareClass(square)}>
 					{@render contents(index, name)}
 				</div>
 			{/if}

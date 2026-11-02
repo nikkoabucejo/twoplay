@@ -2,7 +2,7 @@
 	import { flip } from "svelte/animate";
 	import { cubicOut } from "svelte/easing";
 	import { fade } from "svelte/transition";
-	import { rovingStep } from "$lib/components/layout";
+	import { MOVE_DOT, rovingStep, SELECTED_RING, squareClass } from "$lib/components/layout";
 	import { ACCENTS, cn } from "$lib/utils/style";
 	import { playerIndexOf, rc } from "../../../../../convex/models/games/checkers/rules.js";
 	import type { Square } from "../../../../../convex/models/games/checkers/rules.js";
@@ -76,7 +76,7 @@
 		<span class="absolute inset-[6%] rounded-full ring-2 ring-destructive"></span>
 	{/if}
 	{#if destinations.includes(index)}
-		<span class="absolute size-1/4 rounded-full bg-emerald-400/70"></span>
+		<span data-hint="move" class={MOVE_DOT} in:fade={{ duration: 150 }}></span>
 	{/if}
 {/snippet}
 
@@ -93,29 +93,25 @@
 		{#each board as _, index (index)}
 			{@const [row, col] = rc(index)}
 			{#if (row + col) % 2 === 1}
-				{@const squareClass = cn(
-					"relative flex items-center justify-center bg-foreground/15 outline-none",
-					lastMove &&
-						(lastMove.from === index || lastMove.to === index) &&
-						ACCENTS[lastMove.seat].tintBg
-				)}
+				{@const square = {
+					dark: true,
+					tint:
+						lastMove && (lastMove.from === index || lastMove.to === index) ? lastMove.seat : null
+				}}
 				{#if onselect}
 					<button
 						type="button"
 						data-slot-index={index}
 						tabindex={index === focusedSlot ? 0 : -1}
 						aria-label={labelOf(index)}
-						class={cn(
-							squareClass,
-							"hover:bg-foreground/20 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset"
-						)}
+						class={squareClass({ ...square, interactive: true })}
 						onfocus={() => (focusedSlot = index)}
 						onclick={() => onselect(index)}
 					>
 						{@render marks(index)}
 					</button>
 				{:else}
-					<div data-slot-index={index} class={squareClass}>
+					<div data-slot-index={index} class={squareClass(square)}>
 						{@render marks(index)}
 					</div>
 				{/if}
@@ -144,7 +140,7 @@
 					)}
 				>
 					{#if selected === index}
-						<div class="absolute inset-1 rounded-full ring-2 ring-white"></div>
+						<div class={cn("absolute inset-1", SELECTED_RING)} in:fade={{ duration: 150 }}></div>
 					{/if}
 					{#if piece.king}
 						<svg viewBox="0 0 24 24" class="crown size-2/5 text-background/90" fill="currentColor">

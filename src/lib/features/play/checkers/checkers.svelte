@@ -8,9 +8,12 @@
 	import {
 		Board,
 		BoardPlaceholder,
+		MOVE_DOT,
 		roomStatus,
 		rovingStep,
-		scrubCommand
+		scrubCommand,
+		SELECTED_RING,
+		squareClass
 	} from "$lib/components/layout";
 	import { Button, getToaster, Gate } from "$lib/components/ui";
 	import { Cursor, TurnAlert } from "$lib/features/presence";
@@ -192,10 +195,7 @@
 		in:liquidIn
 	>
 		{#if isSelected}
-			<div
-				class="absolute inset-1 rounded-full ring-2 ring-white"
-				in:fade={{ duration: 150 }}
-			></div>
+			<div class={cn("absolute inset-1", SELECTED_RING)} in:fade={{ duration: 150 }}></div>
 		{/if}
 		{#if p.king}
 			<svg viewBox="0 0 24 24" class="h-2/5 w-2/5 text-background/90" fill="currentColor">
@@ -325,10 +325,11 @@
 								type="button"
 								data-slot-index={slot}
 								tabindex={slot === focusedSlot ? 0 : -1}
-								class={cn(
-									"relative flex items-center justify-center bg-foreground/15 outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset",
-									isLastMove && room.lastMove && ACCENTS[room.lastMove.seat].tintBg
-								)}
+								class={squareClass({
+									dark: true,
+									tint: isLastMove && room.lastMove ? room.lastMove.seat : null,
+									interactive: true
+								})}
 								aria-label={squareLabel(index, cell, {
 									ability: room.abilityOf(index),
 									isSelected,
@@ -344,10 +345,7 @@
 									></div>
 								{/if}
 								{#if isDestination}
-									<span
-										class="absolute size-1/4 rounded-full bg-emerald-400/70"
-										in:fade={{ duration: 150 }}
-									></span>
+									<span data-hint="move" class={MOVE_DOT} in:fade={{ duration: 150 }}></span>
 								{/if}
 								{#key pieceKey(index, cell)}
 									{#if cell}
