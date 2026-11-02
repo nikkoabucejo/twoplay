@@ -61,17 +61,3 @@ Each Learn page SHALL render the heading and title `Learn <Game>` (`Learn <Game>
 
 - **WHEN** `/learn` renders
 - **THEN** the heading is `Learn` and the document title is `Learn · twoplay`
-
-### Requirement: Old rules paths redirect
-
-The server SHALL answer `/how-to-play` and every path under it with a permanent 308 redirect to the same path under `/learn`, keeping the query string.
-
-#### Scenario: Old index redirects
-
-- **WHEN** a visitor requests `/how-to-play`
-- **THEN** the response is 308 with `Location: /learn`
-
-#### Scenario: Old game page redirects
-
-- **WHEN** a visitor requests `/how-to-play/checkers?x=1`
-- **THEN** the response is 308 with `Location: /learn/checkers?x=1`

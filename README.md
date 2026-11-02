@@ -60,7 +60,7 @@
 ### Product
 
 - 🎲 **[Games with a twist](#the-games)**: Nine-board tic-tac-toe where you can't replay your last board, and checkers with forced captures and multi-jumps.
-- 🏆 **[Ratings and matchmaking](#how-to-play)**: Find Match pairs waiting players, and every decisive round moves the leaderboard.
+- 🏆 **[Ratings and matchmaking](#learn)**: Find Match pairs waiting players, and every decisive round moves the leaderboard.
 - 🔔 **[Turn alerts](#what-a-spec-looks-like)**: In a background tab, the title flashes "Your turn" and an optional chime plays. Spectators never get pinged.
 
 ### Front-end quality
@@ -72,7 +72,7 @@
 
 ## Contents
 
-- [About](#about): [why I built it](#why-i-built-it), [React to Svelte](#a-react-developer-walks-into-svelte), [how to play](#how-to-play)
+- [About](#about): [why I built it](#why-i-built-it), [React to Svelte](#a-react-developer-walks-into-svelte), [learn](#learn)
 - [The agentic workflow](#the-agentic-workflow): [the team](#the-team), [specs](#what-a-spec-looks-like), [case study](#case-study-one-real-change), [what I learned](#what-i-learned)
 - [Architecture](#architecture): [move flow](#one-move-start-to-finish), [principles](#design-principles), [data model](#data-model), [optimistic UI and clocks](#optimistic-ui-and-clock-sync), [background jobs](#the-system-takes-care-of-itself), [SEO](#seo-without-thinking-about-it), [adding a game](#adding-a-game), [code tour](#code-tour)
 - [Engineering practices](#engineering-practices): [tech stack](#tech-stack), [skills](#skills-on-display)
@@ -121,7 +121,7 @@ The concepts carried over one to one. Only the syntax changed.
 
 </details>
 
-### How to play
+### Learn
 
 1. Sign in and open **Play**.
 2. Pick a game and a clock: 3, 5, or 10 minutes each.
