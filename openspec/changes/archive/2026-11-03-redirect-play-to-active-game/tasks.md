@@ -12,4 +12,4 @@
 ## 3. Verification
 
 - [x] 3.1 `pnpm test`, `pnpm check`, `pnpm format:check`, `pnpm build`
-- [x] 3.2 Live QA (browser-a + browser-b): with a filled room, and with a waiting room, open /play from the nav and from the URL bar; check that the game route loads with its own skeleton and no /play card or skeleton; with no room, /play renders the setup (blocked: all four browser profiles held by other sessions; layout-shift script: /play score 0)
+- [x] 3.2 Live QA (browser-a + browser-b): with a filled room, and with a waiting room, open /play from the nav and from the URL bar; check that the game route loads with its own skeleton and no /play card or skeleton; with no room, /play renders the setup (passed in browser-a/b and browser-c/d; layout-shift script: /play score 0)

@@ -1,3 +1,4 @@
 - PLAN done
 - APPLY done
 - VERIFY done (live QA blocked)
+- QA done: 7\/7 live scenarios passed (browser-a\/b, browser-c\/d)
