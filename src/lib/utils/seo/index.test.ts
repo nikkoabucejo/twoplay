@@ -14,9 +14,9 @@ import {
 const EXPECTED_PATHS = [
 	"/",
 	"/play",
-	"/how-to-play",
-	"/how-to-play/tictactoe",
-	"/how-to-play/checkers",
+	"/learn",
+	"/learn/tictactoe",
+	"/learn/checkers",
 	"/tour",
 	"/about",
 	"/sandbox/sound",
@@ -37,7 +37,7 @@ describe("INDEXED_PATHS", () => {
 
 	test("has a rules page for every game", () => {
 		for (const game of Object.keys(GAMES)) {
-			expect(INDEXED_PATHS).toContain(`/how-to-play/${game}`);
+			expect(INDEXED_PATHS).toContain(`/learn/${game}`);
 		}
 	});
 });
@@ -49,12 +49,12 @@ describe("isIndexable", () => {
 	});
 
 	test("accepts rules and info pages", () => {
-		expect(isIndexable(new URL("/how-to-play/checkers", SITE_URL))).toBe(true);
+		expect(isIndexable(new URL("/learn/checkers", SITE_URL))).toBe(true);
 		expect(isIndexable(new URL("/privacy", SITE_URL))).toBe(true);
 	});
 
 	test("rejects stats, settings, and unknown rules pages", () => {
-		for (const path of ["/me", "/settings", "/how-to-play/chess"]) {
+		for (const path of ["/me", "/settings", "/learn/chess"]) {
 			expect(isIndexable(new URL(path, SITE_URL))).toBe(false);
 		}
 	});

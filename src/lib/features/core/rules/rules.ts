@@ -292,14 +292,14 @@ export const RULES: Record<GameType, GameRules> = {
 	tictactoe: {
 		summary: "Nine small boards in one big grid. Win three boards in a line.",
 		description:
-			"How to play Tic-Tac-Toe on twoplay: nine boards, switching boards, winning three in a line, and clocks.",
+			"Learn Tic-Tac-Toe on twoplay: nine boards, switching boards, winning three in a line, and clocks.",
 		steps: TICTACTOE_STEPS,
 		preview: NINE_BOARDS
 	},
 	checkers: {
 		summary: "Move diagonally, jump to capture, and crown your pieces on the far row.",
 		description:
-			"How to play Checkers on twoplay: diagonal moves, forced captures, multi-jumps, crowning, and clocks.",
+			"Learn Checkers on twoplay: diagonal moves, forced captures, multi-jumps, crowning, and clocks.",
 		steps: CHECKERS_STEPS,
 		preview: MULTI_JUMPS
 	}

@@ -22,7 +22,7 @@ Every indexed page SHALL render a `link[rel="canonical"]` and an `og:url` equal 
 
 ### Requirement: Indexing rules
 
-Only `/`, `/play`, `/how-to-play`, `/how-to-play/tictactoe`, `/how-to-play/checkers`, `/tour`, `/about`, `/privacy`, and `/terms` on the production origin `https://twoplay.xyz` SHALL be indexable. Every other page, and every page on any other origin, SHALL render `meta[name="robots"]` with `noindex`, and SHALL NOT render a canonical link.
+Only `/`, `/play`, `/learn`, `/learn/tictactoe`, `/learn/checkers`, `/tour`, `/about`, `/privacy`, and `/terms` on the production origin `https://twoplay.xyz` SHALL be indexable. Every other page, and every page on any other origin, SHALL render `meta[name="robots"]` with `noindex`, and SHALL NOT render a canonical link.
 
 #### Scenario: Game room is not indexed
 
@@ -41,7 +41,7 @@ Only `/`, `/play`, `/how-to-play`, `/how-to-play/tictactoe`, `/how-to-play/check
 
 #### Scenario: Rules and info pages are indexed
 
-- **WHEN** `/how-to-play/checkers`, `/tour`, `/about`, or `/privacy` is rendered on `https://twoplay.xyz`
+- **WHEN** `/learn/checkers`, `/tour`, `/about`, or `/privacy` is rendered on `https://twoplay.xyz`
 - **THEN** no `meta[name="robots"]` tag contains `noindex` and the canonical link equals `https://twoplay.xyz` plus the path
 
 #### Scenario: Preview host is not indexed
@@ -93,7 +93,7 @@ The landing page SHALL render one `script[type="application/ld+json"]` containin
 #### Scenario: Sitemap lists indexed pages only
 
 - **WHEN** `/sitemap.xml` is requested
-- **THEN** the response is 200 `application/xml` with `<loc>` entries for `/`, `/play`, `/how-to-play`, `/how-to-play/tictactoe`, `/how-to-play/checkers`, `/tour`, `/about`, `/privacy`, and `/terms` under `https://twoplay.xyz`, and no others
+- **THEN** the response is 200 `application/xml` with `<loc>` entries for `/`, `/play`, `/learn`, `/learn/tictactoe`, `/learn/checkers`, `/tour`, `/about`, `/privacy`, and `/terms` under `https://twoplay.xyz`, and no others
 
 ### Requirement: Crawlable landing content
 

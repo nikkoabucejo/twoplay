@@ -11,7 +11,7 @@
 
 <!-- A game's way into its lesson: its looping preview above, its name below. -->
 <a
-	href="/how-to-play/{type}"
+	href="/learn/{type}"
 	class={cn(
 		"flex h-full flex-col overflow-hidden rounded-2xl border bg-muted/30 outline-none backdrop-blur-sm transition-colors hover:border-foreground/20 hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring",
 		className

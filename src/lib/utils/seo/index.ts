@@ -6,9 +6,9 @@ export const SITE_DESCRIPTION =
 export const INDEXED_PATHS = [
 	"/",
 	"/play",
-	"/how-to-play",
-	"/how-to-play/tictactoe",
-	"/how-to-play/checkers",
+	"/learn",
+	"/learn/tictactoe",
+	"/learn/checkers",
 	"/tour",
 	"/about",
 	"/sandbox/sound",

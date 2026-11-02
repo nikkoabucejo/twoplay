@@ -5,10 +5,10 @@
 	import { GAME_TYPES } from "$lib/features/play";
 </script>
 
-<Meta title="How to play" description="Rules for every game on twoplay." />
+<Meta title="Learn" description="Rules for every game on twoplay." />
 
 <Page
-	title="How to play"
+	title="Learn"
 	description="Pick a game. Each lesson plays out on a board, then lets you try it."
 >
 	<ul class="grid gap-4 sm:grid-cols-2">

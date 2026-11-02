@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, test, vi } from "vitest";
 import Page from "./+page.svelte";
 
 vi.mock("$app/state", () => ({
-	page: { url: new URL("https://twoplay.xyz/how-to-play/checkers") }
+	page: { url: new URL("https://twoplay.xyz/learn/checkers") }
 }));
 
 function renderGame(game: "tictactoe" | "checkers") {
@@ -27,11 +27,11 @@ beforeAll(() => {
 	);
 });
 
-describe("How to play a game", () => {
+describe("Learn a game", () => {
 	test("names the game in the heading and the document title", () => {
 		renderGame("checkers");
-		expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("How to play Checkers");
-		expect(document.title).toBe("How to play Checkers · twoplay");
+		expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Learn Checkers");
+		expect(document.title).toBe("Learn Checkers · twoplay");
 	});
 
 	test("has one Play link, to the play page with the game picked", () => {

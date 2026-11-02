@@ -144,12 +144,12 @@ The tab bar SHALL be hidden on game-room routes (any route with a room code segm
 
 ### Requirement: Footer
 
-Non-game routes SHALL show a fixed footer bar below the scrolling main region, with How to play, Tour, About, Privacy, and Terms on the left and Support on the right; below `sm` Support shows only its icon. The footer SHALL hold only existing internal pages that the header, tab bar, and avatar menu do not link, and no copyright. Game-room routes SHALL NOT render the footer.
+Non-game routes SHALL show a fixed footer bar below the scrolling main region, with About, Tour, Learn, Privacy, and Terms on the left and Support on the right; below `sm` Support shows only its icon. The footer SHALL hold only existing internal pages that the header, tab bar, and avatar menu do not link, and no copyright. Game-room routes SHALL NOT render the footer.
 
 #### Scenario: Footer links
 
 - **WHEN** any non-game page renders
-- **THEN** the footer links to `/how-to-play`, `/tour`, `/about`, `/privacy`, `/terms`, and the Ko-fi page
+- **THEN** the footer links to `/about`, `/tour`, `/learn` (labelled "Learn"), `/privacy`, `/terms`, and the Ko-fi page
 
 #### Scenario: Footer layout
 

@@ -148,7 +148,7 @@
 		<p class="text-muted-foreground">Start a game in your browser, with a stranger or a friend.</p>
 		<div class="flex flex-wrap justify-center gap-3">
 			<Button size="lg" href="/play">Play now</Button>
-			<Button size="lg" variant="outline" href="/how-to-play">How to play</Button>
+			<Button size="lg" variant="outline" href="/learn">Learn</Button>
 		</div>
 	</section>
 </div>

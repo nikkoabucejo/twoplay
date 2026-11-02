@@ -322,4 +322,15 @@ describe("Tictactoe", () => {
 		const cell = within(board).getAllByRole("button")[0];
 		expect(cell.closest('[data-sfx="off"]')).not.toBeNull();
 	});
+
+	test("the Rules popover links to the tic-tac-toe Learn page", async () => {
+		await renderSeatedRoom();
+
+		const [trigger] = screen.getAllByRole("button", { name: "Rules" });
+		await fireEvent.click(trigger);
+		expect(await screen.findByRole("link", { name: "Learn the rules" })).toHaveAttribute(
+			"href",
+			"/learn/tictactoe"
+		);
+	});
 });

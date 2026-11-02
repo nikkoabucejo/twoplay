@@ -1,6 +1,7 @@
 # ui-click-sounds Specification
 
 ## Purpose
+
 A soft tick when the user activates a UI control, so buttons and links give audible feedback that follows the user's sound settings.
 
 ## Requirements
@@ -40,7 +41,7 @@ The app SHALL NOT tick for a control that is disabled, `aria-disabled="true"`, i
 
 #### Scenario: Board cell
 
-- **WHEN** the user clicks a cell on a tic-tac-toe, checkers, or How to play practice board
+- **WHEN** the user clicks a cell on a tic-tac-toe, checkers, or Learn practice board
 - **THEN** no click tick plays
 
 #### Scenario: Scripted click

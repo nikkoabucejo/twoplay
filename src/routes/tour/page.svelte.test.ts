@@ -26,12 +26,13 @@ describe("Tour page", () => {
 		render(Page);
 		expect(screen.getByRole("link", { name: /^Tic-Tac-Toe/ })).toHaveAttribute(
 			"href",
-			"/how-to-play/tictactoe"
+			"/learn/tictactoe"
 		);
 		expect(screen.getByRole("link", { name: /^Checkers/ })).toHaveAttribute(
 			"href",
-			"/how-to-play/checkers"
+			"/learn/checkers"
 		);
+		expect(screen.getByRole("link", { name: "Learn" })).toHaveAttribute("href", "/learn");
 	});
 
 	test("has no Ko-fi link", () => {

@@ -9,12 +9,12 @@ function links() {
 }
 
 describe("Footer", () => {
-	test("links to About, Tour, How to play, Privacy, Terms, Sandbox, and Support, in that order", () => {
+	test("links to About, Tour, Learn, Privacy, Terms, Sandbox, and Support, in that order", () => {
 		const hrefs = links().map((link) => link.getAttribute("href"));
 		expect(hrefs).toEqual([
 			"/about",
 			"/tour",
-			"/how-to-play",
+			"/learn",
 			"/privacy",
 			"/terms",
 			"/sandbox/sound",
@@ -26,7 +26,7 @@ describe("Footer", () => {
 		const names = links()
 			.filter((link) => link.getAttribute("href")?.startsWith("/"))
 			.map((link) => link.textContent?.trim());
-		expect(names).toEqual(["About", "Tour", "How to play", "Privacy", "Terms", "Sandbox"]);
+		expect(names).toEqual(["About", "Tour", "Learn", "Privacy", "Terms", "Sandbox"]);
 	});
 
 	test("repeats no header, dock, or avatar menu link", () => {

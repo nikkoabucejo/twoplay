@@ -12,9 +12,9 @@ describe("GET", () => {
 			[
 				"/",
 				"/play",
-				"/how-to-play",
-				"/how-to-play/tictactoe",
-				"/how-to-play/checkers",
+				"/learn",
+				"/learn/tictactoe",
+				"/learn/checkers",
 				"/tour",
 				"/about",
 				"/sandbox/sound",

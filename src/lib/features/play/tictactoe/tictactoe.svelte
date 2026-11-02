@@ -216,8 +216,8 @@
 		<li>Three boards in a row wins the game.</li>
 		<li>You can't play the board you played last turn, unless it's the only open board.</li>
 	</ul>
-	<Button href="/how-to-play/tictactoe" variant="link" size="xs" class="mt-2 px-0">
-		How to play
+	<Button href="/learn/tictactoe" variant="link" size="xs" class="mt-2 px-0">
+		Learn the rules
 	</Button>
 {/snippet}
 

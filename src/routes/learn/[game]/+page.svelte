@@ -10,9 +10,9 @@
 	const name = $derived(GAMES[data.game].name);
 </script>
 
-<Meta title="How to play {name}" description={RULES[data.game].description} />
+<Meta title="Learn {name}" description={RULES[data.game].description} />
 
-<Page title="How to play {name}" description={RULES[data.game].summary} class="lg:min-h-0">
+<Page title="Learn {name}" description={RULES[data.game].summary} class="lg:min-h-0">
 	{#snippet actions()}
 		<Button href="/play?game={data.game}">Play</Button>
 	{/snippet}

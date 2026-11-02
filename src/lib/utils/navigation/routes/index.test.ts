@@ -36,8 +36,8 @@ describe("isGatedRoute", () => {
 
 	test.each([
 		"/(games)",
-		"/how-to-play",
-		"/how-to-play/[game]",
+		"/learn",
+		"/learn/[game]",
 		"/tour",
 		"/about",
 		"/privacy",

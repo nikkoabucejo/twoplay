@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/svelte";
 import { beforeAll, describe, expect, test, vi } from "vitest";
 import Page from "./+page.svelte";
 
-vi.mock("$app/state", () => ({ page: { url: new URL("https://twoplay.xyz/how-to-play") } }));
+vi.mock("$app/state", () => ({ page: { url: new URL("https://twoplay.xyz/learn") } }));
 
 beforeAll(() => {
 	vi.stubGlobal(
@@ -14,22 +14,22 @@ beforeAll(() => {
 	);
 });
 
-describe("How to play index", () => {
+describe("Learn index", () => {
 	test("links to each game's rules", () => {
 		render(Page);
 		expect(screen.getByRole("link", { name: /^Tic-Tac-Toe/ })).toHaveAttribute(
 			"href",
-			"/how-to-play/tictactoe"
+			"/learn/tictactoe"
 		);
 		expect(screen.getByRole("link", { name: /^Checkers/ })).toHaveAttribute(
 			"href",
-			"/how-to-play/checkers"
+			"/learn/checkers"
 		);
 	});
 
-	test("is titled How to play", () => {
+	test("is titled Learn", () => {
 		render(Page);
-		expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("How to play");
-		expect(document.title).toBe("How to play · twoplay");
+		expect(screen.getByRole("heading", { level: 1, name: "Learn" })).toBeInTheDocument();
+		expect(document.title).toBe("Learn · twoplay");
 	});
 });
