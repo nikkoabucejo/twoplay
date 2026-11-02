@@ -57,6 +57,16 @@ describe("Home page", () => {
 		).toBeTruthy();
 	});
 
+	test("renders the site's structured data", () => {
+		render(Page);
+		const script = document.head.querySelectorAll('script[type="application/ld+json"]');
+		expect(script).toHaveLength(1);
+		const types = JSON.parse(script[0].textContent!)["@graph"].map(
+			(entry: { "@type": string }) => entry["@type"]
+		);
+		expect(types).toEqual(["WebSite", "WebApplication"]);
+	});
+
 	test("Signed-in visitors see the games without a Sign in prompt", () => {
 		context.auth!.hydrate({ id: "user_1", email: null, name: null, imageUrl: null });
 		render(Page);

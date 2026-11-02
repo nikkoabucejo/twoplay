@@ -1,6 +1,5 @@
 <script lang="ts">
-	import { Meta } from "$lib/components/ui";
-	import { Button, Emblem, Sparkle } from "$lib/components/ui";
+	import { Button, Emblem, Meta, Sparkle } from "$lib/components/ui";
 	import { GAMES, GAME_TYPES } from "$lib/features/play";
 	import { getClerkAuth } from "$lib/services/auth";
 	import { SITE_DESCRIPTION, landingJsonLd } from "$lib/utils/seo";
@@ -28,7 +27,7 @@
 		{#each GAME_TYPES as type (type)}
 			<a
 				href="/play?game={type}"
-				class="flex flex-col items-center gap-1 text-foreground transition-opacity hover:opacity-70 active:opacity-50"
+				class="flex flex-col items-center gap-1 rounded-md p-1 text-foreground transition-opacity outline-none hover:opacity-70 focus-visible:ring-2 focus-visible:ring-ring active:opacity-50"
 			>
 				<Emblem icon={GAMES[type].icon} colors={GAMES[type].colors} class="size-14" />
 				<span class="font-semibold">{GAMES[type].name}</span>

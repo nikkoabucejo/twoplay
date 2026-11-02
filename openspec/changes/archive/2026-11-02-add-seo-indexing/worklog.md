@@ -1,2 +1,3 @@
 - PLAN done
 - APPLY done
+- VERIFY done

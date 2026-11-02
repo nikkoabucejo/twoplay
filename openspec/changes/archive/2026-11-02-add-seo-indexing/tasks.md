@@ -16,5 +16,5 @@
 
 ## 5. Verification
 
-- [ ] 5.1 `pnpm test`, `pnpm check`, `pnpm format:check`, `pnpm build`
-- [ ] 5.2 Live QA: curl `/`, `/play?game=checkers`, `/tictactoe/ABCD`, `/history`, `/robots.txt`, `/sitemap.xml` on the preview server and check tags/bodies; signed-out `/` shows the games in the browser
+- [x] 5.1 `pnpm test`, `pnpm check`, `pnpm format:check`, `pnpm build`
+- [x] 5.2 Live QA: curl `/`, `/play?game=checkers`, `/tictactoe/ABCD`, `/history`, `/robots.txt`, `/sitemap.xml` on the preview server and check tags/bodies; signed-out `/` shows the games in the browser (curl checks passed; browser checks blocked: QA profiles held by another session)

@@ -17,17 +17,20 @@ function renderAt(href: string, props: Record<string, unknown> = {}) {
 
 describe("Meta", () => {
 	test("titles the page with the app name", () => {
-		render(Meta, { props: { title: "Leaderboard", description: "Top players." } });
+		renderAt("https://twoplay.xyz/leaderboard", { title: "Leaderboard" });
 		expect(document.title).toBe("Leaderboard · twoplay");
 	});
 
 	test("uses the app name alone without a title", () => {
-		render(Meta, { props: { description: "Real-time two-player games." } });
+		renderAt("https://twoplay.xyz/", { title: undefined });
 		expect(document.title).toBe("twoplay");
 	});
 
 	test("adds the description and Open Graph tags", () => {
-		render(Meta, { props: { title: "Leaderboard", description: "Top players." } });
+		renderAt("https://twoplay.xyz/leaderboard", {
+			title: "Leaderboard",
+			description: "Top players."
+		});
 		expect(content('meta[name="description"]')).toBe("Top players.");
 		expect(content('meta[property="og:title"]')).toBe("Leaderboard · twoplay");
 		expect(content('meta[property="og:description"]')).toBe("Top players.");
