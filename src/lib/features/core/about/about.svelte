@@ -50,13 +50,31 @@
 			hash: "96da485",
 			title: "Round settlement",
 			body: "Rounds settle on the server the moment they end."
+		},
+		{
+			date: "2026-11-02",
+			hash: "1d54e6a",
+			title: "Sound and music",
+			body: "Click sounds and music scenes that follow the game."
+		},
+		{
+			date: "2026-11-02",
+			hash: "b173293",
+			title: "Chess",
+			body: "A third game, on the same engine contract as the first two."
+		},
+		{
+			date: "2026-11-03",
+			hash: "bbb17c6",
+			title: "This page",
+			body: "Nine agents build the About page live, section by section."
 		}
 	];
 	const STATS: readonly { value: number; suffix?: string; label: string }[] = [
 		{ value: 1, label: "engineer" },
 		{ value: 9, label: "agents" },
-		{ value: 2, label: "games" },
-		{ value: 860, suffix: "+", label: "tests" }
+		{ value: 3, label: "games" },
+		{ value: 2, suffix: "k+", label: "tests" }
 	];
 
 	const BIO =
@@ -84,7 +102,7 @@
 		{
 			label: "the product",
 			title: "Simple games on purpose",
-			body: "Tic-tac-toe and checkers keep the product out of the way. What twoplay shows is the engineering underneath: real-time sync, a server that decides everything, and tests that mean something."
+			body: "Tic-tac-toe, checkers, and chess keep the product out of the way. What twoplay shows is the engineering underneath: real-time sync, a server that decides everything, and tests that mean something."
 		},
 		{
 			label: "the stack",
@@ -119,11 +137,11 @@
 			body: "One command takes a request through triage, spec, build, tests, live QA, review, and commit."
 		},
 		{
-			value: 860,
-			suffix: "+",
+			value: 2,
+			suffix: "k+",
 			unit: "tests",
-			max: 1000,
-			maxLabel: "1k",
+			max: 2.5,
+			maxLabel: "2.5k",
 			title: "Tests, plus live QA",
 			body: "Vitest across the backend, logic, and UI, and an agent that plays the game against itself in two browsers."
 		},
@@ -154,10 +172,10 @@
 			body: "One polish change had 122 written scenarios, each mapped to a test or code path before it shipped."
 		},
 		{
-			value: 11,
+			value: 16,
 			unit: "decisions",
-			max: 15,
-			maxLabel: "15",
+			max: 20,
+			maxLabel: "20",
 			title: "Decisions on record",
 			body: "Architecture decisions logged with the reason and what each one replaced."
 		},
@@ -239,7 +257,7 @@
 		},
 		{
 			title: "More games",
-			body: "On the same engine contract: one server engine and one client class each.",
+			body: "Chess was the third. The next ones use the same contract: one server engine and one client class.",
 			when: "next"
 		},
 		{
@@ -644,7 +662,7 @@
 		aria-labelledby="about-timeline"
 		class="relative flex flex-col gap-8"
 	>
-		{@render heading("about-timeline", "Timeline", "Jul 11 → Nov 2, 2026")}
+		{@render heading("about-timeline", "Timeline", "Jul 11 → Nov 3, 2026")}
 		<ol class="flex flex-col">
 			{#each TIMELINE as milestone, index (milestone.hash)}
 				{@const isLast = index === TIMELINE.length - 1}

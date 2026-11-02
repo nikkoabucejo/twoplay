@@ -18,7 +18,7 @@
 ---
 
 > [!NOTE]
-> **This isn't really about the games.** Tic-tac-toe and checkers are simple on purpose, so the product stays out of the way. What this repo shows is the engineering underneath: real-time sync, a server that decides everything, tests that mean something, and the agentic workflow that built it. Simple product, serious engineering, without unnecessary complexity.
+> **This isn't really about the games.** Tic-tac-toe, checkers, and chess are simple on purpose, so the product stays out of the way. What this repo shows is the engineering underneath: real-time sync, a server that decides everything, tests that mean something, and the agentic workflow that built it. Simple product, serious engineering, without unnecessary complexity.
 
 ## Highlights
 
@@ -35,10 +35,10 @@
 ### Engineering discipline
 
 - 📜 **[Spec-driven](#what-a-spec-looks-like)**: Every behavior is a written scenario first, and every scenario needs a test or code path before it ships.
-- 🧪 **[860+ tests, plus live QA](#engineering-practices)**: Vitest across backend, logic, and UI, and an agent that plays the game against itself in two browsers.
+- 🧪 **[2,000+ tests, plus live QA](#engineering-practices)**: Vitest across backend, logic, and UI, and an agent that plays the game against itself in two browsers.
 - 🗺️ **[Impact before edits](#engineering-practices)**: CodeGraph lists every caller of a shared symbol before an agent changes it.
 - 🧹 **[Anti-slop rules](#engineering-practices)**: Agent code has no noise comments, no defensive clutter, no type escapes, and no AI-sounding copy.
-- 📚 **[Decisions on record](#what-i-learned)**: 11 architecture decisions logged with the reason and what each one replaced.
+- 📚 **[Decisions on record](#what-i-learned)**: 16 architecture decisions logged with the reason and what each one replaced.
 
 ### Real-time and sync
 
@@ -655,7 +655,6 @@ openspec/                 specs and change proposals
 - Rate limiting on moves, cursors, room creation, and matchmaking
 - Split the large rooms module into lifecycle, play, and history
 - More games on the same engine contract
-- A generated sitemap and canonical URLs
 - Clock-skew correction, so the countdown display matches the server on devices with a wrong clock
 
 ### Run it locally
