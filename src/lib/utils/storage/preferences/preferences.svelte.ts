@@ -37,7 +37,10 @@ const DEFAULT_PREFERENCES: Preferences = {
 const CONTEXT_KEY = Symbol("preferences");
 
 // A record rather than an array so adding a game to `GameType` fails the type check here.
-const STORED_GAMES = { tictactoe: true, checkers: true } satisfies Record<GameType, true>;
+const STORED_GAMES = { tictactoe: true, checkers: true, chess: true } satisfies Record<
+	GameType,
+	true
+>;
 const PLAY_OPPONENTS: readonly unknown[] = ["anyone", "friend", "open"] satisfies PlayOpponent[];
 const PLAY_MINUTES: readonly unknown[] = [3, 5, 10] satisfies PlayMinutes[];
 

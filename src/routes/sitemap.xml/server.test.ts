@@ -15,6 +15,7 @@ describe("GET", () => {
 				"/learn",
 				"/learn/tictactoe",
 				"/learn/checkers",
+				"/learn/chess",
 				"/tour",
 				"/about",
 				"/sandbox/sound",

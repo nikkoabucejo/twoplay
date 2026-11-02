@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/svelte";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
 import { beforeAll, describe, expect, test, vi } from "vitest";
 import Lesson from "./lesson.svelte";
 
@@ -29,6 +29,20 @@ function headings() {
 	return screen
 		.getAllByRole("heading", { level: 2 })
 		.map((heading) => within(heading).getByRole("button").textContent?.trim());
+}
+
+/** A practice board square by its name, such as "e2". */
+function square(name: string) {
+	return within(screen.getByRole("group", { name: "Practice board" })).getByRole("button", {
+		name: new RegExp(`^${name},`)
+	});
+}
+
+async function playChess(moves: readonly [string, string][]) {
+	for (const [from, to] of moves) {
+		await fireEvent.click(square(from));
+		await fireEvent.click(square(to));
+	}
 }
 
 function currentStep() {
@@ -67,6 +81,28 @@ describe("Lesson", () => {
 		expect(screen.getByText(/keeps jumping/)).toBeInTheDocument();
 		expect(screen.getByText(/reaches the far row becomes a king/)).toBeInTheDocument();
 		expect(screen.getByText(/no legal move/)).toBeInTheDocument();
+	});
+
+	test("chess steps through moving, check, castling, en passant, promotion, draws, and clocks", () => {
+		render(Lesson, { props: { type: "chess" } });
+		expect(headings()).toEqual([
+			"Moving",
+			"Check and checkmate",
+			"Castling",
+			"En passant",
+			"Promotion",
+			"Draws",
+			"Clocks",
+			"Try it"
+		]);
+		expect(screen.getByText(/that's checkmate and you lose/)).toBeInTheDocument();
+		expect(screen.getByText(/fifty moves by each side/)).toBeInTheDocument();
+	});
+
+	test("a chess demo draws its position's pieces on the board", () => {
+		render(Lesson, { props: { type: "chess" } });
+		expect(document.querySelectorAll("[data-piece]")).toHaveLength(32);
+		expect(screen.queryByRole("group", { name: "Practice board" })).not.toBeInTheDocument();
 	});
 
 	test("Next and Back move the current step", async () => {
@@ -116,12 +152,64 @@ describe("Lesson", () => {
 		expect(screen.getByText("You can't play the board you played last turn")).toBeInTheDocument();
 	});
 
+	test("chess practice refuses an illegal move with a notice, then alternates seats", async () => {
+		render(Lesson, { props: { type: "chess" } });
+		await fireEvent.click(screen.getByRole("button", { name: "Try it" }));
+		expect(screen.getByText("Player 1 to move")).toBeInTheDocument();
+		await fireEvent.click(square("e2"));
+		expect(square("e2")).toHaveAccessibleName("e2, Player 1 pawn, selected");
+		expect(square("e4")).toHaveAccessibleName("e4, empty, move here");
+		await fireEvent.click(square("e5"));
+		expect(screen.getByText("That piece can't move there")).toBeInTheDocument();
+		await fireEvent.click(square("e4"));
+		expect(screen.getByText("Player 2 to move")).toBeInTheDocument();
+		expect(square("e4")).toHaveAccessibleName("e4, Player 1 pawn");
+	});
+
+	test("chess practice promotes through the picker, and Escape keeps the pawn", async () => {
+		render(Lesson, { props: { type: "chess" } });
+		await fireEvent.click(screen.getByRole("button", { name: "Try it" }));
+		await playChess([
+			["b2", "b4"],
+			["a7", "a5"],
+			["b4", "a5"],
+			["b7", "b6"],
+			["a5", "b6"],
+			["b8", "c6"],
+			["b6", "b7"],
+			["c6", "e5"],
+			["b7", "b8"]
+		]);
+		const picker = await screen.findByRole("dialog", { name: "Promote to" });
+		expect(within(picker).getByRole("button", { name: "Queen" })).toHaveFocus();
+		await fireEvent.keyDown(picker, { key: "Escape" });
+		await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+		expect(square("b7")).toHaveAccessibleName("b7, Player 1 pawn");
+		await playChess([["b7", "b8"]]);
+		const reopened = await screen.findByRole("dialog", { name: "Promote to" });
+		await fireEvent.click(within(reopened).getByRole("button", { name: "Knight" }));
+		expect(square("b8")).toHaveAccessibleName("b8, Player 1 knight");
+		expect(screen.getByText("Player 2 to move")).toBeInTheDocument();
+	});
+
 	test("arrow keys inside the practice board don't change the step", async () => {
 		render(Lesson, { props: { type: "tictactoe" } });
 		await fireEvent.click(screen.getByRole("button", { name: "Try it" }));
 		await fireEvent.keyDown(screen.getByRole("button", { name: "Board 1, cell 1, empty" }), {
 			key: "ArrowLeft"
 		});
+		expect(currentStep()).toBe("Try it");
+	});
+
+	test("arrow keys inside the chess practice board move focus, not the step", async () => {
+		render(Lesson, { props: { type: "chess" } });
+		await fireEvent.click(screen.getByRole("button", { name: "Try it" }));
+		const board = screen.getByRole("group", { name: "Practice board" });
+		const first = within(board).getByRole("button", { name: /^a8,/ });
+		expect(first).toHaveAttribute("tabindex", "0");
+		first.focus();
+		await fireEvent.keyDown(first, { key: "ArrowRight" });
+		expect(square("b8")).toHaveFocus();
 		expect(currentStep()).toBe("Try it");
 	});
 });

@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/sve
 import { beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { api } from "../../../../../convex/_generated/api.js";
 import { checkersEngine } from "../../../../../convex/models/games/checkers/index.js";
+import { chessEngine } from "../../../../../convex/models/games/chess/index.js";
 import { tictactoeEngine } from "../../../../../convex/models/games/tictactoe/index.js";
 import {
 	ALICE,
@@ -54,6 +55,15 @@ describe("Playing", () => {
 		render(Playing, { props: { code: "WXYZ", type: "checkers" } });
 		expect(screen.getByText("Checkers")).toBeInTheDocument();
 		expect(screen.getByText("WXYZ")).toBeInTheDocument();
+	});
+
+	test("reads a chess room's live round through the chess rules", async () => {
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(chessEngine.createInitialState()));
+		render(Playing, { props: { code: "WXYZ", type: "chess" } });
+		expect(screen.getByText("Chess")).toBeInTheDocument();
+		expect(await openConfirmation()).toHaveTextContent(
+			"You'll forfeit round 1 to Bob and lose 8 rating points. The room closes."
+		);
 	});
 
 	test("has no link of its own, since the header's live-game pill opens the room", () => {

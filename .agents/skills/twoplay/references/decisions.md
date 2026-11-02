@@ -13,6 +13,15 @@ Template:
 **Follow-ups:** <existing code that now violates it, or "—">
 ```
 
+## 2026-11-02 — Chess rules through chess.js, wrapper only
+**Decision:** chess.js, pinned to exactly 1.4.0, is imported only by
+`convex/models/games/chess/rules.ts`. State is FEN plus the position keys since the last capture or
+pawn move. Enforced by the import-guard test in `convex/models/games/chess/rules.test.ts`.
+**Why:** It is mature and covers FIDE edge cases. The wrapper keeps the pure-rules API and the engine
+contract, and the stored keys restore the threefold check that chess.js loses on FEN load.
+**Supersedes:** —
+**Follow-ups:** —
+
 ## 2026-11-02 — Rounds settle when they end
 **Decision:** Every path that ends a round (`play`, `resign`, `timeout`, `abandon`, `sweep`) calls
 `settleRound` (`convex/models/games/index.ts`), which credits score and rating once (`games.settledAt`).

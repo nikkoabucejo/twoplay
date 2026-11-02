@@ -1,5 +1,8 @@
 import { describe, expect, test } from "vitest";
 import { checkersEngine } from "../../../../../convex/models/games/checkers/index.js";
+import { chessEngine } from "../../../../../convex/models/games/chess/index.js";
+import { boardOf, outcome, squareIndex } from "../../../../../convex/models/games/chess/rules.js";
+import type { Square } from "../../../../../convex/models/games/chess/rules.js";
 import { tictactoeEngine } from "../../../../../convex/models/games/tictactoe/index.js";
 import { RULES } from "./rules.js";
 import type { BoardDemo } from "./rules.js";
@@ -14,6 +17,19 @@ function checkersDemo(heading: string) {
 	const demo = RULES.checkers.steps.find((step) => step.heading === heading)?.demo;
 	if (demo?.kind !== "checkers") throw new Error(`No checkers demo for ${heading}`);
 	return demo;
+}
+
+function chessDemo(heading: string) {
+	const demo = RULES.chess.steps.find((step) => step.heading === heading)?.demo;
+	if (demo?.kind !== "chess") throw new Error(`No chess demo for ${heading}`);
+	return demo;
+}
+
+/** The piece on `square` after a chess demo's last move. */
+function pieceAt(heading: string, square: Square) {
+	const last = chessDemo(heading).steps.at(-1)?.state;
+	if (!last) throw new Error(`No moves in ${heading}`);
+	return boardOf(last.fen)[squareIndex(square)];
 }
 
 function rejections(demo: BoardDemo) {
@@ -65,5 +81,73 @@ describe("RULES", () => {
 		for (const demo of [tictactoeDemo("Nine boards"), checkersDemo("Moving")]) {
 			expect(rejections(demo).every((rejection) => rejection === null)).toBe(true);
 		}
+	});
+
+	test("the chess steps cover piece moves, check, castling, en passant, promotion, draws, and clocks", () => {
+		expect(RULES.chess.steps.map((step) => step.heading)).toEqual([
+			"Moving",
+			"Check and checkmate",
+			"Castling",
+			"En passant",
+			"Promotion",
+			"Draws",
+			"Clocks"
+		]);
+		expect(RULES.chess.steps.at(-1)?.demo.kind).toBe("clocks");
+	});
+
+	test("the chess moving step names every piece", () => {
+		const body = RULES.chess.steps[0].body.toLowerCase();
+		for (const piece of ["pawns", "knights", "bishops", "rooks", "queens", "king"]) {
+			expect(body).toContain(piece);
+		}
+	});
+
+	test("the draws step names all four automatic draws", () => {
+		const body = RULES.chess.steps.find((step) => step.heading === "Draws")?.body;
+		expect(body).toMatch(/stalemate/);
+		expect(body).toMatch(/enough pieces to checkmate/);
+		expect(body).toMatch(/three times/);
+		expect(body).toMatch(/fifty moves/);
+	});
+
+	test("every chess demo move is legal", () => {
+		for (const step of RULES.chess.steps) {
+			if (step.demo.kind !== "chess") continue;
+			expect(rejections(step.demo).every((rejection) => rejection === null)).toBe(true);
+		}
+	});
+
+	test("the checkmate demo ends with Player 2 winning", () => {
+		const last = chessDemo("Check and checkmate").steps.at(-1)?.state;
+		expect(last && chessEngine.status(last)).toMatchObject({ isOver: true, winnerIndex: 1 });
+	});
+
+	test("the castling demo moves each king two squares with its rook over it", () => {
+		expect(pieceAt("Castling", "g1")).toEqual({ color: "w", type: "k" });
+		expect(pieceAt("Castling", "f1")).toEqual({ color: "w", type: "r" });
+		expect(pieceAt("Castling", "c8")).toEqual({ color: "b", type: "k" });
+		expect(pieceAt("Castling", "d8")).toEqual({ color: "b", type: "r" });
+	});
+
+	test("the en passant demo takes the pawn that moved two squares", () => {
+		expect(pieceAt("En passant", "d6")).toEqual({ color: "w", type: "p" });
+		expect(pieceAt("En passant", "d5")).toBeNull();
+	});
+
+	test("the promotion demo turns the pawn into a queen", () => {
+		const demo = chessDemo("Promotion");
+		const first = demo.steps[0].state;
+		expect(boardOf(first.fen)[squareIndex("b8")]).toEqual({ color: "w", type: "q" });
+	});
+
+	test("the draws demo ends in stalemate with no winner", () => {
+		const last = chessDemo("Draws").steps.at(-1)?.state;
+		expect(last && outcome(last)).toBe("stalemate");
+		expect(last && chessEngine.status(last)).toMatchObject({ isOver: true, winnerIndex: null });
+	});
+
+	test("the chess preview is one of its steps", () => {
+		expect(RULES.chess.steps.map((step) => step.demo)).toContain(RULES.chess.preview);
 	});
 });

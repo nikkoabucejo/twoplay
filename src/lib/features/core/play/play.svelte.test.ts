@@ -186,8 +186,8 @@ describe("Play", () => {
 	test("End checks the last game card and Home the first", async () => {
 		showSetup();
 		await fireEvent.keyDown(radio("Tic-Tac-Toe"), { key: "End" });
-		expect(radio("Checkers")).toBeChecked();
-		await fireEvent.keyDown(radio("Checkers"), { key: "Home" });
+		expect(radio("Chess")).toBeChecked();
+		await fireEvent.keyDown(radio("Chess"), { key: "Home" });
 		expect(radio("Tic-Tac-Toe")).toBeChecked();
 	});
 

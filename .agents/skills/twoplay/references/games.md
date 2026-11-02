@@ -6,14 +6,15 @@ half mirrors it so the UI responds instantly. Both share a discriminated union t
 ## Server: `convex/models/games/<game>/`
 - `schema.ts` — `v.object` validators for `State` and `Move`, each with `kind: v.literal("<game>")`.
 - `rules.ts` — pure board math, with no turn order and no player index (e.g. checkers
-  `computeLegalMoves`, which the client also imports).
+  `computeLegalMoves`, which the client also imports). A third-party rules library is imported only
+  here: chess wraps chess.js, and `chess/rules.test.ts` fails if any other file imports it.
 - `engine.ts` — implements `GameEngine<State, Move>` from `convex/models/games/engine.ts`:
   `kind`, `playerCount`, `createInitialState()`, `applyMove(state, playerIndex, move)` (throws
   `"Not your turn"`; any other illegal move returns the same state, which `rooms.play` treats as a no-op), `status(state)` → `{ turnIndex, winnerIndex, isOver }`, `roundWinner(state)`.
 - `index.ts` — barrel: engine, validators, inferred types.
 
 ### Registry: `convex/models/games/index.ts`
-`gameEngines = { tictactoe, checkers }`, `GameType = keyof typeof gameEngines`, plus
+`gameEngines = { tictactoe, checkers, chess }`, `GameType = keyof typeof gameEngines`, plus
 `gameTypeValidator` / `gameStateValidator` / `gameMoveValidator` unions and switch-dispatched
 `applyMove` / `roundWinner` / `gameStatus` (TS can't correlate union state with union engine).
 **A new game adds one entry plus one `case` to each switch, and widens the three unions.** `rooms`,
@@ -49,6 +50,16 @@ half mirrors it so the UI responds instantly. Both share a discriminated union t
 - `src/lib/assets/icons/games/<game>.svelte` + barrel line.
 - `src/lib/features/play/games.ts` `GAMES` record (name + icon) drives the home picker, `/play`,
   `/lobby`, `/history`. Register once there. `colors` is `SEAT_COLORS`.
+- `isSameState` in `src/lib/utils/multiplayer/room/room.svelte.ts`: one `case` per `kind`.
+- `src/lib/components/layout/board/keys.ts`: a `<game>Step` and a `FIRST_AND_LAST` entry for
+  `rovingStep`.
+- `src/lib/components/ui/playing/playing.svelte`: one `case` in the Room `switch`.
+- `src/lib/features/core/home/preview.svelte`: a static board branch for the home card.
+- `STORED_GAMES` in `src/lib/utils/storage/preferences/preferences.svelte.ts`.
+- Learn (`src/lib/features/core/rules/`): a `RULES` entry in `rules.ts`, a practice class in
+  `practice.svelte.ts`, and a branch in `demo.svelte`, `practice-board.svelte`, and `lesson.svelte`.
+- `src/lib/utils/seo/index.ts`: `/learn/<game>` in `INDEXED_PATHS`, and the name in
+  `SITE_DESCRIPTION`.
 - Route: `src/routes/(games)/<game>/[code]/[[round]]/+page.svelte` (copy tictactoe's, swap names).
   It renders `<Meta title={GAMES.<game>.name}>`. The `[code]` segment is what makes the root layout
   use the game-room frame (`isGameRoomRoute`).

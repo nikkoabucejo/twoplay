@@ -6,6 +6,11 @@ import {
 	type CheckersState
 } from "../../../../../convex/models/games/checkers/index.js";
 import { idx } from "../../../../../convex/models/games/checkers/rules.js";
+import {
+	chessEngine,
+	type ChessMove,
+	type ChessState
+} from "../../../../../convex/models/games/chess/index.js";
 import type { GameMove, GameState, GameType } from "../../../../../convex/models/games/index.js";
 import { tictactoeEngine } from "../../../../../convex/models/games/tictactoe/index.js";
 import {
@@ -43,6 +48,16 @@ const clientEngines: Record<GameType, ClientEngine> = {
 		status(state) {
 			if (state.kind !== "checkers") throw new Error("Wrong game");
 			return checkersEngine.status(state);
+		}
+	},
+	chess: {
+		applyMove(state, seat, move) {
+			if (state.kind !== "chess" || move.kind !== "chess") throw new Error("Wrong game");
+			return chessEngine.applyMove(state, seat, move);
+		},
+		status(state) {
+			if (state.kind !== "chess") throw new Error("Wrong game");
+			return chessEngine.status(state);
 		}
 	}
 };
@@ -94,6 +109,16 @@ const doubleJump: CheckersState = {
 	turn: "cyan",
 	mustContinueFrom: null
 };
+
+/** Each position after the from-to moves, played by alternating seats from the start. */
+function chessLine(...moves: string[]): ChessState[] {
+	let state = chessEngine.createInitialState();
+	return moves.map((text, ply) => {
+		const move: ChessMove = { kind: "chess", from: text.slice(0, 2), to: text.slice(2) };
+		state = chessEngine.applyMove(state, ply % 2, move);
+		return state;
+	});
+}
 
 let destroy: () => void;
 
@@ -653,6 +678,24 @@ describe("Room", () => {
 		expect(room.isMyTurn).toBe(true);
 	});
 
+	test("a pending chess move is confirmed by a server state with the same FEN", () => {
+		const room = createRoom("chess");
+		const [e4, e5] = chessLine("e2e4", "e7e5");
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(chessEngine.createInitialState()));
+		mutationFor(api.models.rooms.index.play).mockReturnValueOnce(deferred().promise);
+		void room.move({ kind: "chess", from: "e2", to: "e4" });
+
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(e4));
+		flushSync();
+		expect(room.shownState).toEqual(e4);
+		expect(room.activeSeat).toBe(1);
+
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(e5));
+		flushSync();
+		expect(room.shownState).toEqual(e5);
+		expect(room.isMyTurn).toBe(true);
+	});
+
 	test("a resolved request clears the pending move", async () => {
 		const room = createRoom();
 		setQueryResult(api.models.rooms.index.get, roomSnapshot(initial));
@@ -938,6 +981,14 @@ describe("Room", () => {
 		setQueryResult(api.models.rooms.index.get, roomSnapshot(afterThree));
 		setQueryResult(api.models.games.index.history, historyOf([afterOne, afterTwo]));
 		expect(room.previousState).toEqual(afterTwo);
+	});
+
+	test("a chess board that repeats is told apart by its FEN", () => {
+		const room = createRoom("chess");
+		const line = chessLine("g1f3", "g8f6", "f3g1", "f6g8", "g1f3", "g8f6");
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(line[5]));
+		setQueryResult(api.models.games.index.history, historyOf(line.slice(0, 5)));
+		expect(room.previousState).toEqual(line[4]);
 	});
 
 	test("the previous position of a pending move is the position it was played on", () => {

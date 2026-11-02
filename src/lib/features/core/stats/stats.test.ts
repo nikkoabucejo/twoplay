@@ -47,14 +47,16 @@ describe("recordByGame", () => {
 
 		expect(recordByGame(history)).toEqual({
 			tictactoe: { wins: 2, losses: 0, draws: 0 },
-			checkers: { wins: 0, losses: 1, draws: 1 }
+			checkers: { wins: 0, losses: 1, draws: 1 },
+			chess: { wins: 0, losses: 0, draws: 0 }
 		});
 	});
 
 	test("gives every game an empty record with no history", () => {
 		expect(recordByGame([])).toEqual({
 			tictactoe: { wins: 0, losses: 0, draws: 0 },
-			checkers: { wins: 0, losses: 0, draws: 0 }
+			checkers: { wins: 0, losses: 0, draws: 0 },
+			chess: { wins: 0, losses: 0, draws: 0 }
 		});
 	});
 });

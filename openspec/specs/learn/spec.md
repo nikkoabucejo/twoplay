@@ -13,7 +13,7 @@ Explains each game's rules on its own Learn page, so a new player can learn a ga
 #### Scenario: Index lists both games
 
 - **WHEN** a visitor opens `/learn`
-- **THEN** it links to `/learn/tictactoe` and `/learn/checkers`
+- **THEN** it links to `/learn/tictactoe`, `/learn/checkers`, and `/learn/chess`
 
 ### Requirement: Rules lesson per game
 
@@ -28,6 +28,11 @@ Explains each game's rules on its own Learn page, so a new player can learn a ga
 
 - **WHEN** a visitor opens `/learn/checkers`
 - **THEN** the steps explain diagonal moves, forced captures, multi-jump continuation, crowning on the far row, that a player with no legal move loses, and that a player whose clock runs out loses, followed by a practice step
+
+#### Scenario: Chess rules
+
+- **WHEN** a visitor opens `/learn/chess`
+- **THEN** the steps explain how each piece moves, check and checkmate, castling, en passant, promotion, the automatic draws (stalemate, insufficient material, threefold repetition, and the fifty-move rule), and that a player whose clock runs out loses, followed by a practice step
 
 #### Scenario: Stepping through the lesson
 
@@ -45,7 +50,7 @@ Explains each game's rules on its own Learn page, so a new player can learn a ga
 
 #### Scenario: Unknown game slug
 
-- **WHEN** a visitor opens `/learn/chess`
+- **WHEN** a visitor opens `/learn/backgammon`
 - **THEN** the response status is 404
 
 ### Requirement: Rules metadata

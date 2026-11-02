@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { squareIndex, type Square } from "../../../../../convex/models/games/chess/rules.js";
 import { rovingStep, scrubCommand } from "./keys.js";
 
 describe("scrubCommand", () => {
@@ -94,6 +95,35 @@ describe("rovingStep", () => {
 	test("Home and End go to the first and last dark square", () => {
 		expect(rovingStep(square(4, 3), "Home", "checkers")).toBe(square(0, 1));
 		expect(rovingStep(square(4, 3), "End", "checkers")).toBe(square(7, 6));
+	});
+
+	test.each([
+		[square(4, 3), "ArrowRight", square(4, 4)],
+		[square(4, 3), "ArrowLeft", square(4, 2)],
+		[square(4, 3), "ArrowUp", square(3, 3)],
+		[square(4, 3), "ArrowDown", square(5, 3)]
+	])("chess slot %i steps on %s to %i", (slot, key, next) => {
+		expect(rovingStep(slot, key, "chess")).toBe(next);
+	});
+
+	test.each([
+		[square(7, 0), "ArrowLeft"],
+		[square(7, 0), "ArrowDown"],
+		[square(0, 7), "ArrowRight"],
+		[square(0, 7), "ArrowUp"]
+	])("chess slot %i stops at the edge on %s", (slot, key) => {
+		expect(rovingStep(slot, key, "chess")).toBe(slot);
+	});
+
+	test("Home and End go to the first and last chess square", () => {
+		expect(rovingStep(square(4, 3), "Home", "chess")).toBe(0);
+		expect(rovingStep(square(4, 3), "End", "chess")).toBe(63);
+	});
+
+	test("chess steps follow the board as drawn for black", () => {
+		const slot = (name: Square) => 63 - squareIndex(name);
+		expect(rovingStep(slot("e2"), "ArrowRight", "chess")).toBe(slot("d2"));
+		expect(rovingStep(slot("d2"), "ArrowUp", "chess")).toBe(slot("d1"));
 	});
 
 	test("other keys don't move focus", () => {

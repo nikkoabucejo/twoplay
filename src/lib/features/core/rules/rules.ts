@@ -6,6 +6,14 @@ import type {
 } from "../../../../../convex/models/games/checkers/index.js";
 import { colorOfPlayer, idx } from "../../../../../convex/models/games/checkers/rules.js";
 import type { Square } from "../../../../../convex/models/games/checkers/rules.js";
+import { chessEngine } from "../../../../../convex/models/games/chess/index.js";
+import type { ChessMove, ChessState } from "../../../../../convex/models/games/chess/index.js";
+import {
+	INITIAL_FEN,
+	positionKey,
+	type PromotionPiece,
+	type Square as ChessSquare
+} from "../../../../../convex/models/games/chess/rules.js";
 import { tictactoeEngine } from "../../../../../convex/models/games/tictactoe/index.js";
 import type {
 	TictactoeMove,
@@ -31,6 +39,13 @@ export type BoardDemo =
 			start: CheckersState;
 			actions: readonly DemoAction<CheckersMove>[];
 			steps: readonly DemoStep<CheckersState>[];
+	  }
+	| {
+			kind: "chess";
+			caption: string;
+			start: ChessState;
+			actions: readonly DemoAction<ChessMove & { from: ChessSquare; to: ChessSquare }>[];
+			steps: readonly DemoStep<ChessState>[];
 	  };
 
 export type Demo = BoardDemo | { kind: "clocks"; caption: string };
@@ -106,6 +121,24 @@ function checkersDemo(
 		start,
 		actions: moves,
 		steps: demoSteps(checkersEngine, start, moves)
+	};
+}
+
+function chessDemo(
+	caption: string,
+	fen: string,
+	actions: readonly [from: ChessSquare, to: ChessSquare, promotion?: PromotionPiece][]
+): BoardDemo {
+	const start: ChessState = { kind: "chess", fen, positions: [positionKey(fen)] };
+	const moves = actions.map(([from, to, promotion]) => ({
+		move: { kind: "chess" as const, from, to, promotion }
+	}));
+	return {
+		kind: "chess",
+		caption,
+		start,
+		actions: moves,
+		steps: demoSteps(chessEngine, start, moves)
 	};
 }
 
@@ -288,6 +321,86 @@ const CHECKERS_STEPS: readonly RuleStep[] = [
 	CLOCKS
 ];
 
+const OPENING = chessDemo(
+	"Pawns step forward, a knight jumps, and a bishop slides out.",
+	INITIAL_FEN,
+	[
+		["e2", "e4"],
+		["e7", "e5"],
+		["g1", "f3"],
+		["b8", "c6"],
+		["f1", "c4"]
+	]
+);
+
+const CHESS_STEPS: readonly RuleStep[] = [
+	{
+		heading: "Moving",
+		body: "Pawns step forward one square, or two from their first square, and capture one square diagonally forward. Knights jump in an L, bishops slide diagonally, rooks slide straight, queens slide either way, and the king steps one square in any direction.",
+		demo: OPENING
+	},
+	{
+		heading: "Check and checkmate",
+		body: "A king under attack is in check, and you must get it out of check. If you are in check and have no legal move, that's checkmate and you lose.",
+		demo: chessDemo(
+			"Player 2's queen attacks the king, which has no way out: checkmate.",
+			INITIAL_FEN,
+			[
+				["f2", "f3"],
+				["e7", "e5"],
+				["g2", "g4"],
+				["d8", "h4"]
+			]
+		)
+	},
+	{
+		heading: "Castling",
+		body: "Once a game, the king can move two squares toward a rook, and the rook jumps to its other side. Neither piece may have moved, the squares between them must be empty, and the king can't castle out of, through, or into check.",
+		demo: chessDemo(
+			"Player 1 castles on the king's side, and Player 2 on the queen's side.",
+			"r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w KQkq - 0 1",
+			[
+				["e1", "g1"],
+				["e8", "c8"]
+			]
+		)
+	},
+	{
+		heading: "En passant",
+		body: "When a pawn moves two squares and lands beside an enemy pawn, that pawn can capture it as if it had moved one. It must do so on the very next move.",
+		demo: chessDemo(
+			"Player 2's pawn moves two squares past Player 1's pawn, which captures it en passant.",
+			"4k3/3p4/8/4P3/8/8/8/4K3 b - - 0 1",
+			[
+				["d7", "d5"],
+				["e5", "d6"]
+			]
+		)
+	},
+	{
+		heading: "Promotion",
+		body: "A pawn that reaches the far row becomes a queen, rook, bishop, or knight, whichever you choose.",
+		demo: chessDemo(
+			"Player 1's pawn reaches the far row and becomes a queen, giving check.",
+			"4k3/1P6/8/8/8/8/8/4K3 w - - 0 1",
+			[
+				["b7", "b8", "q"],
+				["e8", "e7"]
+			]
+		)
+	},
+	{
+		heading: "Draws",
+		body: "The game is a draw on stalemate, when the side to move has no legal move but isn't in check. It is also a draw when neither side has enough pieces to checkmate, when the same position comes up three times, or after fifty moves by each side with no capture or pawn move.",
+		demo: chessDemo(
+			"Player 2's king isn't in check but has no legal move: stalemate, a draw.",
+			"7k/8/8/8/8/8/6Q1/K7 w - - 0 1",
+			[["g2", "g6"]]
+		)
+	},
+	CLOCKS
+];
+
 export const RULES: Record<GameType, GameRules> = {
 	tictactoe: {
 		summary: "Nine small boards in one big grid. Win three boards in a line.",
@@ -302,5 +415,12 @@ export const RULES: Record<GameType, GameRules> = {
 			"Learn Checkers on twoplay: diagonal moves, forced captures, multi-jumps, crowning, and clocks.",
 		steps: CHECKERS_STEPS,
 		preview: MULTI_JUMPS
+	},
+	chess: {
+		summary: "Every piece moves its own way. Checkmate the king to win.",
+		description:
+			"Learn Chess on twoplay: how each piece moves, check and checkmate, castling, en passant, promotion, draws, and clocks.",
+		steps: CHESS_STEPS,
+		preview: OPENING
 	}
 };

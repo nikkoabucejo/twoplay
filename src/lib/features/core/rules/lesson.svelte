@@ -9,7 +9,7 @@
 	import ClocksDemo from "./clocks-demo.svelte";
 	import Demo from "./demo.svelte";
 	import PracticeBoard from "./practice-board.svelte";
-	import { CheckersPractice, TictactoePractice } from "./practice.svelte.js";
+	import { CheckersPractice, ChessPractice, TictactoePractice } from "./practice.svelte.js";
 	import { isMotionReduced } from "./playback.svelte.js";
 	import { RULES } from "./rules.js";
 	import { Stepper } from "./stepper.svelte.js";
@@ -24,9 +24,16 @@
 	const rules = $derived(RULES[type]);
 	const steps = $derived([...rules.steps, PRACTICE]);
 	const stepper = $derived(new Stepper(rules.steps.length + 1));
-	const practice = $derived(
-		type === "tictactoe" ? new TictactoePractice() : new CheckersPractice()
-	);
+	const practice = $derived.by(() => {
+		switch (type) {
+			case "tictactoe":
+				return new TictactoePractice();
+			case "checkers":
+				return new CheckersPractice();
+			case "chess":
+				return new ChessPractice();
+		}
+	});
 	/** The rule on screen, or undefined on the practice step. */
 	const rule = $derived(rules.steps.at(stepper.index));
 

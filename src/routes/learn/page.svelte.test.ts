@@ -25,6 +25,7 @@ describe("Learn index", () => {
 			"href",
 			"/learn/checkers"
 		);
+		expect(screen.getByRole("link", { name: /^Chess/ })).toHaveAttribute("href", "/learn/chess");
 	});
 
 	test("is titled Learn", () => {

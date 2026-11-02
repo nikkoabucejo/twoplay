@@ -48,9 +48,17 @@ function checkersStep(slot: number, [dRow, dCol]: [number, number]): number {
 	return nextCol < 0 || nextCol > 7 ? slot : row * 8 + nextCol;
 }
 
+/** Chess slots are the 64 squares in DOM order, all of them stops. */
+function chessStep(slot: number, [dRow, dCol]: [number, number]): number {
+	const row = Math.floor(slot / 8) + dRow;
+	const col = (slot % 8) + dCol;
+	return row < 0 || row > 7 || col < 0 || col > 7 ? slot : row * 8 + col;
+}
+
 const FIRST_AND_LAST: Record<GameType, [number, number]> = {
 	tictactoe: [0, 80],
-	checkers: [1, 62]
+	checkers: [1, 62],
+	chess: [0, 63]
 };
 
 /** The slot focus moves to on `key`, the same slot at an edge, or null for a key that doesn't move
@@ -60,5 +68,12 @@ export function rovingStep(slot: number, key: string, layout: GameType): number 
 	if (key === "End") return FIRST_AND_LAST[layout][1];
 	const step = STEPS[key];
 	if (!step) return null;
-	return layout === "tictactoe" ? tictactoeStep(slot, step) : checkersStep(slot, step);
+	switch (layout) {
+		case "tictactoe":
+			return tictactoeStep(slot, step);
+		case "checkers":
+			return checkersStep(slot, step);
+		case "chess":
+			return chessStep(slot, step);
+	}
 }

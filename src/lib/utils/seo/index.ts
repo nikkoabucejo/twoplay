@@ -1,6 +1,6 @@
 export const SITE_URL = "https://twoplay.xyz";
 export const SITE_DESCRIPTION =
-	"Play Tic-Tac-Toe and Checkers in real time against a friend or a random opponent. Free, in the browser.";
+	"Play Tic-Tac-Toe, Checkers, and Chess in real time against a friend or a random opponent. Free, in the browser.";
 
 /** Every other path, and every other origin, renders `noindex`. */
 export const INDEXED_PATHS = [
@@ -9,6 +9,7 @@ export const INDEXED_PATHS = [
 	"/learn",
 	"/learn/tictactoe",
 	"/learn/checkers",
+	"/learn/chess",
 	"/tour",
 	"/about",
 	"/sandbox/sound",

@@ -1,7 +1,12 @@
 import { describe, expect, test } from "vitest";
 import { idx } from "../../../../../convex/models/games/checkers/rules.js";
 import type { Square } from "../../../../../convex/models/games/checkers/rules.js";
-import { CheckersPractice, TictactoePractice } from "./practice.svelte.js";
+import {
+	positionKey,
+	squareIndex,
+	type Square as ChessSquare
+} from "../../../../../convex/models/games/chess/rules.js";
+import { CheckersPractice, ChessPractice, TictactoePractice } from "./practice.svelte.js";
 
 const CYAN: Square = { color: "cyan", king: false };
 const PINK: Square = { color: "pink", king: false };
@@ -124,5 +129,107 @@ describe("CheckersPractice", () => {
 			mustContinueFrom: null
 		};
 		expect(practice.result).toEqual({ winner: 0 });
+	});
+});
+
+describe("ChessPractice", () => {
+	function practiceAt(fen: string) {
+		const practice = new ChessPractice();
+		practice.state = { kind: "chess", fen, positions: [positionKey(fen)] };
+		return practice;
+	}
+
+	function move(practice: ChessPractice, from: ChessSquare, to: ChessSquare) {
+		practice.select(squareIndex(from));
+		return practice.select(squareIndex(to));
+	}
+
+	const PROMOTING = "4k3/1P6/8/8/8/8/8/4K3 w - - 0 1";
+
+	test("selecting a piece shows where it can move", () => {
+		const practice = new ChessPractice();
+		practice.select(squareIndex("g1"));
+		expect(practice.selected).toBe("g1");
+		expect(practice.destinations).toEqual(["f3", "h3"]);
+	});
+
+	test("both seats alternate and the last move is marked", () => {
+		const practice = new ChessPractice();
+		expect(move(practice, "e2", "e4")).toBe(true);
+		expect(practice.turn).toBe(1);
+		expect(practice.lastMove).toEqual({ from: "e2", to: "e4", seat: 0 });
+		expect(move(practice, "e7", "e5")).toBe(true);
+		expect(practice.turn).toBe(0);
+		expect(practice.lastMove).toEqual({ from: "e7", to: "e5", seat: 1 });
+	});
+
+	test("an illegal move is refused with a notice, keeping the position and the selection", () => {
+		const practice = new ChessPractice();
+		const start = practice.state;
+		expect(move(practice, "g1", "g3")).toBe(false);
+		expect(practice.state).toBe(start);
+		expect(practice.notice).toBe("That piece can't move there");
+		expect(practice.selected).toBe("g1");
+		expect(practice.select(squareIndex("f3"))).toBe(true);
+		expect(practice.notice).toBeNull();
+	});
+
+	test("a piece with no legal move is refused with a notice", () => {
+		const practice = new ChessPractice();
+		practice.select(squareIndex("a1"));
+		expect(practice.selected).toBeNull();
+		expect(practice.notice).toBe("That piece can't move");
+	});
+
+	test("selecting the selected piece again drops it", () => {
+		const practice = new ChessPractice();
+		practice.select(squareIndex("g1"));
+		practice.select(squareIndex("g1"));
+		expect(practice.selected).toBeNull();
+	});
+
+	test("a pawn reaching the far row waits for the picker", () => {
+		const practice = practiceAt(PROMOTING);
+		expect(move(practice, "b7", "b8")).toBe(false);
+		expect(practice.pendingPromotion).toEqual({ from: "b7", to: "b8" });
+		expect(practice.turn).toBe(0);
+		expect(practice.promote("n")).toBe(true);
+		expect(practice.pendingPromotion).toBeNull();
+		expect(practice.board[squareIndex("b8")]).toEqual({ color: "w", type: "n" });
+		expect(practice.turn).toBe(1);
+	});
+
+	test("cancelling the picker leaves the pawn in place", () => {
+		const practice = practiceAt(PROMOTING);
+		move(practice, "b7", "b8");
+		practice.cancelPromotion();
+		expect(practice.pendingPromotion).toBeNull();
+		expect(practice.board[squareIndex("b7")]).toEqual({ color: "w", type: "p" });
+		expect(practice.turn).toBe(0);
+	});
+
+	test("checkmate ends the practice with a winner and marks the checked king", () => {
+		const practice = new ChessPractice();
+		move(practice, "f2", "f3");
+		move(practice, "e7", "e5");
+		move(practice, "g2", "g4");
+		move(practice, "d8", "h4");
+		expect(practice.checkSquare).toBe("e1");
+		expect(practice.result).toEqual({ winner: 1 });
+	});
+
+	test("stalemate ends the practice as a draw", () => {
+		const practice = practiceAt("7k/8/8/8/8/8/6Q1/K7 w - - 0 1");
+		move(practice, "g2", "g6");
+		expect(practice.result).toEqual({ winner: null });
+	});
+
+	test("reset goes back to the start", () => {
+		const practice = new ChessPractice();
+		move(practice, "e2", "e4");
+		practice.reset();
+		expect(practice.state.fen).toBe(new ChessPractice().state.fen);
+		expect(practice.lastMove).toBeNull();
+		expect(practice.selected).toBeNull();
 	});
 });

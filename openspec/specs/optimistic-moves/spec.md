@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Shows a seated viewer's own tic-tac-toe or checkers move the moment it is made, as a pending move, and reconciles it with the server, which stays the sole authority: the server's state replaces the pending move once it arrives, and a move the server rejects is rolled back.
+Shows a seated viewer's own tic-tac-toe, checkers, or chess move the moment it is made, as a pending move, and reconciles it with the server, which stays the sole authority: the server's state replaces the pending move once it arrives, and a move the server rejects is rolled back.
 
 ## Requirements
 
@@ -19,6 +19,16 @@ When a seated viewer makes a legal move in the live round, the room SHALL show t
 
 - **WHEN** the viewer in seat 0 moves a piece with a simple move and the play request is held pending
 - **THEN** the piece shows on its destination square, its source square is empty, and the active seat is 1
+
+#### Scenario: Chess move before the server answers
+
+- **WHEN** the viewer in seat 0 plays e2 to e4 and the play request is held pending
+- **THEN** the pawn shows on e4, e2 is empty, the active seat is 1, and no white piece can be selected
+
+#### Scenario: Chess promotion before the server answers
+
+- **WHEN** the viewer promotes a pawn on b8 to a knight and the play request is held pending
+- **THEN** b8 shows a knight and b7 is empty
 
 #### Scenario: Spectator sees only confirmed moves
 

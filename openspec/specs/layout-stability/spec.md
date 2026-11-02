@@ -10,7 +10,7 @@ Measurement used by every scenario below: a `PerformanceObserver` for `layout-sh
 
 ### Requirement: Stable page load
 
-Loading `/`, `/play`, `/lobby`, `/history`, `/leaderboard`, and a game room (`/tictactoe/<code>`, `/checkers/<code>`) SHALL produce a cumulative layout-shift score of at most 0.01, at 360x640 and at 1280x800, both signed in and signed out.
+Loading `/`, `/play`, `/lobby`, `/history`, `/leaderboard`, and a game room (`/tictactoe/<code>`, `/checkers/<code>`, `/chess/<code>`) SHALL produce a cumulative layout-shift score of at most 0.01, at 360x640 and at 1280x800, both signed in and signed out.
 
 #### Scenario: Signed-in load at both viewports
 
@@ -137,7 +137,7 @@ Wherever this change shows a loading placeholder (a Skeleton or a Spinner state)
 
 ### Requirement: Stable turn changes
 
-When the turn passes between players, or a round ends, in a tic-tac-toe or checkers room, the app SHALL record no layout-shift entries. The same SHALL hold when the viewer's pending move is shown, confirmed, or rolled back with its shake and toast. The player strips, names, scores, clocks, status lines, board, and round controls SHALL keep their positions and sizes. Numbers SHALL use tabular figures in fixed-width boxes, and animations SHALL change only `transform` or `opacity`.
+When the turn passes or a round ends in any game room, the app SHALL record no layout-shift entries. The same SHALL hold when the chess promotion picker opens or closes, and when the viewer's pending move is shown, confirmed, or rolled back. The player strips (names, scores, clocks, status lines), board, and round controls SHALL keep their positions and sizes. Numbers SHALL use tabular figures in fixed-width boxes, and animations SHALL change only `transform` or `opacity`.
 
 #### Scenario: Three turn changes in tic-tac-toe
 
@@ -168,6 +168,16 @@ When the turn passes between players, or a round ends, in a tic-tac-toe or check
 
 - **WHEN** `browser-a`'s pending move is rejected, the board shakes, and the toast appears while its observer runs
 - **THEN** `browser-a` records no layout-shift entry
+
+#### Scenario: Three turn changes in chess
+
+- **WHEN** two players in `browser-a` and `browser-b`, seated in one chess room, alternate at least three moves while both observers run
+- **THEN** neither browser records a layout-shift entry
+
+#### Scenario: Promotion picker without shift
+
+- **WHEN** a seated player opens the promotion picker, cancels it, then opens it again and promotes, while the observer runs
+- **THEN** the browser records no layout-shift entry
 
 ### Requirement: Player strips keep their boxes
 

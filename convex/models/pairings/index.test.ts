@@ -80,6 +80,16 @@ test("enqueue pairs with an opponent waiting for the same game", async () => {
 	expect(result).toMatchObject({ status: "matched", type: "checkers" });
 });
 
+test("enqueue pairs two players waiting for chess", async () => {
+	const t = setup();
+	const a = await signIn(t, "user_a", "Ada");
+	const b = await signIn(t, "user_b", "Bea");
+	await a.mutation(enqueue, { type: "chess" });
+
+	const result = await b.mutation(enqueue, { type: "chess" });
+	expect(result).toMatchObject({ status: "matched", type: "chess" });
+});
+
 test("a match seats the waiting opponent first and the newcomer second", async () => {
 	const t = setup();
 	const a = await signIn(t, "user_a", "Ada");

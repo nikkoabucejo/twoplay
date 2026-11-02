@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import { GAMES } from "$lib/features/play";
 import {
 	INDEXED_PATHS,
+	SITE_DESCRIPTION,
 	SITE_URL,
 	canonicalUrl,
 	isIndexable,
@@ -17,6 +18,7 @@ const EXPECTED_PATHS = [
 	"/learn",
 	"/learn/tictactoe",
 	"/learn/checkers",
+	"/learn/chess",
 	"/tour",
 	"/about",
 	"/sandbox/sound",
@@ -27,6 +29,14 @@ const EXPECTED_PATHS = [
 describe("SITE_URL", () => {
 	test("is the production origin", () => {
 		expect(SITE_URL).toBe("https://twoplay.xyz");
+	});
+});
+
+describe("SITE_DESCRIPTION", () => {
+	test("names every game", () => {
+		for (const { name } of Object.values(GAMES)) {
+			expect(SITE_DESCRIPTION).toContain(name);
+		}
 	});
 });
 
@@ -50,17 +60,18 @@ describe("isIndexable", () => {
 
 	test("accepts rules and info pages", () => {
 		expect(isIndexable(new URL("/learn/checkers", SITE_URL))).toBe(true);
+		expect(isIndexable(new URL("/learn/chess", SITE_URL))).toBe(true);
 		expect(isIndexable(new URL("/privacy", SITE_URL))).toBe(true);
 	});
 
 	test("rejects stats, settings, and unknown rules pages", () => {
-		for (const path of ["/me", "/settings", "/learn/chess"]) {
+		for (const path of ["/me", "/settings", "/learn/backgammon"]) {
 			expect(isIndexable(new URL(path, SITE_URL))).toBe(false);
 		}
 	});
 
 	test("rejects rooms, history, lobby, and leaderboard", () => {
-		for (const path of ["/tictactoe/ABCD", "/history", "/lobby", "/leaderboard"]) {
+		for (const path of ["/tictactoe/ABCD", "/chess/ABCD", "/history", "/lobby", "/leaderboard"]) {
 			expect(isIndexable(new URL(path, SITE_URL))).toBe(false);
 		}
 	});

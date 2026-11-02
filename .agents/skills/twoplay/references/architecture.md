@@ -28,7 +28,7 @@ src/
       storage/            # preferences (PreferencesStore, localStorage key `twoplay:prefs`)
       sound/
     features/             # container — no barrel
-      play/               # playable games (tictactoe, checkers) + games.ts (GAMES registry)
+      play/               # playable games (tictactoe, checkers, chess) + games.ts (GAMES registry)
       presence/           # cursor, mood, turn-alert
       core/               # page-level features: lobby, play, history, leaderboard
     services/

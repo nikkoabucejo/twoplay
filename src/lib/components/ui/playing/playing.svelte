@@ -13,7 +13,7 @@
 </script>
 
 <script lang="ts">
-	import { CheckersRoom, GAMES, TictactoeRoom } from "$lib/features/play";
+	import { CheckersRoom, ChessRoom, GAMES, TictactoeRoom } from "$lib/features/play";
 	import { ACCENTS, cn } from "$lib/utils/style";
 	import { DEFAULT_EMOJI } from "../../../../../convex/models/players/index.js";
 	import { Button } from "../button/index.js";
@@ -28,7 +28,18 @@
 	// at construction is safe — only the `getCode` closure below needs to stay reactive, same as every
 	// `<Tictactoe>`/`<Checkers>` page component.
 	// svelte-ignore state_referenced_locally
-	const room = type === "tictactoe" ? new TictactoeRoom(() => code) : new CheckersRoom(() => code);
+	const room = createRoom(type);
+
+	function createRoom(type: GameType) {
+		switch (type) {
+			case "tictactoe":
+				return new TictactoeRoom(() => code);
+			case "checkers":
+				return new CheckersRoom(() => code);
+			case "chess":
+				return new ChessRoom(() => code);
+		}
+	}
 
 	$effect(() => () => room.dispose());
 

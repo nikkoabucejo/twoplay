@@ -11,7 +11,7 @@
 	title="Learn"
 	description="Pick a game. Each lesson plays out on a board, then lets you try it."
 >
-	<ul class="grid gap-4 sm:grid-cols-2">
+	<ul class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 		{#each GAME_TYPES as type (type)}
 			<li><Door {type} /></li>
 		{/each}

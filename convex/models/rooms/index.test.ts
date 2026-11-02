@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { api, internal } from "../../_generated/api.js";
 import type { Doc } from "../../_generated/dataModel.js";
+import { chessEngine, type ChessState } from "../games/chess/index.js";
+import { positionKey } from "../games/chess/rules.js";
 import type { TictactoeState } from "../games/tictactoe/index.js";
 import { seatedRoom, setup, signIn, type TestConvex } from "../../test.setup.js";
 import { clockByGameAndPlayer, clocksByGame } from "../clocks/index.js";
@@ -224,6 +226,15 @@ describe("create", () => {
 		expect(room.players).toHaveLength(1);
 		const host = await t.run((ctx) => ctx.db.get(room.players[0]));
 		expect(host).toMatchObject({ name: "Ada", score: 0 });
+	});
+
+	test("creates a chess room at the starting position", async () => {
+		const t = setup();
+		const ada = await signIn(t, "user_a", "Ada");
+		const result = await ada.mutation(create, { type: "chess" });
+		expect(result.type).toBe("chess");
+		const { game } = await roomWithHostClock(t, result.code);
+		expect(game.state).toEqual(chessEngine.createInitialState());
 	});
 
 	test("starts round 1 with the host's clock frozen", async () => {
@@ -740,6 +751,49 @@ describe("play", () => {
 		const { moves, clocks } = await gameSnapshot(t, code);
 		expect(moves).toHaveLength(1);
 		expect(clocks[1]?.turnedAt).toBe(START);
+	});
+
+	test("stores a legal chess move as a moves row", async () => {
+		const t = setup();
+		const { a, code } = await seatedRoom(t, "chess");
+		const move = { kind: "chess", from: "e2", to: "e4" } as const;
+		await a.mutation(play, { code, move });
+		const { room, game, moves } = await gameSnapshot(t, code);
+		const expected = chessEngine.applyMove(chessEngine.createInitialState(), 0, move);
+		expect(game.state).toEqual(expected);
+		expect(moves).toMatchObject([{ turn: 0, playerId: room.players[0], state: expected }]);
+	});
+
+	test("ignores an illegal chess move", async () => {
+		const t = setup();
+		const { a, code } = await seatedRoom(t, "chess");
+		const before = await gameSnapshot(t, code);
+		await a.mutation(play, { code, move: { kind: "chess", from: "e2", to: "e5" } });
+		const after = await gameSnapshot(t, code);
+		expect(after.game.state).toEqual(before.game.state);
+		expect(after.moves).toEqual([]);
+		expect(after.clocks).toEqual(before.clocks);
+	});
+
+	test("ignores a chess promotion with no piece", async () => {
+		const t = setup();
+		const { a, code } = await seatedRoom(t, "chess");
+		const fen = "8/P6k/8/8/8/8/8/K7 w - - 0 1";
+		const promoting: ChessState = { kind: "chess", fen, positions: [positionKey(fen)] };
+		const { game } = await gameSnapshot(t, code);
+		await t.run((ctx) => ctx.db.patch(game._id, { state: promoting }));
+		await a.mutation(play, { code, move: { kind: "chess", from: "a7", to: "a8" } });
+		const after = await gameSnapshot(t, code);
+		expect(after.game.state).toEqual(promoting);
+		expect(after.moves).toEqual([]);
+	});
+
+	test("rejects a chess move out of turn", async () => {
+		const t = setup();
+		const { b, code } = await seatedRoom(t, "chess");
+		await expect(
+			b.mutation(play, { code, move: { kind: "chess", from: "e7", to: "e5" } })
+		).rejects.toThrow("Not your turn");
 	});
 
 	test("banks the mover's elapsed time and stops their clock", async () => {

@@ -13,7 +13,7 @@ Gives the app a Tour page, an About page, and plain-language Privacy and Terms p
 #### Scenario: Tour renders
 
 - **WHEN** a visitor opens `/tour`
-- **THEN** the page has one `h1`, names Tic-Tac-Toe and Checkers with links to their rules pages, and has no link to Ko-fi in its content
+- **THEN** the page has one `h1`, names Tic-Tac-Toe, Checkers, and Chess with links to their rules pages, and has no link to Ko-fi in its content
 
 ### Requirement: About page
 

@@ -22,7 +22,7 @@ describe("Tour page", () => {
 		expect(document.title).toBe("Tour · twoplay");
 	});
 
-	test("names both games and links to their rules", () => {
+	test("names every game and links to their rules", () => {
 		render(Page);
 		expect(screen.getByRole("link", { name: /^Tic-Tac-Toe/ })).toHaveAttribute(
 			"href",
@@ -32,6 +32,8 @@ describe("Tour page", () => {
 			"href",
 			"/learn/checkers"
 		);
+		expect(screen.getByRole("link", { name: /^Chess/ })).toHaveAttribute("href", "/learn/chess");
+		expect(screen.getByText("Tic-Tac-Toe, Checkers, or Chess.")).toBeInTheDocument();
 		expect(screen.getByRole("link", { name: "Learn" })).toHaveAttribute("href", "/learn");
 	});
 

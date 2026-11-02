@@ -32,13 +32,20 @@ type PendingMove = {
 };
 
 /** Compares boards only: every pending move starts from the server's state, so the board settles the
- *  rest. Checkers squares are compared by value, so their field order doesn't matter. */
+ *  rest. Checkers squares are compared by value, so their field order doesn't matter. A chess FEN
+ *  carries the move counters, so a repeated chess board still tells its positions apart. */
 function isSameState(a: GameState, b: GameState): boolean {
-	const boardKey = (state: GameState) =>
-		state.kind === "tictactoe"
-			? JSON.stringify(state.boards)
-			: JSON.stringify(state.board.map((square) => square && [square.color, square.king]));
-	return boardKey(a) === boardKey(b);
+	switch (a.kind) {
+		case "tictactoe":
+			return b.kind === "tictactoe" && JSON.stringify(a.boards) === JSON.stringify(b.boards);
+		case "checkers": {
+			const squaresOf = (board: typeof a.board) =>
+				JSON.stringify(board.map((square) => square && [square.color, square.king]));
+			return b.kind === "checkers" && squaresOf(a.board) === squaresOf(b.board);
+		}
+		case "chess":
+			return b.kind === "chess" && a.fen === b.fen;
+	}
 }
 
 /**

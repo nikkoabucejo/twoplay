@@ -4,7 +4,7 @@
 
 | Term         | Meaning                                                                                                                                     |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| Game type    | `tictactoe` or `checkers`. Server: `gameEngines`. Client: `GAMES`.                                                                          |
+| Game type    | `tictactoe`, `checkers`, or `chess`. Server: `gameEngines`. Client: `GAMES`.                                                                |
 | Room         | A lobby joined by code. Holds the game type and two seats. Spans many rounds.                                                               |
 | Room code    | 6-character shareable code. Not an authorization.                                                                                           |
 | Visibility   | `private` or `public`. Public waiting rooms appear in `/lobby`.                                                                             |
@@ -28,28 +28,31 @@
 | Cursor       | Live pointer position, normalized to 0–1.                                                                                                   |
 | Mood         | Ambient background driven by the board status.                                                                                              |
 | Turn alert   | Title flash and chime when your turn arrives in a hidden tab (`TurnAlert`, `Room.isMyTurnConfirmed`). Sound follows the `sound` preference. |
+| FEN          | A chess position as text: placement, side to move, castling rights, en passant square, and move counters. Chess state stores it.            |
+| SAN          | Standard algebraic notation for one chess move, e.g. `Nf3`. Read to screen readers as the last move.                                        |
+| Position key | The first four FEN fields, with en passant as `-` unless a legal en passant capture exists. Three equal keys draw by repetition.            |
 | Live game    | Header pill linking to your active room (`rooms.active`), hidden while you are in it.                                                       |
 
 ## Code
 
-| Term            | Meaning                                                                                                       |
-| --------------- | ------------------------------------------------------------------------------------------------------------- |
-| Engine          | `GameEngine` implementation per game: initial state, move validation, status, round winner. Server authority. |
-| Rules           | Pure board functions per game (`rules.ts`). No turn or player logic.                                          |
-| Registry        | `convex/models/games/index.ts`: `gameEngines`, union validators, and switch dispatch.                         |
-| `Room`          | Client base class (`$lib/utils/multiplayer`). Subclassed per game (`TictactoeRoom`, `CheckersRoom`).          |
-| Client engine   | `ClientEngine` (`applyMove`, `status`) a `Room` subclass passes to `super`, narrowed to its game.             |
-| Pending move    | The viewer's move shown before the server confirms it. Rolls back with a `rejection` if refused.              |
-| `Board`         | Shared layout component: player strips, board, round controls.                                                |
-| `requireUser`   | Resolves the caller from `ctx.auth`, or throws.                                                               |
-| `requirePlayer` | Resolves the caller's seat in a room, or throws.                                                              |
-| Category        | A folder under `components/`, `utils/`, `features/`, or `services/` that owns a barrel.                       |
-| Leaf            | A folder with `index.ts` one level inside a category.                                                         |
-| Game room route | A route id with a `[code]` segment (`isGameRoomRoute`). Gets the fixed frame with no footer or dock.          |
-| `Dock`          | The mobile bottom tab bar (`components/layout/dock`). Signed in, below `sm`, not in game rooms.               |
-| `NAV_ITEMS`     | The primary links (Play, Lobby, History, Leaderboard), shown in the header from `sm` and the `Dock` below.    |
-| Preferences     | Per-browser settings in `localStorage` (`twoplay:prefs`), via `PreferencesStore`. Currently `sound`.          |
-| Toast           | Short fixed notice from `getToaster().show(...)`, rendered by `ToastRegion`. At most three.                   |
+| Term            | Meaning                                                                                                           |
+| --------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Engine          | `GameEngine` implementation per game: initial state, move validation, status, round winner. Server authority.     |
+| Rules           | Pure board functions per game (`rules.ts`). No turn or player logic.                                              |
+| Registry        | `convex/models/games/index.ts`: `gameEngines`, union validators, and switch dispatch.                             |
+| `Room`          | Client base class (`$lib/utils/multiplayer`). Subclassed per game (`TictactoeRoom`, `CheckersRoom`, `ChessRoom`). |
+| Client engine   | `ClientEngine` (`applyMove`, `status`) a `Room` subclass passes to `super`, narrowed to its game.                 |
+| Pending move    | The viewer's move shown before the server confirms it. Rolls back with a `rejection` if refused.                  |
+| `Board`         | Shared layout component: player strips, board, round controls.                                                    |
+| `requireUser`   | Resolves the caller from `ctx.auth`, or throws.                                                                   |
+| `requirePlayer` | Resolves the caller's seat in a room, or throws.                                                                  |
+| Category        | A folder under `components/`, `utils/`, `features/`, or `services/` that owns a barrel.                           |
+| Leaf            | A folder with `index.ts` one level inside a category.                                                             |
+| Game room route | A route id with a `[code]` segment (`isGameRoomRoute`). Gets the fixed frame with no footer or dock.              |
+| `Dock`          | The mobile bottom tab bar (`components/layout/dock`). Signed in, below `sm`, not in game rooms.                   |
+| `NAV_ITEMS`     | The primary links (Play, Lobby, History, Leaderboard), shown in the header from `sm` and the `Dock` below.        |
+| Preferences     | Per-browser settings in `localStorage` (`twoplay:prefs`), via `PreferencesStore`. Currently `sound`.              |
+| Toast           | Short fixed notice from `getToaster().show(...)`, rendered by `ToastRegion`. At most three.                       |
 
 ## Workflow
 

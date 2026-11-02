@@ -12,6 +12,13 @@ import {
 	type CheckersMove,
 	type CheckersState
 } from "./checkers/index.js";
+import {
+	chessEngine,
+	chessMove,
+	chessState,
+	type ChessMove,
+	type ChessState
+} from "./chess/index.js";
 import { otherPlayer } from "./engine.js";
 export type { GameEngine, GameStatus } from "./engine.js";
 import {
@@ -24,16 +31,21 @@ import {
 
 export const gameEngines = {
 	tictactoe: tictactoeEngine,
-	checkers: checkersEngine
+	checkers: checkersEngine,
+	chess: chessEngine
 } as const;
 
 export type GameType = keyof typeof gameEngines;
-export type GameState = TictactoeState | CheckersState;
-export type GameMove = TictactoeMove | CheckersMove;
+export type GameState = TictactoeState | CheckersState | ChessState;
+export type GameMove = TictactoeMove | CheckersMove | ChessMove;
 
-export const gameTypeValidator = v.union(v.literal("tictactoe"), v.literal("checkers"));
-export const gameStateValidator = v.union(tictactoeState, checkersState);
-export const gameMoveValidator = v.union(tictactoeMove, checkersMove);
+export const gameTypeValidator = v.union(
+	v.literal("tictactoe"),
+	v.literal("checkers"),
+	v.literal("chess")
+);
+export const gameStateValidator = v.union(tictactoeState, checkersState, chessState);
+export const gameMoveValidator = v.union(tictactoeMove, checkersMove, chessMove);
 
 export function getEngine(gameType: GameType) {
 	return gameEngines[gameType];
@@ -64,6 +76,12 @@ export function applyMove(
 			}
 			return checkersEngine.applyMove(state, playerIndex, move);
 		}
+		case "chess": {
+			if (state.kind !== "chess" || move.kind !== "chess") {
+				throw new Error("Move does not match this room's game");
+			}
+			return chessEngine.applyMove(state, playerIndex, move);
+		}
 	}
 }
 
@@ -78,6 +96,10 @@ export function roundWinner(gameType: GameType, state: GameState): number | null
 			if (state.kind !== "checkers") throw new Error("State does not match this room's game");
 			return checkersEngine.roundWinner(state);
 		}
+		case "chess": {
+			if (state.kind !== "chess") throw new Error("State does not match this room's game");
+			return chessEngine.roundWinner(state);
+		}
 	}
 }
 
@@ -91,6 +113,10 @@ export function gameStatus(gameType: GameType, state: GameState) {
 		case "checkers": {
 			if (state.kind !== "checkers") throw new Error("State does not match this room's game");
 			return checkersEngine.status(state);
+		}
+		case "chess": {
+			if (state.kind !== "chess") throw new Error("State does not match this room's game");
+			return chessEngine.status(state);
 		}
 	}
 }

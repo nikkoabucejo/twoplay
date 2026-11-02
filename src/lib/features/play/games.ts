@@ -1,5 +1,5 @@
 import type { Component } from "svelte";
-import { CheckersIcon, TictactoeIcon } from "$lib/assets/icons/games";
+import { CheckersIcon, ChessIcon, TictactoeIcon } from "$lib/assets/icons/games";
 import { SEAT_COLORS } from "$lib/utils/style";
 import type { GameType } from "../../../../convex/models/games/index.js";
 
@@ -25,6 +25,12 @@ export const GAMES: Record<GameType, GameMeta> = {
 		name: "Checkers",
 		description: "Jump and crown on an 8x8 board.",
 		icon: CheckersIcon,
+		colors: SEAT_COLORS
+	},
+	chess: {
+		name: "Chess",
+		description: "Checkmate the king to win.",
+		icon: ChessIcon,
 		colors: SEAT_COLORS
 	}
 };

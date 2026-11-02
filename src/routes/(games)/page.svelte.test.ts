@@ -43,10 +43,13 @@ function signIn() {
 function expectGameCards() {
 	const tictactoe = screen.getByRole("link", { name: /^Tic-Tac-Toe/ });
 	const checkers = screen.getByRole("link", { name: /^Checkers/ });
+	const chess = screen.getByRole("link", { name: /^Chess/ });
 	expect(tictactoe).toHaveAttribute("href", "/play?game=tictactoe");
 	expect(tictactoe).toHaveTextContent("Nine boards. Win three in a row.");
 	expect(checkers).toHaveAttribute("href", "/play?game=checkers");
 	expect(checkers).toHaveTextContent("Jump and crown on an 8x8 board.");
+	expect(chess).toHaveAttribute("href", "/play?game=chess");
+	expect(chess).toHaveTextContent("Checkmate the king to win.");
 }
 
 describe("Home page", () => {
@@ -89,7 +92,8 @@ describe("Home page", () => {
 		render(Page);
 		expect(screen.getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual([
 			"/play?game=tictactoe",
-			"/play?game=checkers"
+			"/play?game=checkers",
+			"/play?game=chess"
 		]);
 	});
 

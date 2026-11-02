@@ -4,6 +4,8 @@ import type { Id } from "../../_generated/dataModel.js";
 import { seatedRoom, setup, signIn, type TestConvex } from "../../test.setup.js";
 import { getRoomByCode } from "../rooms/auth.js";
 import { checkersEngine } from "./checkers/index.js";
+import { chessEngine, type ChessState } from "./chess/index.js";
+import { positionKey } from "./chess/rules.js";
 import {
 	applyMove,
 	countMoves,
@@ -22,6 +24,17 @@ import { tictactoeEngine } from "./tictactoe/index.js";
 
 const tictactoeMove = { kind: "tictactoe", boardIndex: 0, cellIndex: 0 } as const;
 const checkersMove = { kind: "checkers", from: 42, to: 35 } as const;
+const chessMove = { kind: "chess", from: "e2", to: "e4" } as const;
+
+function chessAt(fen: string): ChessState {
+	return { kind: "chess", fen, positions: [positionKey(fen)] };
+}
+
+/** 1. f3 e5 2. g4 Qh4#: black mates, so seat 1 wins. */
+const FOOLS_MATE = chessAt("rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3");
+const STALEMATE = chessAt("7k/5Q2/6K1/8/8/8/8/8 b - - 1 1");
+/** White to move with a rook against black's lone king. */
+const LONE_BLACK_KING = chessAt("4k3/8/8/8/8/8/8/R3K3 w - - 0 1");
 
 /** A tictactoe state where X has won the top meta row. */
 function decidedTictactoe(): GameState {
@@ -109,6 +122,7 @@ describe("registry", () => {
 	test("getEngine returns the registered engine for each game type", () => {
 		expect(getEngine("tictactoe")).toBe(tictactoeEngine);
 		expect(getEngine("checkers")).toBe(checkersEngine);
+		expect(getEngine("chess")).toBe(chessEngine);
 	});
 });
 
@@ -127,6 +141,11 @@ describe("applyMove dispatch", () => {
 		);
 	});
 
+	test("routes a chess move to the chess engine", () => {
+		const next = applyMove("chess", chessEngine.createInitialState(), 0, chessMove);
+		expect(next).toEqual(chessEngine.applyMove(chessEngine.createInitialState(), 0, chessMove));
+	});
+
 	test("propagates the engine's Not your turn error", () => {
 		expect(() =>
 			applyMove("tictactoe", tictactoeEngine.createInitialState(), 1, tictactoeMove)
@@ -137,7 +156,10 @@ describe("applyMove dispatch", () => {
 		["tictactoe", "a checkers state", checkersEngine.createInitialState(), tictactoeMove],
 		["tictactoe", "a checkers move", tictactoeEngine.createInitialState(), checkersMove],
 		["checkers", "a tictactoe state", tictactoeEngine.createInitialState(), checkersMove],
-		["checkers", "a tictactoe move", checkersEngine.createInitialState(), tictactoeMove]
+		["checkers", "a tictactoe move", checkersEngine.createInitialState(), tictactoeMove],
+		["chess", "a checkers state", checkersEngine.createInitialState(), chessMove],
+		["chess", "a checkers move", chessEngine.createInitialState(), checkersMove],
+		["checkers", "a chess move", checkersEngine.createInitialState(), chessMove]
 	] as const)("a %s room throws when given %s", (gameType, _, state, move) => {
 		expect(() => applyMove(gameType, state, 0, move)).toThrow(
 			"Move does not match this room's game"
@@ -164,16 +186,28 @@ describe("status and roundWinner dispatch", () => {
 		expect(roundWinner("checkers", checkersEngine.createInitialState())).toBeNull();
 	});
 
+	test("a chess checkmate is over with the mating seat as the winner", () => {
+		expect(gameStatus("chess", FOOLS_MATE)).toEqual({ turnIndex: 0, winnerIndex: 1, isOver: true });
+		expect(roundWinner("chess", FOOLS_MATE)).toBe(1);
+	});
+
+	test("a chess stalemate is over with no winner", () => {
+		expect(gameStatus("chess", STALEMATE)).toMatchObject({ winnerIndex: null, isOver: true });
+		expect(roundWinner("chess", STALEMATE)).toBeNull();
+	});
+
 	test.each([
 		["tictactoe", checkersEngine.createInitialState()],
-		["checkers", tictactoeEngine.createInitialState()]
+		["checkers", tictactoeEngine.createInitialState()],
+		["chess", checkersEngine.createInitialState()]
 	] as const)("gameStatus throws for a %s room holding another game's state", (type, state) => {
 		expect(() => gameStatus(type, state)).toThrow("State does not match this room's game");
 	});
 
 	test.each([
 		["tictactoe", checkersEngine.createInitialState()],
-		["checkers", tictactoeEngine.createInitialState()]
+		["checkers", tictactoeEngine.createInitialState()],
+		["chess", checkersEngine.createInitialState()]
 	] as const)("roundWinner throws for a %s room holding another game's state", (type, state) => {
 		expect(() => roundWinner(type, state)).toThrow("State does not match this room's game");
 	});
@@ -289,6 +323,23 @@ describe("claimExpiredClock", () => {
 		expect(expired).not.toHaveProperty("turnedAt");
 	});
 
+	test("a flag against a lone king still loses", async () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(1_000_000);
+		const t = setup();
+		const { code } = await seatedRoom(t, "chess", 10_000);
+		const { game } = await roomAndGame(t, code);
+		await setGameState(t, game._id, LONE_BLACK_KING);
+		vi.setSystemTime(1_010_000);
+		await claim(t, code);
+		const { room, game: claimed } = await roomAndGame(t, code);
+		await t.run((ctx) => settleRound(ctx, room, claimed));
+		expect(await standings(t, room.players, game._id)).toEqual([
+			{ score: 0, rating: 392, mmr: -8 },
+			{ score: 1, rating: 408, mmr: 8 }
+		]);
+	});
+
 	test("leaves a seat with time left alone", async () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(1_000_000);
@@ -349,6 +400,31 @@ describe("settleRound", () => {
 		const { room, game: settled } = await settle(t, code);
 		expect(settled.settledAt).toBeDefined();
 		expect(settled.isNoContest).toBeUndefined();
+		expect(await standings(t, room.players, game._id)).toEqual([
+			{ score: 0, rating: null, mmr: null },
+			{ score: 0, rating: null, mmr: null }
+		]);
+	});
+
+	test("credits seat 1 for a chess checkmate", async () => {
+		const t = setup();
+		const { code } = await seatedRoom(t, "chess");
+		const { game } = await roomAndGame(t, code);
+		await setGameState(t, game._id, FOOLS_MATE);
+		const { room } = await settle(t, code);
+		expect(await standings(t, room.players, game._id)).toEqual([
+			{ score: 0, rating: 392, mmr: -8 },
+			{ score: 1, rating: 408, mmr: 8 }
+		]);
+	});
+
+	test("settles a chess stalemate as a draw", async () => {
+		const t = setup();
+		const { code } = await seatedRoom(t, "chess");
+		const { game } = await roomAndGame(t, code);
+		await setGameState(t, game._id, STALEMATE);
+		const { room, game: settled } = await settle(t, code);
+		expect(settled.settledAt).toBeDefined();
 		expect(await standings(t, room.players, game._id)).toEqual([
 			{ score: 0, rating: null, mmr: null },
 			{ score: 0, rating: null, mmr: null }
@@ -584,6 +660,15 @@ describe("resign", () => {
 		await b.mutation(api.models.games.index.resign, { code });
 		const [ada] = await standings(t, room.players, game._id);
 		expect(ada).toMatchObject({ score: 1, rating: 408 });
+	});
+
+	test("credits the opponent in a chess room", async () => {
+		const t = setup();
+		const { a, code } = await seatedRoom(t, "chess");
+		const { room, game } = await roomAndGame(t, code);
+		await a.mutation(api.models.games.index.resign, { code });
+		const [, bea] = await standings(t, room.players, game._id);
+		expect(bea).toMatchObject({ score: 1, rating: 408 });
 	});
 
 	test("rejects a resign while the second seat is still empty", async () => {

@@ -15,7 +15,7 @@ describe("load", () => {
 	test("throws a 404 for an unknown game", () => {
 		let thrown: unknown;
 		try {
-			loadGame("chess");
+			loadGame("backgammon");
 		} catch (caught) {
 			thrown = caught;
 		}

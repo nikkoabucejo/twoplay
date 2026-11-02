@@ -4,8 +4,16 @@
 	import { cn } from "$lib/utils/style";
 	import { checkersEngine } from "../../../../../convex/models/games/checkers/index.js";
 	import { computeLegalMoves } from "../../../../../convex/models/games/checkers/rules.js";
+	import { chessEngine } from "../../../../../convex/models/games/chess/index.js";
+	import {
+		boardOf,
+		checkedKing,
+		legalMoves as legalMovesOf,
+		squareIndex
+	} from "../../../../../convex/models/games/chess/rules.js";
 	import { tictactoeEngine } from "../../../../../convex/models/games/tictactoe/index.js";
 	import CheckersBoard from "./checkers-board.svelte";
+	import ChessBoard from "./chess-board.svelte";
 	import DemoCursor from "./demo-cursor.svelte";
 	import { movePieceIds, pieceIds } from "./demo.js";
 	import { Playback, isMotionReduced, onVisibility } from "./playback.svelte.js";
@@ -44,12 +52,20 @@
 
 	/** The square or cell the cursor picks up from, and the one it plays to. */
 	function slotsOf(action: number): [number, number] {
-		if (demo.kind === "tictactoe") {
-			const { boardIndex, cellIndex } = demo.actions[action].move;
-			return [boardIndex * 9 + cellIndex, boardIndex * 9 + cellIndex];
+		switch (demo.kind) {
+			case "tictactoe": {
+				const { boardIndex, cellIndex } = demo.actions[action].move;
+				return [boardIndex * 9 + cellIndex, boardIndex * 9 + cellIndex];
+			}
+			case "checkers": {
+				const { from, to } = demo.actions[action].move;
+				return [from, to];
+			}
+			case "chess": {
+				const { from, to } = demo.actions[action].move;
+				return [squareIndex(from), squareIndex(to)];
+			}
 		}
-		const { from, to } = demo.actions[action].move;
-		return [from, to];
 	}
 
 	/** The refused action on screen right now, if any. */
@@ -142,7 +158,31 @@
 		};
 	});
 
-	const winner = $derived(ticTacToe?.winner ?? checkers?.winner ?? null);
+	const chess = $derived.by(() => {
+		if (demo.kind !== "chess") return null;
+		const state = playback.played === 0 ? demo.start : demo.steps[playback.played - 1].state;
+		const { actions } = demo;
+		const last = accepted.at(-1);
+		const target = playback.target;
+		const heading = target !== null && playback.isAiming ? actions[target].move.from : null;
+		return {
+			board: boardOf(state.fen),
+			lastMove: last ? { ...actions[last.action].move, seat: last.seat } : null,
+			selected: heading,
+			destinations: [
+				...new Set(
+					legalMovesOf(state.fen)
+						.filter((move) => move.from === heading)
+						.map((move) => move.to)
+				)
+			],
+			checkSquare: checkedKing(state.fen),
+			rejected: rejected ? actions[rejected.action].move.from : null,
+			winner: chessEngine.status(state).winnerIndex
+		};
+	});
+
+	const winner = $derived(ticTacToe?.winner ?? checkers?.winner ?? chess?.winner ?? null);
 </script>
 
 <div
@@ -168,6 +208,15 @@
 					forced={checkers.forced}
 					lastMove={checkers.lastMove}
 					rejected={checkers.rejected}
+				/>
+			{:else if chess}
+				<ChessBoard
+					board={chess.board}
+					selected={chess.selected}
+					destinations={chess.destinations}
+					lastMove={chess.lastMove}
+					checkSquare={chess.checkSquare}
+					rejected={chess.rejected}
 				/>
 			{/if}
 		</div>

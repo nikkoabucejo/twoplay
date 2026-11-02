@@ -146,7 +146,7 @@ describe("parsePreferences", () => {
 	test("a stored setup with an unknown game reads as absent and keeps sound", () => {
 		const raw = JSON.stringify({
 			sound: false,
-			lastPlay: { game: "chess", opponent: "friend", minutes: 10 }
+			lastPlay: { game: "backgammon", opponent: "friend", minutes: 10 }
 		});
 
 		expect(parsePreferences(raw)).toEqual({ ...DEFAULTS, sound: false });
@@ -191,6 +191,17 @@ describe("PreferencesStore", () => {
 			game: "checkers",
 			opponent: "friend",
 			minutes: 10
+		});
+	});
+
+	test("Chess setup survives reload", () => {
+		const storage = memoryStorage();
+		new PreferencesStore(storage).setLastPlay({ game: "chess", opponent: "anyone", minutes: 5 });
+
+		expect(new PreferencesStore(storage).lastPlay).toEqual({
+			game: "chess",
+			opponent: "anyone",
+			minutes: 5
 		});
 	});
 

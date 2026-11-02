@@ -54,7 +54,7 @@ Keyboard focus rings on interactive controls SHALL have at least 3:1 contrast ag
 
 ### Requirement: Reduced motion
 
-When the user requests reduced motion, the landing wordmark glow animation, the ambient mood blobs, the tic-tac-toe game icon's wobble, the checkers game icon's bouncing pieces, and the rejected-move board shake SHALL stop animating, while their static appearance remains.
+When the user requests reduced motion, the landing wordmark glow animation, the ambient mood blobs, the tic-tac-toe game icon's wobble, the checkers game icon's bouncing pieces, the chess game icon's motion, and the rejected-move board shake SHALL stop animating, while their static appearance remains.
 
 #### Scenario: Wordmark and blobs hold still
 
@@ -70,6 +70,11 @@ When the user requests reduced motion, the landing wordmark glow animation, the 
 
 - **WHEN** `prefers-reduced-motion: reduce` is emulated and `/play` shows the checkers icon
 - **THEN** the icon renders its pieces in their resting positions with no `<animate>` element and no running animation
+
+#### Scenario: Chess icon holds still
+
+- **WHEN** `prefers-reduced-motion: reduce` is emulated and `/play` shows the chess icon
+- **THEN** the icon renders in its resting position with no `<animate>` element and no running animation
 
 #### Scenario: No shake on a rejected move
 

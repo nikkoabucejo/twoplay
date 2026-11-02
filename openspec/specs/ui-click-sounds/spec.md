@@ -41,7 +41,7 @@ The app SHALL NOT tick for a control that is disabled, `aria-disabled="true"`, i
 
 #### Scenario: Board cell
 
-- **WHEN** the user clicks a cell on a tic-tac-toe, checkers, or Learn practice board
+- **WHEN** the user clicks a cell on a tic-tac-toe, checkers, chess, or Learn practice board
 - **THEN** no click tick plays
 
 #### Scenario: Scripted click

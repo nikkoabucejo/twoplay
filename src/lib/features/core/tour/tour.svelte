@@ -22,7 +22,7 @@
 	];
 
 	const STEPS = [
-		{ icon: Swords, title: "Pick a game", body: "Tic-Tac-Toe or Checkers." },
+		{ icon: Swords, title: "Pick a game", body: "Tic-Tac-Toe, Checkers, or Chess." },
 		{
 			icon: Users,
 			title: "Find an opponent",
@@ -90,7 +90,7 @@
 
 	<section aria-labelledby="tour-games" class="flex flex-col gap-5">
 		<h2 id="tour-games" class="text-xl font-bold tracking-tight">Games</h2>
-		<ul class="grid gap-4 sm:grid-cols-2">
+		<ul class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 			{#each GAME_TYPES as type (type)}
 				<li><Door {type} /></li>
 			{/each}

@@ -15,6 +15,11 @@ describe("GAMES", () => {
 		}
 	});
 
+	test("names chess and describes it in one sentence", () => {
+		expect(GAMES.chess.name).toBe("Chess");
+		expect(GAMES.chess.description).toBe("Checkmate the king to win.");
+	});
+
 	test("never shows two games under the same name", () => {
 		const names = Object.values(GAMES).map((meta) => meta.name);
 		expect(new Set(names).size).toBe(names.length);
