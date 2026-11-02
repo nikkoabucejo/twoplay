@@ -9,4 +9,4 @@ export { Tour } from "./tour/index.js";
 export { About } from "./about/index.js";
 export { Legal, type LegalHighlight, type LegalSection } from "./legal/index.js";
 export { Settings } from "./settings/index.js";
-export { SoundLab } from "./sound-lab/index.js";
+export { Sandbox } from "./sandbox/index.js";

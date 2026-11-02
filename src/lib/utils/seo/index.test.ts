@@ -21,7 +21,6 @@ const EXPECTED_PATHS = [
 	"/learn/chess",
 	"/tour",
 	"/about",
-	"/sandbox/sound",
 	"/privacy",
 	"/terms"
 ];
@@ -66,6 +65,12 @@ describe("isIndexable", () => {
 
 	test("rejects stats, settings, and unknown rules pages", () => {
 		for (const path of ["/me", "/settings", "/learn/backgammon"]) {
+			expect(isIndexable(new URL(path, SITE_URL))).toBe(false);
+		}
+	});
+
+	test("rejects the sandbox", () => {
+		for (const path of ["/sandbox", "/sandbox/sound"]) {
 			expect(isIndexable(new URL(path, SITE_URL))).toBe(false);
 		}
 	});

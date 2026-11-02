@@ -6,6 +6,7 @@ export {
 	type BoardPlayer,
 	type BoardStatus,
 	resultView,
+	ResultCard,
 	type ResultAction,
 	type ResultView,
 	roomStatus,

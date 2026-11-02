@@ -7,6 +7,7 @@ import Root, {
 import BoardPlaceholder from "./board-placeholder.svelte";
 import { rovingStep, scrubCommand, type ScrubCommand } from "./keys.js";
 import { resultView, type ResultAction, type ResultView } from "./outcome.js";
+import ResultCard from "./result-card.svelte";
 import { roomStatus } from "./status.js";
 
 export {
@@ -19,6 +20,7 @@ export {
 	type BoardPlayer,
 	type BoardStatus,
 	resultView,
+	ResultCard,
 	type ResultAction,
 	type ResultView,
 	roomStatus,

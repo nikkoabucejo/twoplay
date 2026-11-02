@@ -16,6 +16,7 @@
 		forced = [],
 		lastMove = null,
 		rejected = null,
+		label = "Practice board",
 		onselect
 	}: {
 		board: readonly Square[];
@@ -28,6 +29,8 @@
 		lastMove?: { from: number; to: number; seat: 0 | 1 } | null;
 		/** A refused piece, ringed in red. */
 		rejected?: number | null;
+		/** The board group's name while it takes input. */
+		label?: string;
 		/** Makes the dark squares buttons. Without it the board is a picture. */
 		onselect?: (index: number) => void;
 	} = $props();
@@ -82,7 +85,7 @@
 	<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 	<div
 		role={onselect ? "group" : undefined}
-		aria-label={onselect ? "Practice board" : undefined}
+		aria-label={onselect ? label : undefined}
 		data-board-grid
 		class="grid size-full grid-cols-8 grid-rows-8"
 		onkeydown={onselect ? moveFocus : undefined}

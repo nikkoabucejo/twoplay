@@ -12,6 +12,7 @@
 		footer,
 		players,
 		markIcon,
+		headingLevel = 2,
 		onDismiss
 	}: {
 		view: ResultView;
@@ -20,6 +21,8 @@
 		players?: [BoardPlayer, BoardPlayer];
 		/** The board's `markIcon`, drawn after each name like the strips. */
 		markIcon?: Snippet<[seat: 0 | 1]>;
+		/** The headline's level, for a card placed under other headings. */
+		headingLevel?: 2 | 3 | 4;
 		/** Hides the card to show the final board. */
 		onDismiss: () => void;
 	} = $props();
@@ -148,7 +151,8 @@
 					</span>
 				{/if}
 				<p class="text-caption text-muted-foreground">Round {footer.round}</p>
-				<h2
+				<svelte:element
+					this={`h${headingLevel}`}
 					id={headlineId}
 					class={cn(
 						"text-xl font-bold tracking-tight @sm:text-2xl",
@@ -157,7 +161,7 @@
 					)}
 				>
 					{view.headline}
-				</h2>
+				</svelte:element>
 				{#if view.reason}
 					<p class="text-caption text-muted-foreground">{view.reason}</p>
 				{/if}

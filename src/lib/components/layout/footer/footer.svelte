@@ -22,7 +22,7 @@
 			<a href={link.href} class={LINK_CLASS}>{link.label}</a>
 		{/each}
 		<span aria-hidden="true" class="mx-0.5 h-3 w-px shrink-0 bg-border sm:mx-1"></span>
-		<a href="/sandbox/sound" class={LINK_CLASS}>Sandbox</a>
+		<a href="/sandbox" class={LINK_CLASS}>Sandbox</a>
 	</nav>
 	<!-- Below sm only the icon shows, so the footer stays one row; the label stays for screen readers. -->
 	<a

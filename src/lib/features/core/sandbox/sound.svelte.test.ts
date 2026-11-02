@@ -2,7 +2,7 @@ import { fireEvent, render, screen, within } from "@testing-library/svelte";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { MoodPresence } from "$lib/features/presence";
 import { PreferencesStore } from "$lib/utils/storage";
-import SoundLab from "./sound-lab.svelte";
+import Sound from "./sound.svelte";
 
 const context = vi.hoisted(() => ({
 	mood: null as MoodPresence | null,
@@ -48,9 +48,9 @@ beforeEach(() => {
 	});
 });
 
-describe("SoundLab", () => {
+describe("Sound", () => {
 	test("renders a radio for each moment, with Idle checked", () => {
-		render(SoundLab);
+		render(Sound);
 		const group = screen.getByRole("radiogroup", { name: "Moment" });
 		expect(within(group).getAllByRole("radio")).toHaveLength(MOMENTS.length);
 		for (const name of MOMENTS) expect(moment(name)).toBeInTheDocument();
@@ -65,7 +65,7 @@ describe("SoundLab", () => {
 		["Lose", { type: "winner", player: 1 }, false, "loss"],
 		["Draw", { type: "draw" }, false, "draw"]
 	])("choosing %s sets the full mood", async (name, status, searching, outcome) => {
-		render(SoundLab);
+		render(Sound);
 		await fireEvent.click(moment(name));
 		expect(context.mood?.status).toEqual(status);
 		expect(context.mood?.searching).toBe(searching);
@@ -74,14 +74,14 @@ describe("SoundLab", () => {
 	});
 
 	test("shows the music scene and the mood", async () => {
-		render(SoundLab);
+		render(Sound);
 		await fireEvent.click(moment("Win"));
 		expect(screen.getByText("Seat 1 wins")).toBeInTheDocument();
 		expect(screen.getByText(/^Music:/).parentElement).toHaveTextContent("Music: Win");
 	});
 
 	test("arrow keys move to and choose the next moment", async () => {
-		render(SoundLab);
+		render(Sound);
 		await fireEvent.keyDown(moment("Idle"), { key: "ArrowRight" });
 		expect(context.mood?.status).toEqual({ type: "turn", player: 0 });
 		expect(moment("Your turn")).toHaveFocus();
@@ -89,7 +89,7 @@ describe("SoundLab", () => {
 
 	test("auto-cycle steps to the next moment every 6 seconds", async () => {
 		vi.useFakeTimers();
-		render(SoundLab);
+		render(Sound);
 		await fireEvent.click(screen.getByRole("switch", { name: "Auto-cycle" }));
 		await vi.advanceTimersByTimeAsync(6000);
 		expect(context.mood?.status).toEqual({ type: "turn", player: 0 });
@@ -99,7 +99,7 @@ describe("SoundLab", () => {
 	});
 
 	test("Play starts the music without changing the saved preference", async () => {
-		render(SoundLab);
+		render(Sound);
 		await fireEvent.click(screen.getByRole("button", { name: "Play music" }));
 		expect(sound.music.setWanted).toHaveBeenLastCalledWith(true);
 		expect(context.preferences?.music).toBe(false);
@@ -113,7 +113,7 @@ describe("SoundLab", () => {
 	])("Play is disabled and starts nothing while %s", async (_, saved) => {
 		context.preferences?.setSound(saved.sound);
 		context.preferences?.setVolume(saved.volume);
-		render(SoundLab);
+		render(Sound);
 		const play = screen.getByRole("button", { name: "Play music" });
 		expect(play).toBeDisabled();
 		await fireEvent.click(play);
@@ -123,18 +123,18 @@ describe("SoundLab", () => {
 	test("starts as Play while sound is off, even with music saved on", () => {
 		context.preferences?.setMusic(true);
 		context.preferences?.setSound(false);
-		render(SoundLab);
+		render(Sound);
 		expect(screen.getByRole("button", { name: "Play music" })).toBeDisabled();
 	});
 
 	test("starts as Stop when the saved preference already plays music", () => {
 		context.preferences?.setMusic(true);
-		render(SoundLab);
+		render(Sound);
 		expect(screen.getByRole("button", { name: "Stop music" })).toBeInTheDocument();
 	});
 
 	test("unmounting resets the mood and restores the saved music preference", async () => {
-		const { unmount } = render(SoundLab);
+		const { unmount } = render(Sound);
 		await fireEvent.click(moment("Lose"));
 		await fireEvent.click(screen.getByRole("button", { name: "Play music" }));
 		unmount();
@@ -146,19 +146,19 @@ describe("SoundLab", () => {
 
 	test("links to Settings while sound is off", () => {
 		context.preferences?.setSound(false);
-		render(SoundLab);
+		render(Sound);
 		const link = screen.getByRole("link", { name: "Settings" });
 		expect(link).toHaveAttribute("href", "/settings");
 		expect(link.closest("p")).not.toHaveClass("invisible");
 	});
 
 	test("hides the Settings note while sound is on", () => {
-		render(SoundLab);
+		render(Sound);
 		expect(screen.getByRole("link", { name: "Settings" }).closest("p")).toHaveClass("invisible");
 	});
 
 	test("seat pads play that seat's move and capture sounds", async () => {
-		render(SoundLab);
+		render(Sound);
 		const seat2 = screen.getByRole("group", { name: "Seat 2" });
 		await fireEvent.click(within(seat2).getByRole("button", { name: "Move" }));
 		expect(sound.playMoveSound).toHaveBeenCalledWith(1);
@@ -167,19 +167,19 @@ describe("SoundLab", () => {
 	});
 
 	test("the Turn chime pad plays the chime", async () => {
-		render(SoundLab);
+		render(Sound);
 		await fireEvent.click(screen.getByRole("button", { name: "Turn chime" }));
 		expect(sound.playTurnChime).toHaveBeenCalledOnce();
 	});
 
 	test("the Click pad plays the click sound", async () => {
-		render(SoundLab);
+		render(Sound);
 		await fireEvent.click(screen.getByRole("button", { name: "Click" }));
 		expect(sound.playClickSound).toHaveBeenCalledOnce();
 	});
 
 	test("the pads sit where the UI tick stays off", () => {
-		render(SoundLab);
+		render(Sound);
 		for (const name of ["Click", "Turn chime"]) {
 			expect(screen.getByRole("button", { name }).closest("[data-sfx=off]")).not.toBeNull();
 		}

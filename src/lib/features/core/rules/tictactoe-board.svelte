@@ -19,12 +19,15 @@
 		position,
 		lastMove = null,
 		rejected = null,
+		label = "Practice board",
 		onplay
 	}: {
 		position: TictactoeState;
 		lastMove?: (Spot & { seat: 0 | 1 }) | null;
 		/** A refused attempt, ringed in red. */
 		rejected?: Spot | null;
+		/** The board group's name while it takes input. */
+		label?: string;
 		/** Makes the cells buttons. Without it the board is a picture. */
 		onplay?: (boardIndex: number, cellIndex: number) => void;
 	} = $props();
@@ -106,7 +109,7 @@
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div
 	role={onplay ? "group" : undefined}
-	aria-label={onplay ? "Practice board" : undefined}
+	aria-label={onplay ? label : undefined}
 	data-board-grid
 	class="relative grid size-full grid-cols-3 grid-rows-3 gap-2 sm:gap-3"
 	onkeydown={onplay ? moveFocus : undefined}

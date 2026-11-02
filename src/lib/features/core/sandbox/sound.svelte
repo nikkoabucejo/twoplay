@@ -117,7 +117,7 @@
 
 	function requireMood(): MoodPresence {
 		const mood = getMood();
-		if (!mood) throw new Error("SoundLab needs the mood that the root layout sets up");
+		if (!mood) throw new Error("Sound needs the mood that the root layout sets up");
 		return mood;
 	}
 
@@ -287,12 +287,12 @@
 	</section>
 
 	<section class="flex flex-col gap-2">
-		<h2
+		<h3
 			id="moment-label"
 			class="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
 		>
 			Moment
-		</h2>
+		</h3>
 		<div
 			role="radiogroup"
 			aria-labelledby="moment-label"
@@ -327,7 +327,7 @@
 	</section>
 
 	<section class="flex flex-col gap-2">
-		<h2 class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Sounds</h2>
+		<h3 class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Sounds</h3>
 		<!-- Off, so a pad plays only its own sound and not the UI tick on top. -->
 		<div data-sfx="off" class="grid gap-2 sm:grid-cols-2">
 			{#each [0, 1] as seat (seat)}

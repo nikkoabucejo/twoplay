@@ -17,7 +17,7 @@ describe("Footer", () => {
 			"/learn",
 			"/privacy",
 			"/terms",
-			"/sandbox/sound",
+			"/sandbox",
 			SUPPORT_URL
 		]);
 	});
@@ -45,7 +45,7 @@ describe("Footer", () => {
 	});
 
 	test("sets Sandbox apart with a hidden divider", () => {
-		const sandbox = links().find((link) => link.getAttribute("href") === "/sandbox/sound");
+		const sandbox = links().find((link) => link.getAttribute("href") === "/sandbox");
 		expect(sandbox?.previousElementSibling).toHaveAttribute("aria-hidden", "true");
 	});
 

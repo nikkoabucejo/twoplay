@@ -18,6 +18,7 @@
 		checkSquare = null,
 		rejected = null,
 		promotion,
+		label = "Practice board",
 		onselect
 	}: {
 		board: readonly (Piece | null)[];
@@ -35,6 +36,8 @@
 			onPick: (piece: PromotionPiece) => void;
 			onCancel: () => void;
 		};
+		/** The board group's name while it takes input. */
+		label?: string;
 		/** Makes the squares buttons. Without it the board is a picture. */
 		onselect?: (index: number) => void;
 	} = $props();
@@ -101,7 +104,7 @@
 	<!-- Arrow keys arrive from the focused square; the group moves focus between them. -->
 	<div
 		role={onselect ? "group" : undefined}
-		aria-label={onselect ? "Practice board" : undefined}
+		aria-label={onselect ? label : undefined}
 		data-board-grid
 		class="grid size-full grid-cols-8 grid-rows-8"
 		onkeydown={onselect ? moveFocus : undefined}

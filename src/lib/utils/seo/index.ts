@@ -12,7 +12,6 @@ export const INDEXED_PATHS = [
 	"/learn/chess",
 	"/tour",
 	"/about",
-	"/sandbox/sound",
 	"/privacy",
 	"/terms"
 ];
