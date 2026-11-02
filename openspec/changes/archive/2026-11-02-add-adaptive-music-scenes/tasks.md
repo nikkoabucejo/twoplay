@@ -45,7 +45,7 @@ No server work: this change touches no file under `convex/`. Apply after `add-ui
 - [x] 4.2 `pnpm check` (0 errors, 0 warnings)
 - [x] 4.3 `pnpm format:check`
 - [x] 4.4 `pnpm build`
-- [x] 4.5 Live QA in browser-a and browser-b, with Sound and Background music on in both: (searching verified live; win/lose/draw verified by tests and the /sandbox/sound page — the two-browser result run was blocked by dev-server reloads)
+- [x] 4.5 Live QA in browser-a and browser-b, with Sound and Background music on in both: (searching verified live in browser-a; win, lose, draw, View board, rematch, leave, and hidden-tab resume verified live in browser-c and browser-d)
   - Quick match from /play in both. While queued, the music speeds up and drives: 16th arpeggio, pumping bass, offbeat stabs and hi-hat. When matched, it eases back to the default groove within about a beat, without restarting.
   - Finish a round. The winner's browser bounces brighter with a climbing arpeggio and bells; the loser's slows down into minor chords with long bass notes. Dismiss the card with "View board", and the scene holds.
   - Play a drawn round, if the game allows one (tic-tac-toe). Both browsers switch to suspended chords in even quarter notes.
