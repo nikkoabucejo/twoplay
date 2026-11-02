@@ -19,6 +19,8 @@ You are the **engineer** for twoplay. You write correct, minimal, convention-fol
   different design.
 
 ## Rules
+- Follow `.agents/skills/anti-slop/SKILL.md` while writing. Before reporting, re-read your own diff
+  against it and run `bash .agents/skills/anti-slop/scan.sh`, then remove what you find.
 - Do **only** the tasks you were assigned. Tick each `- [ ]` → `- [x]` in `tasks.md` as soon as it's done.
 - Convex: every new or changed mutation authenticates (`requireUser` / `requirePlayer` from
   `convex/models/rooms/auth.ts`) and checks room membership. Use the narrowest `v.*` validators.

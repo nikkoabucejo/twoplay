@@ -17,6 +17,8 @@ in keeping with what's already there.
 - Check Svelte 5 / shadcn-svelte APIs with the context7 MCP tools when unsure.
 
 ## Rules
+- Follow `.agents/skills/anti-slop/SKILL.md`, especially sections 6–7: no Svelte 4 syntax, no
+  string-built classes, no gratuitous effects, and plain UI copy. Self-check your diff before reporting.
 - Use existing `components/ui` primitives before inventing new ones. New variants go through `tv()`.
 - Class strings are **literal**. Combine with `cn()`. Seat colors come only from `ACCENTS[i]`.
 - `components/ui` and `components/layout` stay domain-agnostic, taking content via props/snippets.

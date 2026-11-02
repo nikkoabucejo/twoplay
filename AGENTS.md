@@ -4,9 +4,10 @@ Real-time two-player games: SvelteKit + Svelte 5 runes + Tailwind v4 + shadcn-sv
 
 ## Start here
 - **Project knowledge:** `.agents/skills/twoplay/` (architecture, conventions, backend, games). Read it before writing code.
-- **Do work through `/dev:work <request>`.** It runs triage → OpenSpec spec → implement → verify → review → archive → commit.
+- **Do work through `/dev:work <request>`.** It runs triage → OpenSpec spec → implement → verify → deslop → review → docs sync → archive → commit.
   - `/dev:work <change-id>` resumes. `/dev:status` shows in-flight work. `/dev:review` runs the review panel on the current diff.
-  - Flags: `--auto` skips the plan-approval gate; `--no-commit` stops before committing.
+  - Flags: `--auto` skips the plan-approval gate, `--no-commit` stops before committing, `--branch` works on a new branch
+    (the default is the current branch), and `--push` pushes after committing.
 
 ## Tooling
 - **OpenSpec** (`openspec` CLI, `/opsx:*` commands) owns specs: `openspec/specs/` is the truth, `openspec/changes/` holds proposals.
@@ -15,9 +16,12 @@ Real-time two-player games: SvelteKit + Svelte 5 runes + Tailwind v4 + shadcn-sv
 - **Stack skills** (upstream, see `.agents/SOURCES.md`): `svelte-core-bestpractices`, `svelte-code-writer`,
   `shadcn-svelte`, `convex`, `convex-design`, `convex-authz`, `convex-reviewer`, `convex-migrate`, `convex-test`,
   `convex-deploy-guard`, `clerk`, `clerk-custom-ui`. Where they conflict with `twoplay`, the `twoplay` skill wins.
-- **Agents** (`.agents/agents/`): `triage`, `architect`, `engineer`, `designer`, `security`, `verifier`, `reviewer`.
+- **Agents** (`.agents/agents/`): `triage`, `architect`, `engineer`, `designer`, `steward`, `security`, `verifier`, `reviewer`.
+  `steward` owns conventions, architecture, and the `twoplay` references: it conforms diffs, syncs docs, and audits drift.
+- **More commands:** `/dev:deslop` strips slop and drift from the current diff. `/dev:audit [area]` reports convention and architecture drift.
 
 ## Non-negotiables
+- **No AI slop.** All agent-written code follows `.agents/skills/anti-slop`. Run its pass, or `/dev:deslop`, before calling work done.
 - The Convex server is the authority. Authenticate via `ctx.auth` and check room membership in every mutation.
 - No completion claim without fresh `pnpm check` (0 errors, 0 warnings). There is no test runner yet.
 - Never push, run `convex deploy`, or edit `.env*` without being asked.

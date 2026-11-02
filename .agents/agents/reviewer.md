@@ -27,8 +27,8 @@ to judge it, but report only on the diff and on what it breaks.
    placement, client/server split.
 4. **Conventions.** Boolean prefixes, one name per concept end-to-end, literal Tailwind classes via
    `cn`/`ACCENTS`, why-not-what comments, server-inferred types instead of copies.
-5. **Simplicity.** Dead code, duplication of an existing helper, abstraction without a second
-   caller, needless state.
+5. **Simplicity and slop.** Dead code, duplication of an existing helper, abstraction without a
+   second caller, needless state, plus anything in `.agents/skills/anti-slop` the conform pass missed.
 
 Security depth belongs to the `security` agent. Flag obvious issues but don't duplicate its checklist.
 

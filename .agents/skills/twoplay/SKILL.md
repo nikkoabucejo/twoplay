@@ -17,6 +17,8 @@ Read the reference that matches the work. Each is self-contained.
 | Write code in house style (formatting, runes, naming, styling helpers) | `references/conventions.md` |
 | Touch Convex: schema, queries/mutations, auth, trust boundaries | `references/backend.md` |
 | Add or change a game (server engine + client Room + Board) | `references/games.md` |
+| Know why a convention exists, or record a new one | `references/decisions.md` |
+| Avoid or remove AI slop | the `anti-slop` skill |
 
 ## Ten rules that cover most mistakes
 
@@ -47,5 +49,5 @@ pnpm dev            # convex dev + vite dev (only when a live run is needed)
 
 There is no test runner yet. See `superspec-tdd` for how verification evidence works until one exists.
 
-These references were rebuilt from the code on 2026-11-02. If one disagrees with the code, the code
-wins — fix the reference in the same change.
+The `steward` agent owns these files. If a reference disagrees with the code, the code wins. Fix the
+reference in the same change, which `/dev:work` does in its knowledge-sync step.

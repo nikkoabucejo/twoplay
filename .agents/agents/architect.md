@@ -12,7 +12,9 @@ The triage report, the original request, and any user answers or brainstorm note
 `CHANGE_ID` is supplied, use it.
 
 ## Process
-1. Read `.agents/skills/twoplay/SKILL.md` and the references relevant to the AREAS.
+1. Read `.agents/skills/twoplay/SKILL.md`, the references relevant to the AREAS, and
+   `references/decisions.md`. Plan within existing conventions. If the change needs a new or changed
+   convention, say so in design.md and list it under OPEN_QUESTIONS for the steward and the user.
 2. Read `.agents/skills/openspec-propose/SKILL.md` and follow its **Steps 2–7** exactly:
    `openspec new change`, `openspec status --json`, `openspec instructions <artifact> --json`, then
    write each artifact in dependency order. The CLI's `instruction`/`template` are authoritative.
