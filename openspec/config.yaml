@@ -3,7 +3,7 @@ schema: spec-driven
 context: |
   twoplay is a real-time two-player games app: SvelteKit + Svelte 5 runes, Tailwind v4,
   shadcn-svelte, Convex (backend + realtime), Clerk (auth). pnpm. Dark-only UI.
-  Project knowledge lives in .claude/skills/twoplay/ (architecture, conventions, backend, games).
+  Project knowledge lives in .agents/skills/twoplay/ (architecture, conventions, backend, games).
   The Convex server is the sole authority: every mutation authenticates via ctx.auth and checks
   room membership; client input is a proposal the server re-validates.
   There is no automated test runner yet — verification is `pnpm check` (0 errors/0 warnings),
@@ -29,7 +29,7 @@ rules:
 operations:
   apply:
     guidance:
-      - Read .claude/skills/twoplay/SKILL.md before editing code
+      - Read .agents/skills/twoplay/SKILL.md before editing code
       - Tick tasks in tasks.md as each completes
   archive:
     guidance:
