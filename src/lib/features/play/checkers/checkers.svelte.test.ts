@@ -121,7 +121,7 @@ describe("Checkers", () => {
 		render(Checkers, { props: { roomCode: "ABCD" } });
 
 		await fireEvent.click(await screen.findByRole("button", { name: "a3, cyan man, can move" }));
-		await fireEvent.click(screen.getByRole("button", { name: "b4, empty" }));
+		await fireEvent.click(screen.getByRole("button", { name: "b4, empty, move here" }));
 		const target = screen.getByRole("button", { name: "b4, cyan man" });
 		const piece = target.querySelector(".shadow-md");
 		expect(piece).not.toBeNull();
@@ -147,7 +147,7 @@ describe("Checkers", () => {
 		render(Checkers, { props: { roomCode: "ABCD" } });
 
 		await fireEvent.click(await screen.findByRole("button", { name: "a3, cyan man, can move" }));
-		await fireEvent.click(screen.getByRole("button", { name: "b4, empty" }));
+		await fireEvent.click(screen.getByRole("button", { name: "b4, empty, move here" }));
 		await vi.waitFor(() => expect(context.toaster!.items).toHaveLength(1));
 
 		expect(context.toaster!.items).toEqual([
@@ -264,6 +264,27 @@ describe("Checkers", () => {
 		const board = await screen.findByRole("group", { name: "Checkers board" });
 		expect(within(board).getAllByRole("button")).toHaveLength(32);
 		expect(screen.queryAllByRole("grid")).toHaveLength(0);
+	});
+
+	test("selecting a piece names it selected and its targets move here", async () => {
+		signIn();
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(checkersEngine.createInitialState()));
+		render(Checkers, { props: { roomCode: "ABCD" } });
+
+		await fireEvent.click(await screen.findByRole("button", { name: "a3, cyan man, can move" }));
+		expect(screen.getByRole("button", { name: "a3, cyan man, selected" })).toBeVisible();
+		expect(screen.getByRole("button", { name: "b4, empty, move here" })).toBeVisible();
+	});
+
+	test("clicking an empty non-target square deselects and restores the names", async () => {
+		signIn();
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(checkersEngine.createInitialState()));
+		render(Checkers, { props: { roomCode: "ABCD" } });
+
+		await fireEvent.click(await screen.findByRole("button", { name: "a3, cyan man, can move" }));
+		await fireEvent.click(screen.getByRole("button", { name: "a5, empty" }));
+		expect(screen.getByRole("button", { name: "a3, cyan man, can move" })).toBeVisible();
+		expect(screen.getByRole("button", { name: "b4, empty" })).toBeVisible();
 	});
 
 	test("the last move's dark squares show the mover's tint, with no override", async () => {

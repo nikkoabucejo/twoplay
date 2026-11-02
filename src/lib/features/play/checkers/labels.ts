@@ -10,10 +10,17 @@ export function squareName(index: number): string {
 export function squareLabel(
 	index: number,
 	piece: Square,
-	ability: "capture" | "move" | null
+	{
+		ability,
+		isSelected,
+		isDestination
+	}: { ability: "capture" | "move" | null; isSelected: boolean; isDestination: boolean }
 ): string {
-	const name = squareName(index);
-	if (!piece) return `${name}, empty`;
-	const label = `${name}, ${piece.color} ${piece.king ? "king" : "man"}`;
-	return ability === null ? label : `${label}, can ${ability}`;
+	return [
+		squareName(index),
+		piece ? `${piece.color} ${piece.king ? "king" : "man"}` : "empty",
+		...(ability !== null && !isSelected ? [`can ${ability}`] : []),
+		...(isSelected ? ["selected"] : []),
+		...(isDestination ? ["move here"] : [])
+	].join(", ");
 }

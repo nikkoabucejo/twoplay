@@ -18,13 +18,19 @@ export function pieceName(type: Piece["type"]): string {
 export function squareLabel(
 	index: number,
 	piece: Piece | null,
-	{ isInCheck, canMove }: { isInCheck: boolean; canMove: boolean }
+	{
+		isInCheck,
+		canMove,
+		isSelected,
+		isDestination
+	}: { isInCheck: boolean; canMove: boolean; isSelected: boolean; isDestination: boolean }
 ): string {
-	const name = squareName(index);
-	if (!piece) return `${name}, empty`;
 	return [
-		`${name}, ${COLOR_NAMES[piece.color]} ${pieceName(piece.type)}`,
+		squareName(index),
+		piece ? `${COLOR_NAMES[piece.color]} ${pieceName(piece.type)}` : "empty",
 		...(isInCheck ? ["in check"] : []),
-		...(canMove ? ["can move"] : [])
+		...(canMove && !isSelected ? ["can move"] : []),
+		...(isSelected ? ["selected"] : []),
+		...(isDestination ? ["move here"] : [])
 	].join(", ");
 }

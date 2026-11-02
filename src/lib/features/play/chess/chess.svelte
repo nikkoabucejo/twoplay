@@ -324,7 +324,9 @@
 							)}
 							aria-label={squareLabel(index, cell, {
 								isInCheck,
-								canMove: room.canSelect(index)
+								canMove: room.canSelect(index),
+								isSelected: room.effectiveSelected === name,
+								isDestination: room.destinations.includes(name)
 							})}
 							onfocus={() => (focusedSlot = slot)}
 							onclick={(event) => select(index, event.currentTarget)}

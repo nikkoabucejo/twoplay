@@ -12,22 +12,54 @@ describe("squareName", () => {
 
 describe("squareLabel", () => {
 	test("a king that can capture", () => {
-		expect(squareLabel(idx(5, 4), { color: "cyan", king: true }, "capture")).toBe(
-			"e3, cyan king, can capture"
-		);
+		expect(
+			squareLabel(
+				idx(5, 4),
+				{ color: "cyan", king: true },
+				{ ability: "capture", isSelected: false, isDestination: false }
+			)
+		).toBe("e3, cyan king, can capture");
 	});
 
 	test("a man that can move", () => {
-		expect(squareLabel(idx(2, 1), { color: "pink", king: false }, "move")).toBe(
-			"b6, pink man, can move"
-		);
+		expect(
+			squareLabel(
+				idx(2, 1),
+				{ color: "pink", king: false },
+				{ ability: "move", isSelected: false, isDestination: false }
+			)
+		).toBe("b6, pink man, can move");
 	});
 
 	test("a piece with no move this turn", () => {
-		expect(squareLabel(idx(7, 0), { color: "cyan", king: false }, null)).toBe("a1, cyan man");
+		expect(
+			squareLabel(
+				idx(7, 0),
+				{ color: "cyan", king: false },
+				{ ability: null, isSelected: false, isDestination: false }
+			)
+		).toBe("a1, cyan man");
 	});
 
 	test("an empty square", () => {
-		expect(squareLabel(idx(4, 3), null, null)).toBe("d4, empty");
+		expect(
+			squareLabel(idx(4, 3), null, { ability: null, isSelected: false, isDestination: false })
+		).toBe("d4, empty");
+	});
+
+	test("the selected piece says selected instead of its ability", () => {
+		expect(
+			squareLabel(
+				idx(5, 0),
+				{ color: "cyan", king: false },
+				{ ability: "move", isSelected: true, isDestination: false }
+			)
+		).toBe("a3, cyan man, selected");
+	});
+
+	test("an empty destination says move here", () => {
+		expect(
+			squareLabel(idx(4, 1), null, { ability: null, isSelected: false, isDestination: true })
+		).toBe("b4, empty, move here");
 	});
 });

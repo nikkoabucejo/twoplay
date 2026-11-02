@@ -150,6 +150,21 @@ describe("Chess", () => {
 		expect(square(board, "e4")).toHaveAccessibleName("e4, empty");
 	});
 
+	test("selecting a piece names it selected and its targets move here", async () => {
+		const board = await renderRoom();
+		await fireEvent.click(square(board, "g1"));
+		expect(square(board, "g1")).toHaveAccessibleName("g1, white knight, selected");
+		expect(square(board, "f3")).toHaveAccessibleName("f3, empty, move here");
+	});
+
+	test("clicking the selected piece again restores its names", async () => {
+		const board = await renderRoom();
+		await fireEvent.click(square(board, "g1"));
+		await fireEvent.click(square(board, "g1"));
+		expect(square(board, "g1")).toHaveAccessibleName("g1, white knight, can move");
+		expect(square(board, "f3")).toHaveAccessibleName("f3, empty");
+	});
+
 	test("pieces are drawn in their seat's accent", async () => {
 		const board = await renderRoom();
 		expect(square(board, "g1").querySelector("svg")).toHaveClass(ACCENTS[0].text);

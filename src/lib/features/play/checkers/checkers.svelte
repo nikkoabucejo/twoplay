@@ -329,7 +329,11 @@
 									"relative flex items-center justify-center bg-foreground/15 outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset",
 									isLastMove && room.lastMove && ACCENTS[room.lastMove.seat].tintBg
 								)}
-								aria-label={squareLabel(index, cell, room.abilityOf(index))}
+								aria-label={squareLabel(index, cell, {
+									ability: room.abilityOf(index),
+									isSelected,
+									isDestination
+								})}
 								onfocus={() => (focusedSlot = slot)}
 								onclick={() => select(index)}
 							>
