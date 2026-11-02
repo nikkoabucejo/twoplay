@@ -1,5 +1,5 @@
 import { getContext, setContext } from "svelte";
-import type { BoardStatus } from "$lib/components/layout";
+import type { BoardStatus, ResultView } from "$lib/components/layout";
 
 const CONTEXT_KEY = Symbol("mood");
 
@@ -7,6 +7,8 @@ export class MoodPresence {
 	status = $state<BoardStatus | null>(null);
 	// Set by the play page while queued for a quick match; ignored when a board status is set.
 	searching = $state(false);
+	/** The viewer's result while the board shows their ended live round. */
+	outcome = $state<Exclude<ResultView["tone"], "neutral"> | null>(null);
 }
 
 // One instance per component tree, set once by the layout that owns the ambient background.

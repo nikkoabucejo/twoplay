@@ -126,3 +126,10 @@ export function resultView({
 		actions: myIndex === null ? ["lobby"] : ["rematch", "new-opponent", "lobby"]
 	};
 }
+
+/** The viewer's own result for the mood, or null when there is none or it isn't theirs. */
+export function moodOutcome(
+	result: ResultView | null
+): Exclude<ResultView["tone"], "neutral"> | null {
+	return result === null || result.tone === "neutral" ? null : result.tone;
+}

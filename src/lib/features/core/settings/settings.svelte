@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Slider, Switch, Tabs, type TabItem } from "$lib/components/ui";
+	import { playClickSound } from "$lib/utils/sound";
 	import {
 		getPreferences,
 		MOTION_OPTIONS,
@@ -90,6 +91,18 @@
 					id="music"
 					checked={preferences.music}
 					onCheckedChange={(value) => preferences.setMusic(value)}
+					disabled={!preferences.sound}
+				/>
+			</div>
+			<div class="flex items-center gap-4 p-4">
+				{@render row("ui-sounds", "Click sounds", "A soft tick when you press a button.")}
+				<Switch
+					id="ui-sounds"
+					checked={preferences.uiSounds}
+					onCheckedChange={(value) => {
+						preferences.setUiSounds(value);
+						if (value) playClickSound();
+					}}
 					disabled={!preferences.sound}
 				/>
 			</div>

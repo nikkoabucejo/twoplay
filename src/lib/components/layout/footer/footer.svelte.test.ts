@@ -9,16 +9,24 @@ function links() {
 }
 
 describe("Footer", () => {
-	test("links to How to play, Tour, About, Privacy, Terms, and Support, in that order", () => {
+	test("links to About, Tour, How to play, Privacy, Terms, Sandbox, and Support, in that order", () => {
 		const hrefs = links().map((link) => link.getAttribute("href"));
-		expect(hrefs).toEqual(["/how-to-play", "/tour", "/about", "/privacy", "/terms", SUPPORT_URL]);
+		expect(hrefs).toEqual([
+			"/about",
+			"/tour",
+			"/how-to-play",
+			"/privacy",
+			"/terms",
+			"/sandbox/sound",
+			SUPPORT_URL
+		]);
 	});
 
 	test("names each internal link", () => {
 		const names = links()
 			.filter((link) => link.getAttribute("href")?.startsWith("/"))
 			.map((link) => link.textContent?.trim());
-		expect(names).toEqual(["How to play", "Tour", "About", "Privacy", "Terms"]);
+		expect(names).toEqual(["About", "Tour", "How to play", "Privacy", "Terms", "Sandbox"]);
 	});
 
 	test("repeats no header, dock, or avatar menu link", () => {
@@ -34,6 +42,11 @@ describe("Footer", () => {
 		expect(external[0]).toHaveAttribute("href", SUPPORT_URL);
 		expect(external[0]).toHaveAttribute("target", "_blank");
 		expect(external[0]).toHaveAttribute("rel", "noopener noreferrer");
+	});
+
+	test("sets Sandbox apart with a hidden divider", () => {
+		const sandbox = links().find((link) => link.getAttribute("href") === "/sandbox/sound");
+		expect(sandbox?.previousElementSibling).toHaveAttribute("aria-hidden", "true");
 	});
 
 	test("shows no copyright", () => {

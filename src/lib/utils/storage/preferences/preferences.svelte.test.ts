@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import {
 	applyPreferences,
 	getPreferences,
+	isMusicAudible,
+	isMusicWanted,
 	parsePreferences,
 	PreferencesStore,
 	setupPreferences
@@ -44,7 +46,8 @@ const DEFAULTS = {
 	motion: "system",
 	newGameOpponent: "matchmaking",
 	newGameClock: 5,
-	music: false
+	music: false,
+	uiSounds: true
 };
 
 beforeEach(() => {
@@ -132,6 +135,12 @@ describe("parsePreferences", () => {
 
 	test("a stored music on is kept", () => {
 		expect(parsePreferences('{"music":true}')).toEqual({ ...DEFAULTS, music: true });
+	});
+
+	test("Invalid click sounds value ignored: a non-boolean uiSounds reads as on and keeps the other fields", () => {
+		const raw = JSON.stringify({ uiSounds: "no", volume: 0.4, music: true });
+
+		expect(parsePreferences(raw)).toEqual({ ...DEFAULTS, volume: 0.4, music: true });
 	});
 
 	test("a stored setup with an unknown game reads as absent and keeps sound", () => {
@@ -280,6 +289,32 @@ describe("PreferencesStore", () => {
 		});
 	});
 
+	test("Click sounds default on", () => {
+		expect(new PreferencesStore(memoryStorage()).uiSounds).toBe(true);
+	});
+
+	test("Click sounds choice survives reload", () => {
+		const storage = memoryStorage();
+		new PreferencesStore(storage).setUiSounds(false);
+
+		expect(new PreferencesStore(storage).uiSounds).toBe(false);
+	});
+
+	test("Click sounds change keeps other fields", () => {
+		const storage = memoryStorage();
+		const preferences = new PreferencesStore(storage);
+		preferences.setVolume(0.4);
+		preferences.setMusic(true);
+		preferences.setUiSounds(false);
+
+		expect(parsePreferences(storage.getItem("twoplay:prefs"))).toEqual({
+			...DEFAULTS,
+			volume: 0.4,
+			music: true,
+			uiSounds: false
+		});
+	});
+
 	test("corrupt stored JSON reads as the defaults", () => {
 		const storage = memoryStorage({ "twoplay:prefs": "not json" });
 		expect(new PreferencesStore(storage).sound).toBe(true);
@@ -378,6 +413,27 @@ describe("applyPreferences", () => {
 
 		expect(root.classList.contains("reduce-motion")).toBe(true);
 		destroy();
+	});
+});
+
+describe("isMusicAudible", () => {
+	test.each([
+		[true, 0.5, true],
+		[true, 0, false],
+		[false, 1, false]
+	])("sound %s at volume %s is %s", (sound, volume, expected) => {
+		expect(isMusicAudible({ sound, volume })).toBe(expected);
+	});
+});
+
+describe("isMusicWanted", () => {
+	test.each([
+		[true, true, 1, true],
+		[false, true, 1, false],
+		[true, false, 1, false],
+		[true, true, 0, false]
+	])("music %s, sound %s, volume %s is %s", (music, sound, volume, expected) => {
+		expect(isMusicWanted({ music, sound, volume })).toBe(expected);
 	});
 });
 

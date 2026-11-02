@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/sve
 import { createRawSnippet, type ComponentProps } from "svelte";
 import { beforeAll, describe, expect, onTestFinished, test, vi } from "vitest";
 import { TictactoeIcon } from "$lib/assets/icons/games";
+import { MoodPresence } from "$lib/features/presence";
 import { BOARD_SIZE, type BoardReplay, type BoardRoom } from "./board.svelte";
 import { Board, type BoardFooter, type BoardPlayer, type BoardStatus } from "./index.js";
 
@@ -10,6 +11,13 @@ vi.mock("$lib/components/ui", async (importOriginal) => {
 	const toaster = new ui.Toaster();
 	return { ...ui, getToaster: () => toaster };
 });
+
+const context = vi.hoisted(() => ({ mood: undefined as MoodPresence | undefined }));
+
+vi.mock("$lib/features/presence", async (importOriginal) => ({
+	...(await importOriginal<typeof import("$lib/features/presence")>()),
+	getMood: () => context.mood
+}));
 
 // vi.mock can't stub lottie-web here: concurrent dynamic imports of a manual mock fall through to
 // the real module. Instead keep the real one inert: it paints a 1x1 canvas on load, then fetches JSON.
@@ -112,6 +120,16 @@ function visibleLayers(seat: 0 | 1): Element[] {
 
 function follows(before: Element, after: Element): boolean {
 	return Boolean(before.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING);
+}
+
+/** A mood for the next board to report to, dropped after the test. */
+function withMood(): MoodPresence {
+	const mood = new MoodPresence();
+	context.mood = mood;
+	onTestFinished(() => {
+		context.mood = undefined;
+	});
+	return mood;
 }
 
 async function openMenu(name: string) {
@@ -992,6 +1010,59 @@ describe("Board", () => {
 		await rerender({ rejectionId: 1 });
 
 		expect(animate).not.toHaveBeenCalled();
+	});
+
+	test.each([
+		[0 as const, "win"],
+		[1 as const, "loss"]
+	])("seat %s sees seat 0's win as %s in the mood", (myIndex, outcome) => {
+		const mood = withMood();
+		renderBoard({ myIndex, status: { type: "winner", player: 0 }, footer: footer() });
+		expect(mood.outcome).toBe(outcome);
+	});
+
+	test("a draw reads draw in the mood", () => {
+		const mood = withMood();
+		renderBoard({ myIndex: 0, status: { type: "draw" }, footer: footer() });
+		expect(mood.outcome).toBe("draw");
+	});
+
+	test("a spectator's finished round leaves the mood outcome null", () => {
+		const mood = withMood();
+		renderBoard({ myIndex: null, status: { type: "winner", player: 0 }, footer: footer() });
+		expect(mood.outcome).toBeNull();
+	});
+
+	test("a closed room leaves the mood outcome null", () => {
+		const mood = withMood();
+		renderBoard({ myIndex: 0, footer: footer({ roomClosed: true }) });
+		expect(mood.outcome).toBeNull();
+	});
+
+	test("View board keeps the mood outcome", async () => {
+		const mood = withMood();
+		renderBoard({ myIndex: 0, status: { type: "winner", player: 0 }, footer: footer() });
+		await fireEvent.click(screen.getByRole("button", { name: "View board" }));
+		await waitFor(() => expect(within(boardArea()).queryByRole("heading")).not.toBeInTheDocument());
+		expect(mood.outcome).toBe("win");
+	});
+
+	test("the next round clears the mood outcome", async () => {
+		const mood = withMood();
+		const { rerender } = renderBoard({
+			myIndex: 0,
+			status: { type: "winner", player: 0 },
+			footer: footer()
+		});
+		await rerender({ status: { type: "turn", player: 1 } });
+		expect(mood.outcome).toBeNull();
+	});
+
+	test("unmounting clears the mood outcome", () => {
+		const mood = withMood();
+		const { unmount } = renderBoard({ myIndex: 0, status: { type: "draw" }, footer: footer() });
+		unmount();
+		expect(mood.outcome).toBeNull();
 	});
 
 	test("the board size defaults to BOARD_SIZE", () => {

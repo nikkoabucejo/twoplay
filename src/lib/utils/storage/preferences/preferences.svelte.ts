@@ -18,6 +18,7 @@ export type Preferences = {
 	newGameOpponent: NewGameOpponent;
 	newGameClock: NewGameClock;
 	music: boolean;
+	uiSounds: boolean;
 };
 type PreferencesStorage = Pick<Storage, "getItem" | "setItem">;
 
@@ -30,7 +31,8 @@ const DEFAULT_PREFERENCES: Preferences = {
 	motion: "system",
 	newGameOpponent: "matchmaking",
 	newGameClock: 5,
-	music: false
+	music: false,
+	uiSounds: true
 };
 const CONTEXT_KEY = Symbol("preferences");
 
@@ -90,7 +92,8 @@ export function parsePreferences(raw: string | null): Preferences {
 			DEFAULT_PREFERENCES.newGameOpponent
 		),
 		newGameClock: oneOf(NEW_GAME_CLOCKS, fields.newGameClock, DEFAULT_PREFERENCES.newGameClock),
-		music: typeof fields.music === "boolean" ? fields.music : DEFAULT_PREFERENCES.music
+		music: typeof fields.music === "boolean" ? fields.music : DEFAULT_PREFERENCES.music,
+		uiSounds: typeof fields.uiSounds === "boolean" ? fields.uiSounds : DEFAULT_PREFERENCES.uiSounds
 	};
 }
 
@@ -103,6 +106,7 @@ export class PreferencesStore {
 	newGameOpponent = $state<NewGameOpponent>(DEFAULT_PREFERENCES.newGameOpponent);
 	newGameClock = $state<NewGameClock>(DEFAULT_PREFERENCES.newGameClock);
 	music = $state(DEFAULT_PREFERENCES.music);
+	uiSounds = $state(DEFAULT_PREFERENCES.uiSounds);
 
 	#storage: PreferencesStorage | null;
 
@@ -123,6 +127,7 @@ export class PreferencesStore {
 		this.newGameOpponent = preferences.newGameOpponent;
 		this.newGameClock = preferences.newGameClock;
 		this.music = preferences.music;
+		this.uiSounds = preferences.uiSounds;
 	}
 
 	setSound(value: boolean): void {
@@ -165,6 +170,11 @@ export class PreferencesStore {
 		this.#write();
 	}
 
+	setUiSounds(value: boolean): void {
+		this.uiSounds = value;
+		this.#write();
+	}
+
 	/** Writes every field, so changing one preference never drops another. */
 	#write(): void {
 		const preferences: Preferences = {
@@ -175,7 +185,8 @@ export class PreferencesStore {
 			motion: this.motion,
 			newGameOpponent: this.newGameOpponent,
 			newGameClock: this.newGameClock,
-			music: this.music
+			music: this.music,
+			uiSounds: this.uiSounds
 		};
 		try {
 			this.#storage?.setItem(STORAGE_KEY, JSON.stringify(preferences));
@@ -183,6 +194,17 @@ export class PreferencesStore {
 			// Unwritable storage keeps the choice for this page load only.
 		}
 	}
+}
+
+/** Sound is on and the volume is above 0, so music would be heard. */
+export function isMusicAudible({ sound, volume }: Pick<Preferences, "sound" | "volume">): boolean {
+	return sound && volume > 0;
+}
+
+export function isMusicWanted(
+	preferences: Pick<Preferences, "music" | "sound" | "volume">
+): boolean {
+	return preferences.music && isMusicAudible(preferences);
 }
 
 type ApplyDeps = {
@@ -200,7 +222,7 @@ export function applyPreferences(
 		deps.configureSound({ isEnabled: preferences.sound, volume: preferences.volume });
 	});
 	$effect(() => {
-		deps.music.setWanted(preferences.music && preferences.sound && preferences.volume > 0);
+		deps.music.setWanted(isMusicWanted(preferences));
 	});
 	$effect(() => {
 		deps.root.classList.toggle("reduce-motion", preferences.motion === "reduce");

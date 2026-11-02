@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/svelte";
 import { beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
+import { playClickSound } from "$lib/utils/sound";
 import { PreferencesStore } from "$lib/utils/storage";
 import Settings from "./settings.svelte";
 
@@ -8,6 +9,11 @@ const context = vi.hoisted(() => ({ preferences: null as PreferencesStore | null
 vi.mock("$lib/utils/storage", async (importOriginal) => ({
 	...(await importOriginal<typeof import("$lib/utils/storage")>()),
 	getPreferences: () => context.preferences
+}));
+
+vi.mock("$lib/utils/sound", async (importOriginal) => ({
+	...(await importOriginal<typeof import("$lib/utils/sound")>()),
+	playClickSound: vi.fn()
 }));
 
 let stored: Map<string, string>;
@@ -75,9 +81,36 @@ describe("Settings", () => {
 		expect(music).toBeDisabled();
 	});
 
-	test("the Sound and Background music rows describe what they control", () => {
+	test("the Click sounds switch turns click sounds off and saves it", async () => {
+		const clicks = screen.getByRole("switch", { name: "Click sounds" });
+		expect(clicks).toBeChecked();
+		await fireEvent.click(clicks);
+		expect(clicks).not.toBeChecked();
+		expect(reload().uiSounds).toBe(false);
+	});
+
+	test("turning Click sounds on plays a tick, and turning it off does not", async () => {
+		const clicks = screen.getByRole("switch", { name: "Click sounds" });
+		vi.mocked(playClickSound).mockClear();
+
+		await fireEvent.click(clicks);
+		expect(playClickSound).not.toHaveBeenCalled();
+
+		await fireEvent.click(clicks);
+		expect(playClickSound).toHaveBeenCalledTimes(1);
+	});
+
+	test("the Click sounds switch is disabled while Sound is off", async () => {
+		const clicks = screen.getByRole("switch", { name: "Click sounds" });
+		expect(clicks).toBeEnabled();
+		await fireEvent.click(screen.getByRole("switch", { name: "Sound" }));
+		expect(clicks).toBeDisabled();
+	});
+
+	test("the Sound, Background music, and Click sounds rows describe what they control", () => {
 		expect(screen.getByText("Game sounds and music.")).toBeInTheDocument();
 		expect(screen.getByText("A quiet retro loop.")).toBeInTheDocument();
+		expect(screen.getByText("A soft tick when you press a button.")).toBeInTheDocument();
 	});
 
 	test("the Your-turn alert switch saves its value", async () => {

@@ -231,6 +231,7 @@
 			)}
 			role="group"
 			aria-label={boardLabel(boardIndex)}
+			data-sfx="off"
 		>
 			{#each cells as cell, cellIndex (cellIndex)}
 				{@const slot = boardIndex * 9 + cellIndex}
@@ -397,6 +398,7 @@
 					role="group"
 					aria-label="Tic-tac-toe board"
 					data-board-grid
+					data-sfx="off"
 					class="grid size-full grid-cols-3 grid-rows-3 gap-3"
 					onkeydown={moveFocus}
 				>

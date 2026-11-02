@@ -13,7 +13,7 @@
 	import { Mood, setupMood } from "$lib/features/presence";
 	import { setupClerkAuth } from "$lib/services/auth";
 	import { isGameRoomRoute, isGatedRoute, liveGameHref, showsDock } from "$lib/utils/navigation";
-	import { bindMusicLifecycle, music } from "$lib/utils/sound";
+	import { bindClickSounds, bindMusicLifecycle, music, musicSceneOf } from "$lib/utils/sound";
 	import { setupPreferences } from "$lib/utils/storage";
 	import { cn } from "$lib/utils/style";
 	import { api } from "../../convex/_generated/api.js";
@@ -41,9 +41,11 @@
 		auth.load(PUBLIC_CLERK_PUBLISHABLE_KEY);
 	}
 
-	setupPreferences();
+	const preferences = setupPreferences();
 	const toaster = setupToaster();
 	$effect(() => bindMusicLifecycle(document, music));
+	$effect(() => music.setScene(musicSceneOf(mood)));
+	$effect(() => bindClickSounds(document, () => preferences.uiSounds));
 
 	const active = useQuery(api.models.rooms.index.active, () => (auth.isSignedIn ? {} : "skip"));
 	const live = $derived.by(() => {

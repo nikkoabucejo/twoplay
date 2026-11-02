@@ -1,5 +1,7 @@
 export {
 	getPreferences,
+	isMusicAudible,
+	isMusicWanted,
 	MOTION_OPTIONS,
 	NEW_GAME_CLOCKS,
 	NEW_GAME_OPPONENTS,

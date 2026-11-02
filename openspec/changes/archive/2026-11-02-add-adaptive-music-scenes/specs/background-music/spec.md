@@ -1,0 +1,171 @@
+## ADDED Requirements
+
+### Requirement: Music follows the scene
+
+The music SHALL play one of five scenes picked from the viewer's state: win, lose, or draw while the board shows a live round that ended with that result for the viewer, searching while the viewer is queued for a quick match, and default otherwise. A round result SHALL take precedence over searching. A spectator's view of a finished round and a closed room SHALL use default.
+
+#### Scenario: Searching for a match
+
+- **WHEN** the viewer is queued for a quick match
+- **THEN** the music scene is searching
+
+#### Scenario: Match found
+
+- **WHEN** a quick match is found and the room's first round starts
+- **THEN** the music scene returns to default
+
+#### Scenario: Win, lose, and draw
+
+- **WHEN** the live round ends and the viewer won, lost, or drew
+- **THEN** the music scene is win, lose, or draw respectively
+
+#### Scenario: Result over searching
+
+- **WHEN** the viewer has a round result and is also marked as searching
+- **THEN** the music scene is the result's scene
+
+#### Scenario: Spectator and closed room
+
+- **WHEN** a spectator sees a finished round, or the room closes
+- **THEN** the music scene is default
+
+### Requirement: Result scene duration
+
+A result scene SHALL last while the board shows that ended round, including after the result card is dismissed, and SHALL return to default when the next round starts, the viewer leaves the room, or another room loads.
+
+#### Scenario: Result card dismissed
+
+- **WHEN** the viewer hides the result card and keeps looking at the ended round
+- **THEN** the music scene stays win, lose, or draw
+
+#### Scenario: Next round or leaving
+
+- **WHEN** a rematch starts the next round, or the viewer leaves the room
+- **THEN** the music scene returns to default
+
+### Requirement: One song across scenes
+
+A scene change SHALL NOT restart or reposition the loop. Every scene SHALL play the same 8-bar loop in the same key with the same 4 chord slots, continuing from the current step, and SHALL keep the music level's target and its scaling with Volume unchanged.
+
+#### Scenario: Scene change keeps the position
+
+- **WHEN** the scene changes while music is playing
+- **THEN** the step after the last one scheduled is the next one played, in the new arrangement, and no step is skipped or played twice
+
+#### Scenario: Scenes stay under game sounds
+
+- **WHEN** music plays in any scene
+- **THEN** the music level still targets about 0.2 of the sound volume, and no arrangement plays above full level
+
+### Requirement: Scene arrangements
+
+Each scene SHALL be its own arrangement of the loop: the rhythm of every base voice, the tempo, the swing, the chord colour, and the lowpass SHALL change with the scene, rather than layers being added over an unchanged loop. Default SHALL be the existing loop.
+
+#### Scenario: Default is unchanged
+
+- **WHEN** the default scene plays
+- **THEN** the notes, tempo (76 BPM), swing, and lowpass (about 1400 Hz) match the loop before scenes existed, with no stab, bell, or hi-hat
+
+#### Scenario: Searching drives
+
+- **WHEN** the searching scene plays a bar
+- **THEN** the tempo is 100 BPM with no swing, an arpeggio note starts on every 16th, the pad plays short chord stabs with a hi-hat on each offbeat 8th, the bass plays a syncopated figure on steps 0, 3, 6, 8, 11, and 14, the melody plays the bar's first four melody notes as a short riff, and the lowpass sits at about 2.8 kHz
+
+#### Scenario: Win lifts
+
+- **WHEN** the win scene plays a bar
+- **THEN** the tempo is 90 BPM, the Em7 slot resolves to the C tonic, the arpeggio climbs through two octaves, the bass bounces between a root and its octave, the melody plays an octave above default on the same steps, bells ring, and the lowpass sits at about 3.2 kHz
+
+#### Scenario: Lose deflates
+
+- **WHEN** the lose scene plays a bar
+- **THEN** the tempo is 62 BPM, the Fmaj7 slot is Fm6 and the Em7 slot is Ebmaj7, the bass holds one root for the whole bar, the arpeggio falls in quarter notes, the melody is two falling notes, the bar has fewer notes than in default, and the lowpass sits at about 650 Hz
+
+#### Scenario: Draw hovers
+
+- **WHEN** the draw scene plays a bar
+- **THEN** the tempo is 76 BPM with no swing, every chord is suspended with no third above its root, the arpeggio moves in quarter notes, the bass plays on beats 1 and 3, the melody repeats one pitch, and the lowpass sits at about 1 kHz
+
+#### Scenario: Hi-hat cuts through
+
+- **WHEN** a hi-hat plays
+- **THEN** it is a short noise burst through a highpass at about 7 kHz into the music gain, bypassing the lowpass
+
+### Requirement: Quick, smooth scene transitions
+
+A scene change SHALL take effect on the loop's next beat. From that beat the new arrangement SHALL play, the previous arrangement's sounding notes SHALL fade out within about 0.2 s, the new arrangement's held pad and bass SHALL start at once, the tempo SHALL glide to the new BPM over about 2 beats, and the lowpass SHALL sweep from its current value to the new cutoff in about 0.4 s. A change that arrives during another transition SHALL continue from the current tempo and cutoff with no jump.
+
+#### Scenario: Change lands on the beat
+
+- **WHEN** the scene changes between two beats
+- **THEN** the switch happens at the time of the next beat on the loop's grid, not at the moment of the call, and within one beat plus the scheduling lookahead
+
+#### Scenario: Arrangement switch
+
+- **WHEN** the scene changes from default to searching
+- **THEN** the notes before the boundary are default's, the notes from the boundary on are searching's, and the default notes still sounding fade out from the boundary
+
+#### Scenario: Tempo glide
+
+- **WHEN** the scene changes from default to searching
+- **THEN** each step after the boundary is no longer than the one before it, from about 0.197 s to 0.15 s over 8 steps
+
+#### Scenario: Rapid changes
+
+- **WHEN** the scene goes through several scenes within half a second
+- **THEN** the cutoff ramps from the value that was sounding, every note envelope starts at 0, no step plays twice, and the last scene's arrangement and tempo end up playing
+
+### Requirement: Scene changes while silent
+
+A scene change while the music is paused, off, or not yet started SHALL be remembered and applied when the music next plays, and SHALL NOT create an audio context or schedule notes.
+
+#### Scenario: Hidden tab
+
+- **WHEN** the tab is hidden, the round ends in a win, and the user returns to the tab
+- **THEN** the music resumes in the win arrangement, tempo, and cutoff, with no sweep from default
+
+#### Scenario: Music off
+
+- **WHEN** music is off and the scene changes
+- **THEN** no audio context is created and no notes are scheduled
+
+## MODIFIED Requirements
+
+### Requirement: Chill retro loop
+
+The music SHALL be an 8-bar loop of Fmaj7, G6, Em7, Am7 played twice at about 76 BPM, with a root bass, an 8th-note arpeggio of each chord, and a sparse melody in C major that differs between the halves, scheduled ahead on the audio clock. The loop SHALL never resolve to the C major tonic and SHALL keep pad, arpeggio, melody, and bass moving across every bar line, including the seam. This is the default scene's arrangement. Other scenes re-arrange the same loop.
+
+#### Scenario: Chord loop
+
+- **WHEN** the note pattern for bars 0 to 8 is generated
+- **THEN** bars 0–7 use Fmaj7, G6, Em7, Am7 twice, bars 4–7 carry a different melody from bars 0–3, and bar 8 repeats bar 0
+
+#### Scenario: Bass on the root
+
+- **WHEN** the note pattern for any bar is generated
+- **THEN** the bass note on the first step is that bar's chord root
+
+#### Scenario: Sparse melody
+
+- **WHEN** the notes for one bar are generated
+- **THEN** fewer than half of the steps carry a melody note, each melody pitch is in C major, and any pitch outside that bar's chord lasts at most two steps
+
+#### Scenario: Phrases cross bar lines
+
+- **WHEN** the note pattern for any bar is generated
+- **THEN** a melody note is sounding on its first step
+
+#### Scenario: Continuous arpeggio
+
+- **WHEN** the note pattern for the whole loop and the first step of the next is generated
+- **THEN** every 8th note starts one arpeggio note from that bar's chord lasting one 8th, so an arpeggio note is sounding on every step, including across the seam
+
+#### Scenario: Pad crossfade
+
+- **WHEN** the music plays across bar changes
+- **THEN** each chord is still at full level just before the next bar starts, the next chord swells to full level within 0.25s while the previous one fades, and the pad's total level stays above about 85% of its mid-bar level through the change
+
+#### Scenario: No ending at the seam
+
+- **WHEN** the note pattern for the last bar is generated
+- **THEN** its chord is not C major, its melody and bass notes run up to the first step of the next loop, and neither is on C at its last step

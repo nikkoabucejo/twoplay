@@ -134,7 +134,7 @@
 	import Controls from "./controls.svelte";
 	import InviteCard from "./invite-card.svelte";
 	import { copyRoomLink, roomUrl, shareRoom } from "./invite.js";
-	import { resultView } from "./outcome.js";
+	import { moodOutcome, resultView } from "./outcome.js";
 	import ResultCard from "./result-card.svelte";
 	import RoomBar from "./room-bar.svelte";
 	import SidePanel from "./side-panel.svelte";
@@ -379,6 +379,14 @@
 		mood.status = status ?? null;
 		return () => {
 			mood.status = null;
+		};
+	});
+
+	$effect(() => {
+		if (!mood) return;
+		mood.outcome = moodOutcome(result ?? null);
+		return () => {
+			mood.outcome = null;
 		};
 	});
 </script>

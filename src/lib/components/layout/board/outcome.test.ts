@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { resultView, type ResultInput } from "./outcome.js";
+import { moodOutcome, resultView, type ResultInput, type ResultView } from "./outcome.js";
 
 const ALEX = { name: "Alex", score: 2 };
 const BLAIR = { name: "Blair", score: 1 };
@@ -162,5 +162,24 @@ describe("resultView", () => {
 		expect(view?.actions).toEqual(["play-again", "lobby"]);
 		expect(view?.reason).toBeNull();
 		expect(view?.rating).toBeNull();
+	});
+});
+
+describe("moodOutcome", () => {
+	test("no result gives null", () => {
+		expect(moodOutcome(null)).toBeNull();
+	});
+
+	test("a neutral result gives null for spectators and closed rooms", () => {
+		expect(moodOutcome(resultView(input({ myIndex: null })))).toBeNull();
+		expect(moodOutcome(resultView(input({ isRoomClosed: true })))).toBeNull();
+	});
+
+	test.each<[ResultInput["status"], ResultView["tone"]]>([
+		[{ type: "winner", player: 0 }, "win"],
+		[{ type: "winner", player: 1 }, "loss"],
+		[{ type: "draw" }, "draw"]
+	])("%o passes %s through", (status, tone) => {
+		expect(moodOutcome(resultView(input({ status })))).toBe(tone);
 	});
 });

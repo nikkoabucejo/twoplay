@@ -11,6 +11,7 @@ export const INDEXED_PATHS = [
 	"/how-to-play/checkers",
 	"/tour",
 	"/about",
+	"/sandbox/sound",
 	"/privacy",
 	"/terms"
 ];

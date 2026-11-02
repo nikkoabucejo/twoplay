@@ -310,4 +310,16 @@ describe("Tictactoe", () => {
 		for (const group of miniBoards) expect(within(group).getAllByRole("button")).toHaveLength(9);
 		expect(screen.queryAllByRole("grid")).toHaveLength(0);
 	});
+
+	test("board cells sit inside a click-sound opt-out region", async () => {
+		await renderSeatedRoom();
+
+		const board = screen.getByRole("group", { name: "Tic-tac-toe board" });
+		expect(board).toHaveAttribute("data-sfx", "off");
+		for (const group of within(board).getAllByRole("group")) {
+			expect(group).toHaveAttribute("data-sfx", "off");
+		}
+		const cell = within(board).getAllByRole("button")[0];
+		expect(cell.closest('[data-sfx="off"]')).not.toBeNull();
+	});
 });

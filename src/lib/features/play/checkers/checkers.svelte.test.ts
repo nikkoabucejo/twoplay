@@ -265,4 +265,15 @@ describe("Checkers", () => {
 		expect(within(board).getAllByRole("button")).toHaveLength(32);
 		expect(screen.queryAllByRole("grid")).toHaveLength(0);
 	});
+
+	test("board cells sit inside a click-sound opt-out region", async () => {
+		signIn();
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(checkersEngine.createInitialState()));
+		render(Checkers, { props: { roomCode: "ABCD" } });
+
+		const board = await screen.findByRole("group", { name: "Checkers board" });
+		expect(board).toHaveAttribute("data-sfx", "off");
+		const cell = within(board).getAllByRole("button")[0];
+		expect(cell.closest('[data-sfx="off"]')).not.toBeNull();
+	});
 });

@@ -1,7 +1,14 @@
 import { getAudibleGraph, getGraph } from "./graph.js";
 
+export { bindClickSounds, playClickSound } from "./click.js";
 export { configureSound } from "./graph.js";
-export { bindMusicLifecycle, music, type MusicPlayer } from "./music.js";
+export {
+	bindMusicLifecycle,
+	music,
+	musicSceneOf,
+	type MusicPlayer,
+	type MusicScene
+} from "./music.js";
 
 export function prepareSound() {
 	void getGraph();

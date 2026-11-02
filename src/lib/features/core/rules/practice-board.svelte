@@ -26,16 +26,18 @@
 	}
 </script>
 
-{#if practice instanceof TictactoePractice}
-	<TictactoeBoard position={practice.state} lastMove={practice.lastMove} onplay={play} />
-{:else}
-	<CheckersBoard
-		board={practice.state.board}
-		ids={practice.ids}
-		selected={practice.activePiece}
-		destinations={practice.destinations}
-		forced={practice.forcedPieces}
-		lastMove={practice.lastMove}
-		onselect={select}
-	/>
-{/if}
+<div class="contents" data-sfx="off">
+	{#if practice instanceof TictactoePractice}
+		<TictactoeBoard position={practice.state} lastMove={practice.lastMove} onplay={play} />
+	{:else}
+		<CheckersBoard
+			board={practice.state.board}
+			ids={practice.ids}
+			selected={practice.activePiece}
+			destinations={practice.destinations}
+			forced={practice.forcedPieces}
+			lastMove={practice.lastMove}
+			onselect={select}
+		/>
+	{/if}
+</div>

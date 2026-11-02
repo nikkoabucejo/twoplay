@@ -309,6 +309,7 @@
 					role="group"
 					aria-label="Checkers board"
 					data-board-grid
+					data-sfx="off"
 					onkeydown={moveFocus}
 				>
 					{#each { length: 64 } as _, slot (slot)}

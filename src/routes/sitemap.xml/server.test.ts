@@ -17,6 +17,7 @@ describe("GET", () => {
 				"/how-to-play/checkers",
 				"/tour",
 				"/about",
+				"/sandbox/sound",
 				"/privacy",
 				"/terms"
 			].map((path) => `https://twoplay.xyz${path}`)
