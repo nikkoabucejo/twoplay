@@ -10,6 +10,8 @@ const TOKEN_FILES = new Set([
 	"src/lib/assets/favicon.svg"
 ]);
 const STRAY_SEAT_LITERAL = /#06b6d4|#ec4899|cyan-500|pink-500/i;
+// Only real sources, so editor backups or files mid-write never make the scan flaky.
+const SOURCE_FILE = /\.(svelte|ts|js|css|html|svg)$/;
 
 describe("SEAT_COLORS", () => {
 	test("matches the seat tokens in the stylesheet, in seat order", () => {
@@ -22,7 +24,7 @@ describe("SEAT_COLORS", () => {
 
 	test("no source file outside the token definitions repeats a seat color", () => {
 		const offenders = readdirSync("src", { recursive: true, withFileTypes: true })
-			.filter((entry) => entry.isFile())
+			.filter((entry) => entry.isFile() && SOURCE_FILE.test(entry.name))
 			.map((entry) => join(entry.parentPath, entry.name))
 			.filter((path) => !path.endsWith(".test.ts") && !TOKEN_FILES.has(path))
 			.filter((path) => STRAY_SEAT_LITERAL.test(readFileSync(path, "utf8")));

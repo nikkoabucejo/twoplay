@@ -70,3 +70,12 @@
 - SPEC revised: player strips, QA fixes (dock on auth fail, history active row, icon motion)
 - SPEC revised: fixed auth slot, checkers icon motion
 - 2026-11-02T06:03:48Z APPLY done (groups 20-24: player strips, auth-failure chrome, history active row, icon motion)
+- QA 2026-11-02T22:50Z run (pnpm dev 5173; Vite full-reloaded both pages ~6 times from concurrent src edits, observers re-injected after each)
+- QA strips ttt T2Z9HZ (A 360, B 1280) pass: opponent strip above, own below, SVG X/O marks (sr-only letter), board 324px at 360, clocks in strips, ring on the strip to move; 3 turn changes 0 entries both; A resign 0 entries in A, B not measured (page reloaded)
+- QA strips checkers AMPFXT (A 1280, B 360) pass: seat-colored disc marks, no "●"; 3 turn changes 0 entries both; abandoned
+- QA banner signed in /play 360x640 fail: 0.0214, footer y 508 into view (picker swapped for the signed-out prompt on load failure); banner, tab bar, disabled Sign in in auth slot (264,12,84x32) ok; control load without block 0
+- QA banner signed in /play 1280x800 fail: 2 entries 0.00007 each, header right group x 524->520->524 (font swap, also on unblocked loads); primary links stay, Sign in disabled at trailing edge (1180,16,84x32)
+- QA history 1280x800 pass: starting a room from a second tab 0 entries, no list row, Playing card after the list, header pill shown; one abandon recorded 0.0209 (rows pushed 118px by the new finished row), a second abandon 0
+- QA not covered: 25.15 8ch name width, checkers round end, spectator; 25.16 sign-out, reduced motion, /history 360x640
+- 2026-11-02T07:27:25Z VERIFY done. pnpm test 987 passed (12 expected fail), check 0/0, build ok, validate strict ok. Preview: manifest, og.png, icons 200; per-route title/og; theme-color; Inter preload. Scripted layout-shift (preview, signed out, 7 routes x 2 viewports): all 0. Live QA (pair 1): strips with real marks, 3+ turn changes per game 0 entries, resign 0, Clerk-blocked signed in 0 (360), /play overlay 0, scrub pill visible, /play fits 360.
+- Known follow-ups: /history held finished tiles move ~0.008 when another game starts or ends in the same visit (list rows stay put); spectator turn-alert and empty-history live checks not run (no 3rd account at the time / accounts have history); emerald/amber success colors not tokenized; "Convex functions should not be imported in the browser" warning predates this change.

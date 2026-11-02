@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/svelte";
+import { fireEvent, render, screen } from "@testing-library/svelte";
 import { beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { api } from "../../../../../convex/_generated/api.js";
 import { ClerkAuth } from "$lib/services/auth";
@@ -84,5 +84,32 @@ describe("Play", () => {
 		context.auth!.hydrate(null);
 		render(Play);
 		expect(screen.getByRole("button", { name: "Sign in" })).toBeEnabled();
+	});
+
+	test("a signed-in user whose auth client failed to load is asked to reload, not to sign in", async () => {
+		const reload = vi.fn();
+		const original = globalThis.location;
+		vi.stubGlobal("location", { reload });
+		context.auth!.isSignedIn = false;
+		context.auth!.loadError = "Failed to load @clerk/ui bundle";
+		render(Play);
+		expect(screen.getByText("Can't reach sign-in. Reload to play.")).toBeInTheDocument();
+		expect(screen.queryByText("Sign in to create or join a room.")).not.toBeInTheDocument();
+		await fireEvent.click(screen.getByRole("button", { name: "Reload" }));
+		expect(reload).toHaveBeenCalled();
+		vi.stubGlobal("location", original);
+	});
+
+	test("the room code field has a name", () => {
+		setQueryResult(api.models.rooms.index.active, null);
+		render(Play);
+		expect(screen.getByRole("textbox", { name: "Room code" })).toBeInTheDocument();
+	});
+
+	test("the error line is an empty alert until there is an error", () => {
+		setQueryResult(api.models.rooms.index.active, null);
+		render(Play);
+		const alert = screen.getByRole("alert");
+		expect(alert.textContent?.trim()).toBe("");
 	});
 });

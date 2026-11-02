@@ -87,7 +87,12 @@
 					</DropdownContent>
 				</Dropdown>
 			{:else}
-				<Button size="sm" disabled={auth.loadError !== null} onclick={() => auth.signIn()}>
+				<Button
+					size="sm"
+					class="max-w-full"
+					disabled={auth.loadError !== null}
+					onclick={() => auth.signIn()}
+				>
 					Sign in
 				</Button>
 			{/if}

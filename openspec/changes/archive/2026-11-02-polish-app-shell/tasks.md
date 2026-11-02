@@ -357,6 +357,9 @@
   - rerendering from no active room to `ABCD` active, with `ABCD` newly in history, leaves the row count unchanged
     Replace the existing case that expects the active row's "Playing" label. Verify they fail before 23.4.
 - [x] 23.4 [designer] In `src/lib/features/core/history/history.svelte`, render `withoutActiveRoom(history.data, activeRoom.data?.code)`, drop the per-row `isActive` highlight, emblem `active`, and `Beacon`, and render the Playing card below the empty state when the filtered list is empty. Verify 23.3 and the existing history cases pass.
+- [x] 23.5 [designer] /play keeps the picker box after an auth load failure: when the server rendered the user signed in (`auth.showsMemberNav`) and `isSignedIn` turns false, `play.svelte` keeps the picker laid out but `invisible` and shows "Sign in to create or join a room." in an `absolute inset-0` overlay on it. Visitors who were never signed in keep the short block.
+- [x] 23.6 [designer] /history holds a room that finishes during the visit in the Playing slot: `splitHistory(rooms, activeCode, seenActiveCodes)` in `rooms.ts` (tests in `rooms.test.ts`) keeps rooms that were active earlier in the page view out of the list, and `history.svelte` renders them as finished tiles after the list, where the Playing card was, until the next visit.
+- [x] 23.7 Final review fixes
 
 ## 24. Game icon motion [designer] (parallel-safe)
 
@@ -369,11 +372,11 @@
 
 Groups 1-12 were written when this was group 13, so their `(13.N)` references mean `25.N`. References in groups 15-19 were renumbered from `20.N` to `25.N`.
 
-- [ ] 25.1 Run `pnpm test`. All convex, server, and client projects pass.
-- [ ] 25.2 Run `pnpm check`. 0 errors and 0 warnings.
-- [ ] 25.3 Run `pnpm format:check`. Clean.
-- [ ] 25.4 Run `pnpm build`. Succeeds.
-- [ ] 25.5 With `pnpm build && pnpm preview`:
+- [x] 25.1 Run `pnpm test`. All convex, server, and client projects pass.
+- [x] 25.2 Run `pnpm check`. 0 errors and 0 warnings.
+- [x] 25.3 Run `pnpm format:check`. Clean.
+- [x] 25.4 Run `pnpm build`. Succeeds.
+- [x] 25.5 With `pnpm build && pnpm preview`:
   - `curl` `/`, `/play`, and `/leaderboard` and confirm the per-route `<title>`, description, `og:*`, the manifest link, the apple-touch icon, and `theme-color`
   - `curl` the manifest through `jq` for `name`, `short_name`, `start_url`, `display`, and the 192/512/maskable icons
   - confirm `og:image` returns 200 with an image content type
@@ -388,27 +391,27 @@ Groups 1-12 were written when this was group 13, so their `(13.N)` references me
   - the footer shows Support and the copyright only, and Support opens Ko-fi in a new tab
   - at each width, no href is displayed twice across the header, tab bar, and footer
   - no request to `storage.ko-fi.com`
-- [ ] 25.7 Live QA, layout, at 360px and 1280px:
+- [x] 25.7 Live QA, layout, at 360px and 1280px:
   - `/history` scrolls to the footer with the header still visible
   - room routes have no page scroll and no footer
   - navigating between pages starts at the top
   - one `h1` per page
   - empty history shows the empty state
-- [ ] 25.8 Live QA, turn alert, with `browser-a` and `browser-b` seated in one room. `browser-a` switches tabs and `browser-b` moves: `browser-a`'s title flashes "Your turn" and the chime plays, then stops and restores when the tab is focused. With `twoplay:prefs` set to `{"sound":false}` the title flashes with no chime, and a spectator gets no alert.
+- [x] 25.8 Live QA, turn alert, with `browser-a` and `browser-b` seated in one room. `browser-a` switches tabs and `browser-b` moves: `browser-a`'s title flashes "Your turn" and the chime plays, then stops and restores when the tab is focused. With `twoplay:prefs` set to `{"sound":false}` the title flashes with no chime, and a spectator gets no alert.
 - [x] 25.9 Live QA, B11: block `*/npm/@clerk/ui@1/dist/ui.browser.js` and load `/play` signed in. The page renders, the alert banner with Reload shows, Sign in is disabled, the console has no unhandled rejection, and no query hangs. Unblocked, no banner shows.
 - [x] 25.10 Live QA, accessibility and feedback:
   - with reduced motion emulated, the wordmark and mood blobs hold still
   - keyboard focus on a header link, a tab option, and a button shows a ring of at least 3:1 composited contrast
   - Tabs on `/play` respond to arrow, Home, and End keys
   - Copy link on `/play` shows a "Link copied" toast that is announced and disappears after about 3 s
-- [ ] 25.11 With `pnpm build && pnpm preview`:
+- [x] 25.11 With `pnpm build && pnpm preview`:
   - `curl /` and confirm a `<link rel="preload" as="font" type="font/woff2" crossorigin>` for the latin Inter file, and that the file returns 200
   - with `browser-a`'s signed-in session cookie, `curl /lobby` and confirm the HTML contains the tab bar and the footer
   - `curl /tictactoe/<code>` and confirm it contains neither
 - [x] 25.12 Live QA, page-load layout shift, with the D11 observer: every route, viewport, and auth state from 15.1 has a cumulative score of at most 0.01. Append `VERIFY cls <case> <score>` lines next to the 15.1 audit lines in `worklog.md`.
 - [x] 25.13 Live QA, turn changes, with `browser-a` and `browser-b` seated: at least three turn changes in a tic-tac-toe room and three in a checkers room record zero layout-shift entries in both browsers; loading each room replaces the placeholder with no entry; the status bar, names, clocks, board, and footer controls keep their positions at 360x640 and 1280x800.
-- [ ] 25.14 Live QA, transient UI, with the D11 observer: the auth error banner appearing (bundle blocked, signed out and signed in), the live-game pill appearing on `/history`, the "Link copied" toast, and returning to a tab after a turn alert each record zero layout-shift entries, including in the header. Re-run after groups 22 and 23.
-- [ ] 25.15 Live QA, player strips, with `browser-a` (Alex) and `browser-b` (Blair) seated, at 360x640 and 1280x800, D11 observer running:
+- [x] 25.14 Live QA, transient UI, with the D11 observer: the auth error banner appearing (bundle blocked, signed out and signed in), the live-game pill appearing on `/history`, the "Link copied" toast, and returning to a tab after a turn alert each record zero layout-shift entries, including in the header. Re-run after groups 22 and 23.
+- [x] 25.15 Live QA, player strips, with `browser-a` (Alex) and `browser-b` (Blair) seated, at 360x640 and 1280x800, D11 observer running:
   - each browser shows the opponent's strip above the board and its own below, with "YOU", the seat mark in the seat color, the status line, and the clock in its own strip; the strip to move has the ring
   - at 360x640 each name element is at least `8ch` wide (`el.clientWidth >= 8 *` the width of a `0` in the same font) and the board is at least 300px wide with both strips as wide as it
   - at 1280x800 the strips sit above and below the board at its width
@@ -416,7 +419,7 @@ Groups 1-12 were written when this was group 13, so their `(13.N)` references me
   - loading each room replaces the placeholder with zero entries
   - a spectator (signed-out viewers can't join; skip and note it if no third account exists) sees seat 1 above and seat 0 below
     Append `VERIFY strips <case> <result>` lines to `worklog.md`.
-- [ ] 25.16 Live QA, QA fixes, with the D11 observer:
+- [x] 25.16 Live QA, QA fixes, with the D11 observer:
   - signed in, `*/npm/@clerk/ui@1/dist/ui.browser.js` blocked, `/play` at 360x640: the tab bar stays, and no entry is recorded for the footer, the tab bar, the page content, the wordmark, or the primary links; at 1280x800 the header's primary links stay and Sign in sits at the trailing edge
   - unblocked, signing out from the avatar menu removes the tab bar and the header's primary links
   - signed in on `/history` at 1280x800 and 360x640, start a room in `browser-b`'s other tab (or `browser-a`'s second tab): no row is added to the list, the Playing card appears below it, and no entry is recorded for the list rows

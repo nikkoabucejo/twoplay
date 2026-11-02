@@ -1,6 +1,7 @@
 # search-indexing Specification
 
 ## Purpose
+
 TBD - created by archiving change add-seo-indexing. Update Purpose after archive.
 
 ## Requirements

@@ -285,19 +285,20 @@
 	{:else if data}
 		<div class="relative">
 			{#if room.isViewingHistory}
+				<!-- top-18: 0.5rem into the board area, below the h-14 strip and its gap-2. -->
 				<div
-					class="pointer-events-none absolute inset-x-0 top-0 z-20 flex -translate-y-[calc(100%+0.5rem)] justify-center"
+					class="pointer-events-none absolute inset-x-0 top-18 z-20 flex justify-center"
 					transition:fade={{ duration: 150 }}
 				>
 					<div
-						class="pointer-events-auto flex items-center gap-2 rounded-full border bg-background/90 px-3 py-1 text-xs shadow-sm backdrop-blur-sm"
+						class="pointer-events-auto flex items-center gap-2 rounded-full border bg-background/90 px-3 py-1 text-xs whitespace-nowrap shadow-sm backdrop-blur-sm"
 					>
 						<span class="tabular-nums text-muted-foreground">
 							Move {room.viewedMoveNumber} of {room.historyLength}
 						</span>
 						<button
 							type="button"
-							class="font-semibold text-primary hover:underline"
+							class="rounded-sm font-semibold text-primary outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
 							onclick={() => room.jumpToLatest()}
 						>
 							Return to live

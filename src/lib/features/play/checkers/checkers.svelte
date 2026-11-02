@@ -215,19 +215,20 @@
 	{:else if data}
 		<div class="relative">
 			{#if room.isViewingHistory}
+				<!-- top-18: 0.5rem into the board area, below the h-14 strip and its gap-2. -->
 				<div
-					class="pointer-events-none absolute inset-x-0 top-0 z-20 flex -translate-y-[calc(100%+0.5rem)] justify-center"
+					class="pointer-events-none absolute inset-x-0 top-18 z-20 flex justify-center"
 					transition:fade={{ duration: 150 }}
 				>
 					<div
-						class="pointer-events-auto flex items-center gap-2 rounded-full border bg-background/90 px-3 py-1 text-xs shadow-sm backdrop-blur-sm"
+						class="pointer-events-auto flex items-center gap-2 rounded-full border bg-background/90 px-3 py-1 text-xs whitespace-nowrap shadow-sm backdrop-blur-sm"
 					>
 						<span class="tabular-nums text-muted-foreground">
 							Move {room.viewedMoveNumber} of {room.historyLength}
 						</span>
 						<button
 							type="button"
-							class="font-semibold text-primary hover:underline"
+							class="rounded-sm font-semibold text-primary outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
 							onclick={() => room.jumpToLatest()}
 						>
 							Return to live
@@ -241,15 +242,13 @@
 						label: room.players[0] ? firstName(room.players[0].name) : "Player 1",
 						emoji: room.players[0]?.emoji ?? DEFAULT_EMOJI,
 						accent: ACCENTS[0].text,
-						score: room.players[0]?.score ?? 0,
-						mark: "Player 1 pieces"
+						score: room.players[0]?.score ?? 0
 					},
 					{
 						label: room.players[1] ? firstName(room.players[1].name) : "Player 2",
 						emoji: room.players[1]?.emoji ?? DEFAULT_EMOJI,
 						accent: ACCENTS[1].text,
-						score: room.players[1]?.score ?? 0,
-						mark: "Player 2 pieces"
+						score: room.players[1]?.score ?? 0
 					}
 				]}
 				{status}

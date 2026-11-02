@@ -267,7 +267,7 @@ QA 20.14 (now 25.14) at 1280x800: a room started in another tab is inserted as t
 
 - A pure helper `withoutActiveRoom(rooms, activeCode)` in `features/core/history/rooms.ts` (test `rooms.test.ts`) returns the list without the room whose `code` equals `activeCode` (unchanged when `activeCode` is null or undefined). `history.svelte` renders the filtered list and drops the `isActive` highlight, emblem `active`, and `Beacon` in rows.
 - When the filtered list is empty, the page shows the empty state, with the Playing card below it when there is an active room, so a first-ever room starting doesn't swap the empty state for a feed.
-- When the active room ends while the page is open, it appears as a new top row. That is a shift caused by the game finishing, not by a room starting; it stays out of scope (see Open Questions).
+- When the active room ends while the page is open, it stays in the Playing slot after the list as a finished tile until the next visit (`splitHistory` in `features/core/history/rooms.ts`), so finishing a game never inserts a row above the visible ones.
 - Alternative: keep the row but reserve its slot. Rejected: the row has no height until the room exists, and it duplicates the Playing card.
 
 ### D15. Game icon motion

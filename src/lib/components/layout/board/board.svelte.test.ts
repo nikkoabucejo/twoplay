@@ -1,13 +1,8 @@
 import { fireEvent, render, screen, within } from "@testing-library/svelte";
 import { createRawSnippet, type ComponentProps } from "svelte";
 import { beforeAll, describe, expect, test, vi } from "vitest";
-import {
-	BOARD_SIZE,
-	Board,
-	type BoardFooter,
-	type BoardPlayer,
-	type BoardStatus
-} from "./index.js";
+import { BOARD_SIZE } from "./board.svelte";
+import { Board, type BoardFooter, type BoardPlayer, type BoardStatus } from "./index.js";
 
 // vi.mock can't stub lottie-web here: concurrent dynamic imports of a manual mock fall through to
 // the real module. Instead keep the real one inert: it paints a 1x1 canvas on load, then fetches JSON.
@@ -161,6 +156,20 @@ describe("Board", () => {
 		}
 	});
 
+	test("a mark icon without a mark is decorative and replaces the disc", () => {
+		const markIcon = createRawSnippet((seat: () => 0 | 1) => ({
+			render: () => `<svg data-icon="${seat()}"></svg>`
+		}));
+		renderBoard({ status: { type: "turn", player: 0 }, markIcon });
+		for (const seat of [0, 1] as const) {
+			const icon = strip(seat).querySelector(`[data-icon="${seat}"]`)!;
+			const box = icon.closest<HTMLElement>("[data-slot=mark]")!;
+			expect(icon.closest("[aria-hidden=true]")).not.toBeNull();
+			expect(within(box).queryByText("●")).not.toBeInTheDocument();
+			expect(box.querySelector(".sr-only")).toBeNull();
+		}
+	});
+
 	test("a seat's clock sits in its strip in monospace tabular figures", () => {
 		renderBoard({
 			status: { type: "turn", player: 0 },
@@ -180,7 +189,7 @@ describe("Board", () => {
 		const controls = screen
 			.getByRole("button", { name: "Previous round" })
 			.closest<HTMLElement>("[data-slot=controls]")!;
-		expect(within(controls).queryByLabelText(/clock/)).not.toBeInTheDocument();
+		expect(within(controls).queryByText(/clock/)).not.toBeInTheDocument();
 		const lower = strip(0);
 		expect(follows(lower, controls)).toBe(true);
 		expect(follows(controls, screen.getByText("Round 2 of 3"))).toBe(true);
@@ -328,7 +337,7 @@ describe("Board", () => {
 
 	test("a disconnected opponent is flagged to a seated viewer", () => {
 		renderBoard({ status: { type: "turn", player: 0 }, myIndex: 0, opponentDisconnected: true });
-		expect(screen.getByLabelText("Opponent disconnected")).toBeInTheDocument();
+		expect(screen.getByRole("img", { name: "Opponent disconnected" })).toBeInTheDocument();
 	});
 
 	test("spectators don't see a disconnected flag", () => {
@@ -336,30 +345,31 @@ describe("Board", () => {
 		expect(screen.queryByLabelText("Opponent disconnected")).not.toBeInTheDocument();
 	});
 
-	test("clocks read as minutes and seconds", () => {
+	test("clocks read as minutes and seconds, spoken with the player's name", () => {
 		renderBoard({ footer: footer(), clock: { remaining: [65_000, 600_000], activeSeat: 0 } });
-		expect(screen.getByLabelText("Alice's clock: 1:05 remaining")).toBeInTheDocument();
-		expect(screen.getByLabelText("Bob's clock: 10:00 remaining")).toBeInTheDocument();
+		expect(screen.getByText("Alice's clock: 1:05 remaining")).toHaveClass("sr-only");
+		expect(screen.getByText("Bob's clock: 10:00 remaining")).toHaveClass("sr-only");
+		expect(within(strip(0)).getByText("1:05")).toHaveAttribute("aria-hidden", "true");
 	});
 
 	test("a partial second rounds up so the clock never shows 0:00 with time left", () => {
 		renderBoard({ footer: footer(), clock: { remaining: [400, 60_000], activeSeat: 0 } });
-		expect(screen.getByLabelText("Alice's clock: 0:01 remaining")).toBeInTheDocument();
+		expect(screen.getByText("Alice's clock: 0:01 remaining")).toBeInTheDocument();
 	});
 
 	test("clocks are hidden without a clock", () => {
 		renderBoard({ footer: footer() });
-		expect(screen.queryByLabelText(/clock/)).not.toBeInTheDocument();
+		expect(screen.queryByText(/clock/)).not.toBeInTheDocument();
 	});
 
 	test("the running clock turns red in its last ten seconds", () => {
 		renderBoard({ footer: footer(), clock: { remaining: [9_000, 9_000], activeSeat: 0 } });
-		expect(screen.getByLabelText("Alice's clock: 0:09 remaining")).toHaveClass("text-destructive");
+		expect(within(strip(0)).getByText("0:09")).toHaveClass("text-destructive");
 	});
 
 	test("a paused clock stays in its player's color even when low", () => {
 		renderBoard({ footer: footer(), clock: { remaining: [9_000, 9_000], activeSeat: 0 } });
-		const bobClock = screen.getByLabelText("Bob's clock: 0:09 remaining");
+		const bobClock = within(strip(1)).getByText("0:09");
 		expect(bobClock).toHaveClass("text-pink-500");
 		expect(bobClock).not.toHaveClass("text-destructive");
 	});

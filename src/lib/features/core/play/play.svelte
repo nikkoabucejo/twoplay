@@ -76,6 +76,9 @@
 	const selectedGame = $derived(ENTRIES[centerIndex].type);
 	const queued = $derived(queueStatus.data === true);
 	const isCheckingActiveRoom = $derived(auth.isSignedIn && activeRoom.isLoading);
+	// The server rendered the picker, then the auth client failed to load: the reload prompt takes
+	// the picker's box so the page below doesn't move up.
+	const holdsPickerBox = $derived(!auth.isSignedIn && auth.showsMemberNav);
 
 	const createdRoom = useQuery(api.models.rooms.index.get, () =>
 		createdCode ? { code: createdCode } : "skip"
@@ -213,88 +216,108 @@
 			</div>
 		</div>
 
-		{#if !auth.isSignedIn}
+		{#if !auth.showsMemberNav}
 			<div class="flex w-full max-w-xs flex-col items-center gap-3">
 				<p class="text-muted-foreground">Sign in to create or join a room.</p>
 				<Button disabled={auth.loadError !== null} onclick={() => auth.signIn()}>Sign in</Button>
 			</div>
 		{:else}
-			<div
-				class="flex w-full max-w-xs flex-col items-center gap-6 rounded-2xl border bg-muted/40 p-6 backdrop-blur-sm"
-			>
-				<Tabs
-					items={MODE_OPTIONS}
-					value={mode}
-					onValueChange={(value) => (mode = value)}
-					disabled={!!createdCode || queued}
-					aria-label="Matchmaking or room visibility"
-				/>
+			<div class="relative w-full max-w-xs">
+				<div
+					class={cn(
+						"flex w-full flex-col items-center gap-6 rounded-2xl border bg-muted/40 p-6 backdrop-blur-sm",
+						holdsPickerBox && "invisible"
+					)}
+				>
+					<Tabs
+						items={MODE_OPTIONS}
+						value={mode}
+						onValueChange={(value) => (mode = value)}
+						disabled={!!createdCode || queued}
+						aria-label="Matchmaking or room visibility"
+					/>
 
-				<Tabs
-					items={TIME_CONTROL_MINUTES.map((minutes) => ({
-						value: minutes,
-						label: `${minutes} min`
-					}))}
-					value={timeControlMinutes}
-					onValueChange={(minutes) => (timeControlMinutes = minutes)}
-					disabled={!!createdCode || queued}
-					aria-label="Starting clock per player"
-				/>
+					<Tabs
+						items={TIME_CONTROL_MINUTES.map((minutes) => ({
+							value: minutes,
+							label: `${minutes} min`
+						}))}
+						value={timeControlMinutes}
+						onValueChange={(minutes) => (timeControlMinutes = minutes)}
+						disabled={!!createdCode || queued}
+						aria-label="Starting clock per player"
+					/>
 
-				<div class="flex w-full flex-col gap-2">
-					{#if createdCode}
-						<div class="flex w-full items-center gap-2">
-							<p
-								class="flex h-9 flex-1 items-center justify-center rounded-md border bg-background/60 font-mono tracking-widest"
-							>
-								{createdCode}
-							</p>
-							<Button variant="outline" onclick={copyInviteLink}>Copy link</Button>
-						</div>
-					{:else if queued}
-						<div
-							class="flex w-full flex-col items-center gap-3 rounded-md border bg-background/60 px-4 py-13.25"
-						>
-							<div class="flex flex-col items-center gap-0.5" aria-live="polite">
-								<p class="flex items-center gap-1 text-sm font-semibold text-foreground">
-									Finding a match
+					<div class="flex w-full flex-col gap-2">
+						{#if createdCode}
+							<div class="flex w-full items-center gap-2">
+								<p
+									class="flex h-9 flex-1 items-center justify-center rounded-md border bg-background/60 font-mono tracking-widest"
+								>
+									{createdCode}
 								</p>
-								<p class="text-xs text-muted-foreground">
-									{GAMES[selectedGame].name} &middot; {timeControlMinutes} min
-								</p>
+								<Button variant="outline" onclick={copyInviteLink}>Copy link</Button>
 							</div>
-						</div>
-						<Button variant="outline" class="w-full" onclick={handleCancelQueue}>Cancel</Button>
-					{:else}
-						<Button class="w-full" onclick={handleStart} disabled={queuing || creating}>
-							{mode === "matchmaking" ? "Find Match" : "Create Room"}
-						</Button>
-					{/if}
-				</div>
-
-				{#if !createdCode && !queued}
-					<div class="flex w-full items-center gap-3 text-xs text-muted-foreground">
-						<div class="h-px flex-1 bg-border"></div>
-						or
-						<div class="h-px flex-1 bg-border"></div>
+						{:else if queued}
+							<div
+								class="flex w-full flex-col items-center gap-3 rounded-md border bg-background/60 px-4 py-13.25"
+							>
+								<div class="flex flex-col items-center gap-0.5" aria-live="polite">
+									<p class="flex items-center gap-1 text-sm font-semibold text-foreground">
+										Finding a match
+									</p>
+									<p class="text-xs text-muted-foreground">
+										{GAMES[selectedGame].name} &middot; {timeControlMinutes} min
+									</p>
+								</div>
+							</div>
+							<Button variant="outline" class="w-full" onclick={handleCancelQueue}>Cancel</Button>
+						{:else}
+							<Button class="w-full" onclick={handleStart} disabled={queuing || creating}>
+								{mode === "matchmaking" ? "Find Match" : "Create Room"}
+							</Button>
+						{/if}
 					</div>
 
-					<form class="flex w-full flex-col items-center gap-3" onsubmit={handleJoin}>
-						<input
-							type="text"
-							placeholder="Room code"
-							bind:value={joinCode}
-							maxlength={6}
-							class="w-full rounded-md border bg-background px-3 py-2 text-center font-mono uppercase tracking-widest"
-						/>
-						<Button type="submit" variant="outline" class="w-full" disabled={!joinCode.trim()}>
-							Join room
-						</Button>
-					</form>
-				{/if}
+					{#if !createdCode && !queued}
+						<div class="flex w-full items-center gap-3 text-xs text-muted-foreground">
+							<div class="h-px flex-1 bg-border"></div>
+							or
+							<div class="h-px flex-1 bg-border"></div>
+						</div>
 
-				{#if error}
-					<p class="text-sm text-destructive">{error}</p>
+						<form class="flex w-full flex-col items-center gap-3" onsubmit={handleJoin}>
+							<input
+								type="text"
+								aria-label="Room code"
+								placeholder="Room code"
+								bind:value={joinCode}
+								maxlength={6}
+								class="w-full rounded-md border bg-background px-3 py-2 text-center font-mono uppercase tracking-widest"
+							/>
+							<Button type="submit" variant="outline" class="w-full" disabled={!joinCode.trim()}>
+								Join room
+							</Button>
+						</form>
+					{/if}
+
+					<!-- Always in the layout, so an error never moves the picker. -->
+					<p
+						role="alert"
+						class={cn(
+							"h-5 w-full truncate text-center text-sm text-destructive",
+							!error && "invisible"
+						)}
+					>
+						{error ?? ""}
+					</p>
+				</div>
+
+				{#if holdsPickerBox}
+					<div class="absolute inset-0 flex flex-col items-center justify-center gap-3">
+						<p class="text-muted-foreground">Can't reach sign-in. Reload to play.</p>
+						<Button variant="outline" onclick={() => location.reload()}>Reload</Button>
+					</div>
 				{/if}
 			</div>
 		{/if}

@@ -1,1 +1,1 @@
-export { shouldAlert, TurnAlert } from "./turn-alert.svelte.js";
+export { TurnAlert } from "./turn-alert.svelte.js";

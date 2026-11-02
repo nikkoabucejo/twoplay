@@ -15,7 +15,7 @@
 		/** Match score shown in the strip's status line. Omit to hide. */
 		score?: number;
 		/** Seat mark after the name, e.g. "X". Read by screen readers when `markIcon` draws it.
-		 *  Defaults to a disc. */
+		 *  Without a mark or `markIcon`, a decorative disc. */
 		mark?: string;
 	};
 
@@ -136,7 +136,7 @@
 		/** Called with the chosen codepoint when the viewer picks a new emoji for their own seat. */
 		onTrashtalk?: (emoji: string) => void;
 		/** Draws a seat's mark in the strip, in `currentColor` at `size-full` of a `size-3.5` box.
-		 *  Needs that player's `mark` as its spoken label. */
+		 *  Decorative; that player's `mark`, if any, is its spoken label. */
 		markIcon?: Snippet<[seat: 0 | 1]>;
 		/** The game itself. Fills the square board area — use `size-full`. */
 		children: Snippet;
@@ -281,6 +281,7 @@
 		{/if}
 		{#if myIndex !== null && myIndex !== seat && opponentDisconnected}
 			<span
+				role="img"
 				class="absolute -top-1 -right-1 size-3 rounded-full bg-destructive ring-2 ring-background"
 				aria-label="Opponent disconnected"
 				title="Opponent disconnected"
@@ -304,10 +305,11 @@
 				"font-mono text-base font-semibold tabular-nums sm:text-lg",
 				low ? "text-destructive" : players[seat].accent
 			)}
-			aria-label={`${players[seat].label}'s clock: ${formatClock(ms)} remaining`}
+			aria-hidden="true"
 		>
 			{formatClock(ms)}
 		</span>
+		<span class="sr-only">{players[seat].label}'s clock: {formatClock(ms)} remaining</span>
 	</div>
 {/snippet}
 
@@ -334,9 +336,11 @@
 						ACCENTS[seat].text
 					)}
 				>
-					{#if markIcon && players[seat].mark}
+					{#if markIcon}
 						<span aria-hidden="true" class="contents">{@render markIcon(seat)}</span>
-						<span class="sr-only">{players[seat].mark}</span>
+						{#if players[seat].mark}
+							<span class="sr-only">{players[seat].mark}</span>
+						{/if}
 					{:else if players[seat].mark}
 						{players[seat].mark}
 					{:else}
@@ -416,19 +420,14 @@
 
 				<span class={cn(footer.isLive && isSpectator && "cursor-not-allowed")}>
 					{#if !footer.isLive}
-						<Button
-							variant="outline"
-							size="sm"
-							class="w-28 px-3 uppercase sm:w-32"
-							onclick={footer.onGoLive}
-						>
+						<Button variant="outline" size="sm" class="w-28 px-3 sm:w-32" onclick={footer.onGoLive}>
 							Go live
 						</Button>
 					{:else if footer.roomClosed}
 						<Button
 							variant="outline"
 							size="sm"
-							class="w-28 px-3 uppercase sm:w-32"
+							class="w-28 px-3 sm:w-32"
 							onclick={footer.onPlayAgain}
 						>
 							Play again
@@ -437,7 +436,7 @@
 						<Button
 							variant="outline"
 							size="sm"
-							class="w-28 px-3 uppercase sm:w-32"
+							class="w-28 px-3 sm:w-32"
 							onclick={footer.onAbandon}
 							disabled={isSpectator}
 						>
@@ -448,7 +447,7 @@
 							<DropdownTrigger
 								variant="outline"
 								size="sm"
-								class="w-28 px-3 uppercase sm:w-32"
+								class="w-28 px-3 sm:w-32"
 								disabled={isSpectator}
 							>
 								Resign
@@ -466,7 +465,7 @@
 							<DropdownTrigger
 								variant="outline"
 								size="sm"
-								class="w-28 px-3 uppercase sm:w-32"
+								class="w-28 px-3 sm:w-32"
 								disabled={isSpectator}
 							>
 								Rematch

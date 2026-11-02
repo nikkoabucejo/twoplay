@@ -58,7 +58,7 @@ describe("Checkers", () => {
 		expect(screen.getByRole("button", { name: "Sign in" })).toBeEnabled();
 	});
 
-	test("the strips show each seat's board piece, read as that player's pieces", async () => {
+	test("the strips show each seat's board piece, decorative", async () => {
 		context.auth!.hydrate({ id: "user-1", email: null, name: "Alice Archer", imageUrl: null });
 		mutationFor(api.models.rooms.index.join).mockResolvedValue({ redirected: false });
 		setQueryResult(api.models.rooms.index.get, roomSnapshot(checkersEngine.createInitialState()));
@@ -75,7 +75,7 @@ describe("Checkers", () => {
 			expect(boardPiece).toHaveClass("rounded-full", "shadow-md", `bg-seat-${seat}`);
 			expect(icon.closest("[aria-hidden=true]")).not.toBeNull();
 			expect(within(strip).queryByText("●")).not.toBeInTheDocument();
-			expect(within(strip).getByText(`Player ${seat + 1} pieces`)).toHaveClass("sr-only");
+			expect(within(strip).queryByText(`Player ${seat + 1} pieces`)).not.toBeInTheDocument();
 		}
 	});
 });

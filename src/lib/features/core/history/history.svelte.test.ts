@@ -164,6 +164,76 @@ describe("History", () => {
 		expect(playingCard()).toBeInTheDocument();
 	});
 
+	test("a room that finishes while the page is open stays after the list, in the Playing slot", async () => {
+		setQueryResult(api.models.rooms.index.history, [ACTIVE_ROOM, PAST_ROOM, OTHER_ROOM]);
+		setQueryResult(api.models.rooms.index.active, { code: "ABCD", type: "tictactoe" });
+		render(History);
+		await tick();
+
+		setQueryResult(api.models.rooms.index.history, [
+			{
+				...ACTIVE_ROOM,
+				status: "closed",
+				games: [{ round: 1, createdAt: 3, result: "win", mmr: 10 }]
+			},
+			PAST_ROOM,
+			OTHER_ROOM
+		]);
+		setQueryResult(api.models.rooms.index.active, null);
+		await tick();
+
+		expect(playingCard()).not.toBeInTheDocument();
+		expect(rows().map((row) => row.textContent?.trim())).toEqual([
+			"You vs Bob Baker",
+			"You vs Cy Cole",
+			"You vs Dee Dunn"
+		]);
+	});
+
+	test("with only the active room, its finishing keeps the room and shows no empty state", async () => {
+		setQueryResult(api.models.rooms.index.history, [ACTIVE_ROOM]);
+		setQueryResult(api.models.rooms.index.active, { code: "ABCD", type: "tictactoe" });
+		render(History);
+		await tick();
+
+		setQueryResult(api.models.rooms.index.history, [
+			{
+				...ACTIVE_ROOM,
+				status: "closed",
+				games: [{ round: 1, createdAt: 3, result: "win", mmr: 10 }]
+			}
+		]);
+		setQueryResult(api.models.rooms.index.active, null);
+		await tick();
+
+		expect(screen.queryByText("No games yet")).not.toBeInTheDocument();
+		expect(rows().map((row) => row.textContent?.trim())).toEqual(["You vs Dee Dunn"]);
+	});
+
+	test("a second game started in the same visit puts its Playing card above the held room", async () => {
+		const NEXT_ROOM: RoomHistoryEntry = { ...ACTIVE_ROOM, code: "JKLM", opponentName: "Eve Ek" };
+		setQueryResult(api.models.rooms.index.history, [ACTIVE_ROOM, PAST_ROOM]);
+		setQueryResult(api.models.rooms.index.active, { code: "ABCD", type: "tictactoe" });
+		render(History);
+		await tick();
+
+		setQueryResult(api.models.rooms.index.history, [
+			NEXT_ROOM,
+			{
+				...ACTIVE_ROOM,
+				status: "closed",
+				games: [{ round: 1, createdAt: 3, result: "win", mmr: 10 }]
+			},
+			PAST_ROOM
+		]);
+		setQueryResult(api.models.rooms.index.active, { code: "JKLM", type: "tictactoe" });
+		await tick();
+
+		const held = screen.getByText("You vs Dee Dunn");
+		expect(playingCard()?.compareDocumentPosition(held)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+		expect(screen.queryByText("You vs Eve Ek")).not.toBeInTheDocument();
+	});
+
 	test("Sign in is disabled when the auth client failed to load", () => {
 		context.auth!.hydrate(null);
 		context.auth!.loadError = "Failed to load @clerk/ui bundle";

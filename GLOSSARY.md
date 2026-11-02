@@ -24,7 +24,7 @@
 | Pairing      | Quick-match queue entry. Deleted when paired, expires after 5 min.                                                                     |
 | Heartbeat    | `players.heartbeat`. Updates `seenAt`.                                                                                                 |
 | Sweep        | Cron, every 2 min. Closes a room whose second seat stayed empty for 45 min. Abandons a seat silent for 4 min. Clears expired pairings. |
-| Trashtalk    | A player's status-bar emoji in a room.                                                                                                 |
+| Trashtalk    | A player's strip emoji.                                                                                                                |
 | Cursor       | Live pointer position, normalized to 0–1.                                                                                              |
 | Mood         | Ambient background driven by the board status.                                                                                         |
 | Turn alert   | Title flash and chime when your turn arrives in a hidden tab (`TurnAlert`, `Room.isMyTurn`). Sound follows the `sound` preference.     |
@@ -38,7 +38,7 @@
 | Rules           | Pure board functions per game (`rules.ts`). No turn or player logic.                                          |
 | Registry        | `convex/models/games/index.ts`: `gameEngines`, union validators, and switch dispatch.                         |
 | `Room`          | Client base class (`$lib/utils/multiplayer`). Subclassed per game (`TictactoeRoom`, `CheckersRoom`).          |
-| `Board`         | Shared layout component: status bar, play area, clocks, footer.                                               |
+| `Board`         | Shared layout component: player strips, board, round controls.                                                |
 | `requireUser`   | Resolves the caller from `ctx.auth`, or throws.                                                               |
 | `requirePlayer` | Resolves the caller's seat in a room, or throws.                                                              |
 | Category        | A folder under `components/`, `utils/`, `features/`, or `services/` that owns a barrel.                       |

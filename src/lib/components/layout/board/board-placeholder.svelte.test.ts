@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/svelte";
 import { describe, expect, test } from "vitest";
-import { BOARD_SIZE, BoardPlaceholder } from "./index.js";
+import { BOARD_SIZE } from "./board.svelte";
+import { BoardPlaceholder } from "./index.js";
 
 describe("BoardPlaceholder", () => {
 	test("announces that the room is loading", () => {
@@ -31,15 +32,9 @@ describe("BoardPlaceholder", () => {
 		expect(container.querySelector(".size-10")).not.toBeInTheDocument();
 	});
 
-	test("the board size defaults to BOARD_SIZE", () => {
+	test("the board area takes BOARD_SIZE", () => {
 		const { container } = render(BoardPlaceholder);
 		const root = container.querySelector<HTMLElement>("[style]");
 		expect(root?.style.getPropertyValue("--board-size")).toBe(BOARD_SIZE);
-	});
-
-	test("takes a custom board size", () => {
-		const { container } = render(BoardPlaceholder, { props: { size: "20rem" } });
-		const root = container.querySelector<HTMLElement>("[style]");
-		expect(root?.style.getPropertyValue("--board-size")).toBe("20rem");
 	});
 });
