@@ -3,8 +3,17 @@
 set -uo pipefail
 base="${1:-$(git merge-base main HEAD 2>/dev/null || echo HEAD)}"
 
+# Changed lines from the diff, plus every line of untracked files (shown as additions).
+added() {
+	git diff -U0 "$base" -- 'src' 'convex' ':!convex/_generated'
+	git ls-files --others --exclude-standard -- 'src' 'convex' | while read -r f; do
+		printf '+++ b/%s\n@@ -0,0 +1 @@\n' "$f"
+		sed 's/^/+/' "$f"
+	done
+}
+
 flag() { # label, extended regex
-	git diff -U0 "$base" -- 'src' 'convex' ':!convex/_generated' \
+	added \
 		| LABEL="$1" RE="$2" awk '
 			BEGIN { label = ENVIRON["LABEL"]; re = ENVIRON["RE"] }
 			/^\+\+\+ b\// { file = substr($0, 7); next }
