@@ -13,6 +13,14 @@ Template:
 **Follow-ups:** <existing code that now violates it, or "—">
 ```
 
+## 2026-11-02 — One test file per source file
+**Decision:** Each source file has exactly one test file, with the same name and next to it, and one `describe` per export.
+Barrels, `types.ts`, and `schema.ts` are exempt.
+**Why:** The rooms tests were split into 12 files and duplicated `resign`/`timeout` coverage from `games`.
+**Supersedes:** —
+**Follow-ups:** `convex/models/rooms/index.ts` (719 lines) mixes lifecycle, play, and history. Split it as a `/dev:work`
+refactor, and its test file splits with it.
+
 ## 2026-11-02 — Vitest and live QA
 **Decision:** Every behavior change has a Vitest test (projects: convex, server, client). User-visible scenarios
 are also checked live by the `qa` agent in two browsers (`browser-a`, `browser-b`) as part of `dev-build`.

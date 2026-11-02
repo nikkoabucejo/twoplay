@@ -30,6 +30,7 @@ Used after implementation, before review.
    - exports: explicit named re-exports, no `export *`, `.js` relative imports, a barrel line added for every new leaf
    - naming: boolean prefixes, one name per concept end-to-end, `<Game>Room` / `<game>Engine`
    - style: runes usage, `cn` / `ACCENTS` / `tv`, server-inferred types
+   - tests: one test file per source file, same name, with `describe` per export (see `conventions.md` Tests)
 5. If a fix would change behavior or needs a design decision (e.g. moving a file other code imports
    heavily), don't do it. List it under ESCALATE.
 6. Run `pnpm check` (must show 0 errors and 0 warnings) and prettier on the touched files.
@@ -48,7 +49,8 @@ Used at the end of a change, or after any merge that adds a pattern.
 ### 3. Audit (repo → drift report)
 Used via `/dev:audit [area]`. Read-only unless told otherwise.
 1. Scope: the given area (e.g. `src/lib/features`, `convex/models/rooms`), else the whole of `src/` and `convex/`.
-2. Check the code against every reference statement and every anti-slop rule. Also check the
+2. Check the code against every reference statement and every anti-slop rule. List source files with logic
+   that have no test file. Also check the
    references against the code: stale facts, missing tables or APIs, renamed things.
 3. Group findings into: architecture, conventions, naming, anti-slop, docs drift. Give each a
    severity and an effort estimate.

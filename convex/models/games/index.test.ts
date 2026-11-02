@@ -403,6 +403,14 @@ describe("resign", () => {
 			"You are not playing this round"
 		);
 	});
+
+	// Bug: resign ends a round with no opponent seat; rematch then crashes on `db.get(undefined)`.
+	test.fails("rejects a resign while the second seat is still empty", async () => {
+		const t = setup();
+		const ada = await signIn(t, "user_a", "Ada");
+		const { code } = await ada.mutation(api.models.rooms.index.create, { type: "tictactoe" });
+		await expect(ada.mutation(api.models.games.index.resign, { code })).rejects.toThrow();
+	});
 });
 
 describe("timeout", () => {
@@ -518,5 +526,25 @@ describe("timeout", () => {
 		await a.mutation(api.models.games.index.timeout, { code });
 		const results = await resultsOf(t, game._id);
 		expect(results).toMatchObject([{ playerId: room.players[1], state: "timeout" }]);
+	});
+
+	test("gives the round to the timed-out seat's opponent on rematch", async () => {
+		const { t, b, code, room, game } = await timedRoom();
+		vi.setSystemTime(START + TIME_CONTROL_MS);
+		await b.mutation(api.models.games.index.timeout, { code });
+		await b.mutation(api.models.rooms.index.rematch, { code });
+		const [ada, bea] = await t.run((ctx) =>
+			Promise.all(
+				room.players.map(async (id) => ({
+					player: await ctx.db.get(id),
+					result: await ctx.db
+						.query("results")
+						.withIndex("byGameAndPlayer", (q) => q.eq("gameId", game._id).eq("playerId", id))
+						.unique()
+				}))
+			)
+		);
+		expect([ada?.player?.score, bea?.player?.score]).toEqual([0, 1]);
+		expect([ada?.result?.mmr, bea?.result?.mmr]).toEqual([-8, 8]);
 	});
 });

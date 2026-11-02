@@ -1,0 +1,547 @@
+import { flushSync } from "svelte";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { api } from "../../../../../convex/_generated/api.js";
+import type { GameState } from "../../../../../convex/models/games/index.js";
+import { tictactoeEngine } from "../../../../../convex/models/games/tictactoe/index.js";
+import {
+	ALICE,
+	BOB,
+	createRooted,
+	historyOf,
+	mutationFor,
+	resetConvex,
+	roomSnapshot,
+	setQueryResult
+} from "./fake-convex.svelte.js";
+import { Room } from "./room.svelte.js";
+
+vi.mock("convex-svelte", () => import("./fake-convex.svelte.js"));
+
+class SeatRoom extends Room {
+	seat = $state<0 | 1 | null>(null);
+
+	constructor() {
+		super("tictactoe", () => "ABCD");
+	}
+
+	override get activeSeat() {
+		return this.seat;
+	}
+
+	get shownState() {
+		return this.displayState;
+	}
+
+	move() {
+		return this.submitMove({ kind: "tictactoe", boardIndex: 0, cellIndex: 0 });
+	}
+}
+
+const NOW = 1_000_000;
+const initial = tictactoeEngine.createInitialState();
+const afterOne = tictactoeEngine.applyMove(initial, 0, {
+	kind: "tictactoe",
+	boardIndex: 0,
+	cellIndex: 0
+});
+const afterTwo = tictactoeEngine.applyMove(afterOne, 1, {
+	kind: "tictactoe",
+	boardIndex: 1,
+	cellIndex: 0
+});
+const afterThree = tictactoeEngine.applyMove(afterTwo, 0, {
+	kind: "tictactoe",
+	boardIndex: 2,
+	cellIndex: 0
+});
+
+let destroy: () => void;
+
+function createRoom() {
+	const rooted = createRooted(() => new SeatRoom());
+	destroy = () => {
+		rooted.instance.dispose();
+		rooted.destroy();
+	};
+	return rooted.instance;
+}
+
+function playedThrough(states: GameState[]) {
+	setQueryResult(api.models.rooms.index.get, roomSnapshot(states[states.length - 1]));
+	setQueryResult(api.models.games.index.history, historyOf(states));
+}
+
+beforeEach(() => {
+	vi.useFakeTimers();
+	vi.setSystemTime(NOW);
+});
+
+afterEach(() => {
+	destroy();
+	resetConvex();
+	vi.useRealTimers();
+});
+
+describe("Room", () => {
+	test("the room is loading until the room query resolves", () => {
+		const room = createRoom();
+		expect(room.isLoading).toBe(true);
+
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(initial));
+		expect(room.isLoading).toBe(false);
+	});
+
+	test("both seats read as empty and the viewer unseated while loading", () => {
+		const room = createRoom();
+		expect(room.players).toEqual([null, null]);
+		expect(room.myIndex).toBeNull();
+	});
+
+	test("myIndex is the viewer's seat", () => {
+		const room = createRoom();
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(initial, { myIndex: 1 }));
+		expect(room.myIndex).toBe(1);
+	});
+
+	test("myIndex is null for a spectator", () => {
+		const room = createRoom();
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(initial, { myIndex: null }));
+		expect(room.myIndex).toBeNull();
+	});
+
+	test("the room waits for an opponent while a seat is empty", () => {
+		const room = createRoom();
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(initial, { players: [ALICE, null] }));
+		expect(room.isWaitingForOpponent).toBe(true);
+	});
+
+	test("the room stops waiting once both seats are filled", () => {
+		const room = createRoom();
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(initial));
+		expect(room.isWaitingForOpponent).toBe(false);
+	});
+
+	test("isRoomClosed follows the room's closed status", () => {
+		const room = createRoom();
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(initial));
+		expect(room.isRoomClosed).toBe(false);
+
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(initial, { status: "closed" }));
+		expect(room.isRoomClosed).toBe(true);
+	});
+
+	test("a room code that belongs to another game is flagged as the wrong game type", () => {
+		const room = createRoom();
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(initial, { type: "checkers" }));
+		expect(room.wrongGameType).toBe(true);
+	});
+
+	test("a missing room is not mistaken for the wrong game type", () => {
+		const room = createRoom();
+		setQueryResult(api.models.rooms.index.get, null);
+		expect(room.wrongGameType).toBe(false);
+	});
+
+	test("the round defaults to a live round 1 while loading", () => {
+		const room = createRoom();
+		expect(room.game).toEqual({
+			round: 1,
+			latestRound: 1,
+			isLive: true,
+			endedSeat: null,
+			reason: null
+		});
+	});
+
+	test("a pinned past round reports itself as not live, with the latest round alongside", () => {
+		const room = createRoom();
+		setQueryResult(
+			api.models.rooms.index.get,
+			roomSnapshot(initial, { game: { round: 2, latestRound: 4, isLive: false } })
+		);
+		expect(room.game.round).toBe(2);
+		expect(room.game.latestRound).toBe(4);
+		expect(room.game.isLive).toBe(false);
+	});
+
+	test("a resigned round reports which seat ended it and why", () => {
+		const room = createRoom();
+		setQueryResult(
+			api.models.rooms.index.get,
+			roomSnapshot(initial, { game: { endedSeat: 1, reason: "resign" } })
+		);
+		expect(room.game.endedSeat).toBe(1);
+		expect(room.game.reason).toBe("resign");
+	});
+
+	test("the opponent shows as disconnected after 30s without a heartbeat", () => {
+		const room = createRoom();
+		setQueryResult(
+			api.models.rooms.index.get,
+			roomSnapshot(initial, { players: [ALICE, { ...BOB, seenAt: NOW - 31_000 }] })
+		);
+		expect(room.opponentDisconnected).toBe(true);
+	});
+
+	test("an opponent who heartbeated recently is connected", () => {
+		const room = createRoom();
+		setQueryResult(
+			api.models.rooms.index.get,
+			roomSnapshot(initial, { players: [ALICE, { ...BOB, seenAt: NOW - 5_000 }] })
+		);
+		expect(room.opponentDisconnected).toBe(false);
+	});
+
+	test("an opponent goes disconnected as time passes without a heartbeat", () => {
+		const room = createRoom();
+		setQueryResult(
+			api.models.rooms.index.get,
+			roomSnapshot(initial, { players: [ALICE, { ...BOB, seenAt: NOW }] })
+		);
+		vi.advanceTimersByTime(31_000);
+		expect(room.opponentDisconnected).toBe(true);
+	});
+
+	test("an opponent who never heartbeated isn't shown as disconnected", () => {
+		const room = createRoom();
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(initial));
+		vi.advanceTimersByTime(60_000);
+		expect(room.opponentDisconnected).toBe(false);
+	});
+
+	test("a spectator sees no one as disconnected", () => {
+		const room = createRoom();
+		setQueryResult(
+			api.models.rooms.index.get,
+			roomSnapshot(initial, {
+				myIndex: null,
+				players: [
+					{ ...ALICE, seenAt: NOW - 60_000 },
+					{ ...BOB, seenAt: NOW - 60_000 }
+				]
+			})
+		);
+		expect(room.opponentDisconnected).toBe(false);
+	});
+
+	test("the clock shows banked time while no countdown has started", () => {
+		const room = createRoom();
+		room.seat = 0;
+		setQueryResult(
+			api.models.rooms.index.get,
+			roomSnapshot(initial, { clock: { remaining: [45_000, 50_000], turnedAt: null } })
+		);
+		vi.advanceTimersByTime(5_000);
+		expect(room.clock.remaining).toEqual([45_000, 50_000]);
+	});
+
+	test("only the active seat's clock ticks down", () => {
+		const room = createRoom();
+		room.seat = 1;
+		setQueryResult(
+			api.models.rooms.index.get,
+			roomSnapshot(initial, { clock: { remaining: [45_000, 50_000], turnedAt: NOW } })
+		);
+		vi.advanceTimersByTime(5_000);
+		expect(room.clock.remaining).toEqual([45_000, 45_000]);
+		expect(room.clock.activeSeat).toBe(1);
+	});
+
+	test("a running clock never shows less than zero", () => {
+		const room = createRoom();
+		room.seat = 0;
+		setQueryResult(
+			api.models.rooms.index.get,
+			roomSnapshot(initial, { clock: { remaining: [2_000, 50_000], turnedAt: NOW } })
+		);
+		vi.advanceTimersByTime(5_000);
+		expect(room.clock.remaining[0]).toBe(0);
+	});
+
+	test("the clock display freezes while reviewing history", () => {
+		const room = createRoom();
+		room.seat = 0;
+		setQueryResult(
+			api.models.rooms.index.get,
+			roomSnapshot(afterTwo, { clock: { remaining: [45_000, 50_000], turnedAt: NOW } })
+		);
+		setQueryResult(api.models.games.index.history, historyOf([afterOne, afterTwo]));
+
+		room.stepBack();
+		flushSync();
+		vi.advanceTimersByTime(5_000);
+
+		expect(room.clock.remaining).toEqual([45_000, 50_000]);
+		expect(room.clock.activeSeat).toBeNull();
+	});
+
+	test("the clock resumes from live time when returning from history", () => {
+		const room = createRoom();
+		room.seat = 0;
+		setQueryResult(
+			api.models.rooms.index.get,
+			roomSnapshot(afterTwo, { clock: { remaining: [45_000, 50_000], turnedAt: NOW } })
+		);
+		setQueryResult(api.models.games.index.history, historyOf([afterOne, afterTwo]));
+
+		room.stepBack();
+		flushSync();
+		vi.advanceTimersByTime(5_000);
+		room.jumpToLatest();
+		flushSync();
+
+		expect(room.clock.remaining).toEqual([40_000, 50_000]);
+	});
+
+	test("the timeout is claimed once the active seat's clock runs out", () => {
+		const room = createRoom();
+		room.seat = 0;
+		setQueryResult(
+			api.models.rooms.index.get,
+			roomSnapshot(initial, { clock: { remaining: [1_000, 50_000], turnedAt: NOW } })
+		);
+
+		vi.advanceTimersByTime(2_000);
+		flushSync();
+
+		expect(mutationFor(api.models.games.index.timeout)).toHaveBeenCalledWith({ code: "ABCD" });
+	});
+
+	test("no timeout is claimed while the active seat has time left", () => {
+		const room = createRoom();
+		room.seat = 0;
+		setQueryResult(
+			api.models.rooms.index.get,
+			roomSnapshot(initial, { clock: { remaining: [10_000, 50_000], turnedAt: NOW } })
+		);
+
+		vi.advanceTimersByTime(2_000);
+		flushSync();
+
+		expect(mutationFor(api.models.games.index.timeout)).not.toHaveBeenCalled();
+	});
+
+	test.fails("a timeout claim the server ignores is not immediately re-sent", async () => {
+		// Bug: the claim effect re-runs as soon as #isClaimingTimeout resets, so an unchanged server state retries forever.
+		const room = createRoom();
+		room.seat = 0;
+		setQueryResult(
+			api.models.rooms.index.get,
+			roomSnapshot(initial, { clock: { remaining: [1_000, 50_000], turnedAt: NOW } })
+		);
+		vi.advanceTimersByTime(2_000);
+		flushSync();
+
+		for (let turn = 0; turn < 3; turn++) {
+			await Promise.resolve();
+			await Promise.resolve();
+			flushSync();
+		}
+
+		expect(mutationFor(api.models.games.index.timeout)).toHaveBeenCalledTimes(1);
+	});
+
+	test("the live position counts as the latest move", () => {
+		const room = createRoom();
+		playedThrough([afterOne, afterTwo, afterThree]);
+		expect(room.isViewingHistory).toBe(false);
+		expect(room.viewedMoveNumber).toBe(3);
+		expect(room.historyLength).toBe(3);
+	});
+
+	test("stepping back shows the previous move's snapshot", () => {
+		const room = createRoom();
+		playedThrough([afterOne, afterTwo, afterThree]);
+
+		room.stepBack();
+
+		expect(room.isViewingHistory).toBe(true);
+		expect(room.viewedMoveNumber).toBe(2);
+		expect(room.shownState).toEqual(afterTwo);
+	});
+
+	test("stepping back stops at the first move", () => {
+		const room = createRoom();
+		playedThrough([afterOne, afterTwo, afterThree]);
+
+		room.stepBack();
+		room.stepBack();
+		room.stepBack();
+		room.stepBack();
+
+		expect(room.viewedMoveNumber).toBe(1);
+		expect(room.shownState).toEqual(afterOne);
+	});
+
+	test.fails("stepping back when the only move is the live one stays live", () => {
+		// Bug: with one move, stepBack clamps the cursor to 0 (the live move) but still enters history mode.
+		const room = createRoom();
+		playedThrough([afterOne]);
+
+		room.stepBack();
+
+		expect(room.isViewingHistory).toBe(false);
+	});
+
+	test("stepping back before any move is played does nothing", () => {
+		const room = createRoom();
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(initial));
+		setQueryResult(api.models.games.index.history, []);
+
+		room.stepBack();
+
+		expect(room.isViewingHistory).toBe(false);
+		expect(room.viewedMoveNumber).toBe(0);
+	});
+
+	test("stepping forward onto the latest move returns to live", () => {
+		const room = createRoom();
+		playedThrough([afterOne, afterTwo, afterThree]);
+
+		room.stepBack();
+		room.stepBack();
+		room.stepForward();
+		expect(room.viewedMoveNumber).toBe(2);
+
+		room.stepForward();
+		expect(room.isViewingHistory).toBe(false);
+		expect(room.shownState).toEqual(afterThree);
+	});
+
+	test("stepping forward while live does nothing", () => {
+		const room = createRoom();
+		playedThrough([afterOne, afterTwo]);
+
+		room.stepForward();
+
+		expect(room.isViewingHistory).toBe(false);
+		expect(room.viewedMoveNumber).toBe(2);
+	});
+
+	test("jumping to the first move shows the first snapshot", () => {
+		const room = createRoom();
+		playedThrough([afterOne, afterTwo, afterThree]);
+
+		room.jumpToFirst();
+
+		expect(room.viewedMoveNumber).toBe(1);
+		expect(room.shownState).toEqual(afterOne);
+	});
+
+	test("jumping to the latest move returns to live", () => {
+		const room = createRoom();
+		playedThrough([afterOne, afterTwo, afterThree]);
+
+		room.jumpToFirst();
+		room.jumpToLatest();
+
+		expect(room.isViewingHistory).toBe(false);
+	});
+
+	test("a round reset that clears history drops the viewer back to live", () => {
+		const room = createRoom();
+		playedThrough([afterOne, afterTwo, afterThree]);
+		room.stepBack();
+		flushSync();
+
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(initial));
+		setQueryResult(api.models.games.index.history, []);
+		flushSync();
+
+		expect(room.isViewingHistory).toBe(false);
+		expect(room.shownState).toEqual(initial);
+	});
+
+	test("a rejected move surfaces the server's message", async () => {
+		const room = createRoom();
+		mutationFor(api.models.rooms.index.play).mockRejectedValueOnce(new Error("Not your turn"));
+
+		await room.move();
+
+		expect(room.error).toBe("Not your turn");
+	});
+
+	test("a rejection that isn't an Error falls back to a generic message", async () => {
+		const room = createRoom();
+		mutationFor(api.models.rooms.index.play).mockRejectedValueOnce("offline");
+
+		await room.move();
+
+		expect(room.error).toBe("Something went wrong");
+	});
+
+	test("a successful move clears the previous error", async () => {
+		const room = createRoom();
+		mutationFor(api.models.rooms.index.play).mockRejectedValueOnce(new Error("Not your turn"));
+		await room.move();
+
+		await room.move();
+
+		expect(room.error).toBeNull();
+	});
+
+	test("a failed resign surfaces the server's message", async () => {
+		const room = createRoom();
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(initial));
+		mutationFor(api.models.games.index.resign).mockRejectedValueOnce(
+			new Error("This room is no longer active")
+		);
+
+		await room.resign();
+
+		expect(room.error).toBe("This room is no longer active");
+	});
+
+	test("a failed abandon surfaces the server's message", async () => {
+		const room = createRoom();
+		mutationFor(api.models.rooms.index.abandon).mockRejectedValueOnce(new Error("Room not found"));
+
+		await room.abandon();
+
+		expect(room.error).toBe("Room not found");
+	});
+
+	test("a failed trash-talk surfaces the server's message", async () => {
+		const room = createRoom();
+		mutationFor(api.models.players.index.trashtalk).mockRejectedValueOnce(
+			new Error("You are not in this room")
+		);
+
+		await room.trashtalk("1f525");
+
+		expect(room.error).toBe("You are not in this room");
+	});
+
+	test("a lost timeout race is not shown to the viewer", async () => {
+		const room = createRoom();
+		mutationFor(api.models.games.index.timeout).mockRejectedValueOnce(new Error("Game not found"));
+
+		await room.timeout();
+
+		expect(room.error).toBeNull();
+	});
+
+	test("a rematch returns the viewer to the live position", async () => {
+		const room = createRoom();
+		playedThrough([afterOne, afterTwo, afterThree]);
+		room.stepBack();
+
+		await room.rematch();
+
+		expect(room.isViewingHistory).toBe(false);
+	});
+
+	test("a rematch from a pinned past round does nothing", async () => {
+		const room = createRoom();
+		setQueryResult(
+			api.models.rooms.index.get,
+			roomSnapshot(afterThree, { game: { round: 1, latestRound: 2, isLive: false } })
+		);
+		setQueryResult(api.models.games.index.history, historyOf([afterOne, afterTwo, afterThree]));
+		room.stepBack();
+
+		await room.rematch();
+
+		expect(room.isViewingHistory).toBe(true);
+	});
+});

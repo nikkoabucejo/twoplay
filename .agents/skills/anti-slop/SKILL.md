@@ -104,6 +104,8 @@ names. Unprefixed booleans. A second name for an existing concept. Hungarian or 
   checking behavior.
 - Mocking the unit under test, or mocking what convex-test already provides (db, auth, scheduler).
 - One giant test per function. Use one behavior per `test`, named as the behavior (`"join rejects a full room"`).
+- Test files that don't mirror a source file: split per function, named differently from the source, or
+  testing a function where it isn't defined. Duplicate cases across test files.
 - Re-implementing helpers that `convex/test.setup.ts` already has (`setup`, `signIn`, `seatedRoom`).
 - `expect(true).toBe(true)`, assertion-free tests, `any`-typed fixtures, sleeps instead of fake timers.
 - Deleting or loosening a test to make it pass. A failing test either exposes a bug (fix the code, or mark

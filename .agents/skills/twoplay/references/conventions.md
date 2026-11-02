@@ -35,6 +35,18 @@ Default to none. Write one only for a non-obvious constraint, invariant, or work
   index to a label. Never hardcode `playerCyan`-style names.
 - One concept, one name end-to-end (DB field → server response → client → UI).
 
+## Tests
+- One test file per source file, same name, next to it: `index.ts` gets `index.test.ts`, `board.svelte` gets
+  `board.svelte.test.ts`, and `room.svelte.ts` gets `room.svelte.test.ts`.
+- Use one `describe` per export, in source order, and one behavior per `test`, named as the behavior.
+- Never split one source file's tests across files. If a test file gets too big, split the source module,
+  and the test splits with it.
+- `x.svelte` and `x.svelte.ts` in the same folder share `x.svelte.test.ts`, with a `describe` per export.
+- Barrels (re-export-only `index.ts`), `types.ts`, and `schema.ts` have no test.
+- Code that calls `useQuery`/`useMutation` is tested with the fake in `src/lib/utils/multiplayer/room/fake-convex.svelte.ts`.
+- Test what is defined where it is defined. `resign` lives in `games/index.ts`, so it is tested in `games/index.test.ts`.
+- Known bugs are recorded as `test.fails("…", …)` with a one-line reason.
+
 ## Commit messages
 `<type>(<scope>): <summary>` with type ∈ `feature`, `bug`, `chore`, `refactor`, `docs` — e.g.
 `feature(leaderboard): add leaderboard`.
