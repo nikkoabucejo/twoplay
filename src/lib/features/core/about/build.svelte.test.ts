@@ -173,7 +173,7 @@ function recordClaims(work: Record<StepKind, StepWork>) {
 	return { claims, work: recorded };
 }
 
-const TIERS = [1.5, 2.5, 3];
+const TIERS = [1.5, 2.3, 2.8];
 
 /**
  * Records the run's pace and `progress` after each frame, from the hero's review on. `progress` is
@@ -560,10 +560,10 @@ describe("AboutBuild", RUN_TIMEOUT, () => {
 		expect(Math.max(...firstThird.map(({ pace }) => pace))).toBeGreaterThan(2);
 		for (const { pace } of paces) {
 			expect(pace).toBeGreaterThanOrEqual(1);
-			expect(pace).toBeLessThanOrEqual(3);
+			expect(pace).toBeLessThanOrEqual(2.8);
 		}
-		expect(paces[paces.length - 1].pace).toBeCloseTo(3, 6);
-		for (const { asked, took } of timed) expect(took).toBeGreaterThanOrEqual(asked / 3 - 16);
+		expect(paces[paces.length - 1].pace).toBeCloseTo(2.8, 6);
+		for (const { asked, took } of timed) expect(took).toBeGreaterThanOrEqual(asked / 2.8 - 16);
 	}, 60_000);
 
 	test("work left above the view completes once the scroll lands", async () => {
@@ -855,6 +855,24 @@ describe("AboutBuild assists", RUN_TIMEOUT, () => {
 			overlaps: () => overlaps
 		};
 	}
+
+	test("agents keep working for a second after follow-scroll lands before they gather", async () => {
+		const { build } = recordWork();
+		trackScroll(build);
+		build.start();
+		let landedAt: number | null = null;
+		let gatherAt: number | null = null;
+		for (let ms = 0; build.isBuilding && ms < 90_000; ms += 16) {
+			await vi.advanceTimersByTimeAsync(16);
+			if (landedAt === null && main.scrollTop >= SCROLL_MAX - 0.5) landedAt = Date.now();
+			if (gatherAt === null && build.cursors.some((cursor) => cursor.bubble === "shipped"))
+				gatherAt = Date.now();
+		}
+		expect(build.phase).toBe("done");
+		expect(landedAt).not.toBeNull();
+		expect(gatherAt).not.toBeNull();
+		expect(gatherAt! - landedAt!).toBeGreaterThanOrEqual(1000 - 16);
+	});
 
 	test("idle agents assist on built elements in view, never on one still being built", async () => {
 		const { build, stepStarts, assists } = recordWork();

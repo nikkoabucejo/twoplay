@@ -134,9 +134,11 @@ const CATCH_UP_SMOOTH_MS = 500;
  * Builders' base pace for each third after the hero's review: of follow-scroll's distance while it
  * runs, else of the steps left at the review. It never drops, and stays at the last until the end.
  */
-const PACE_TIERS = [1.5, 2.5, 3];
+const PACE_TIERS = [1.5, 2.3, 2.8];
 /** Follow-scroll eases in and out over this long. */
 const FOLLOW_EASE_MS = 1000;
+/** Agents keep building at least this long after follow-scroll lands, before they gather. */
+const LANDED_HOLD_MS = 1000;
 const SCROLL_KEYS = new Set(["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "]);
 
 export class AgentCursor {
@@ -174,7 +176,7 @@ export class CountedValue {
 
 export type Run = {
 	readonly isCompact: boolean;
-	/** Speed-up (1–3) already applied to `sleep` and `tween` durations. */
+	/** Speed-up (1–2.8) already applied to `sleep` and `tween` durations. */
 	readonly pace: number;
 	readonly cursors: readonly AgentCursor[];
 	sleep(ms: number): Promise<void>;
@@ -325,6 +327,7 @@ export class AboutBuild {
 		startMs: number;
 		durationMs: number;
 		isLanded: boolean;
+		landedAtMs: number | null;
 		/** Share of `distance` scrolled so far. */
 		progress: number;
 	} | null = null;
@@ -665,7 +668,7 @@ export class AboutBuild {
 		this.cursors.push(cursor);
 		this.joined++;
 		await enter(cursor, index, run);
-		while (graph.steps.some((step) => step.status !== "done")) {
+		while (graph.steps.some((step) => step.status !== "done") || this.#isHolding()) {
 			const step = this.#pick(agent, graph);
 			if (!step) {
 				const assist = this.#pickAssist(agent, graph);
@@ -689,6 +692,13 @@ export class AboutBuild {
 			this.#settle(step, el, graph);
 		}
 		cursor.action = "";
+	}
+
+	/** While follow-scroll runs, and for LANDED_HOLD_MS after it lands, agents keep working. */
+	#isHolding(): boolean {
+		const follow = this.#follow;
+		if (!follow || !this.isFollowing) return false;
+		return follow.landedAtMs === null || this.#clockMs < follow.landedAtMs + LANDED_HOLD_MS;
 	}
 
 	/**
@@ -879,6 +889,7 @@ export class AboutBuild {
 			startMs: this.#clockMs,
 			durationMs: speed > 0 ? distance / speed + FOLLOW_EASE_MS : 0,
 			isLanded: false,
+			landedAtMs: null,
 			progress: 0
 		};
 	}
@@ -949,7 +960,10 @@ export class AboutBuild {
 		else if (t > durationMs - ease)
 			offset = distance - (speed * (durationMs - t) ** 2) / (2 * ease);
 		else offset = (speed * ease) / 2 + speed * (t - ease);
-		if (t === durationMs) follow.isLanded = true;
+		if (t === durationMs) {
+			follow.isLanded = true;
+			follow.landedAtMs = this.#clockMs;
+		}
 		follow.progress = distance > 0 ? offset / distance : 1;
 		return {
 			scroller,

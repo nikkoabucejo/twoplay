@@ -1,6 +1,7 @@
 # about-build Specification
 
 ## Purpose
+
 Plays a live build of the About page by nine named agent cursors on a visitor's first visit, as a client-only layer over the complete server-rendered page.
 
 ## Requirements
@@ -173,7 +174,12 @@ Once the first section is reviewed, the page SHALL scroll to the bottom along on
 #### Scenario: Builders speed up after the hero
 
 - **WHEN** the first section is reviewed
-- **THEN** step and assist timing runs 1.5, then 2.5, then 3 times its hero speed over thirds of the rest of the run (of the scroll while following, else of the steps left), each change easing in over about 1 s, holding 3 times until the run ends, and the scroll speed does not change
+- **THEN** step and assist timing runs 1.5, then 2.3, then 2.8 times its hero speed over thirds of the rest of the run (of the scroll while following, else of the steps left), each change easing in over about 1 s, holding 2.8 times until the run ends, and the scroll speed does not change
+
+#### Scenario: Building continues after the scroll lands
+
+- **WHEN** follow-scroll reaches the bottom
+- **THEN** agents keep working for at least 1 s before they gather
 
 #### Scenario: Builders catch up
 

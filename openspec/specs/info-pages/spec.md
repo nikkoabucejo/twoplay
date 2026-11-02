@@ -17,7 +17,7 @@ Gives the app a Tour page, an About page, and plain-language Privacy and Terms p
 
 ### Requirement: About page
 
-`/about` SHALL tell the project story in this order: a hero with the only `h1` ("How twoplay came to be") and the stats 1 engineer, 9 agents, 2 games, 860+ tests; Who I am; Why this?; Highlights; How it's built (the eight-step `/dev:work` pipeline with Approval by Nikko); What I learned; a Timeline of milestones from the git history starting at the first commit, each with its short commit hash; What's next; a link to the Tour; and a "Made by Nikko Abucejo" credit with one link to `https://github.com/nikkoabucejo/twoplay` that opens in a new tab.
+`/about` SHALL tell the project story in this order: a hero with the only `h1` and the project stats; Who I am; Why this?; Highlights; How it's built, with Approval by Nikko; What I learned; a Timeline from the first commit, with short commit hashes; What's next; a link to the Tour; and a "Made by Nikko Abucejo" credit with one link to the GitHub repo that opens in a new tab.
 
 #### Scenario: About renders
 
