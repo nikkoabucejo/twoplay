@@ -1,44 +1,35 @@
 # twoplay
 
-Real-time two-player games: SvelteKit + Svelte 5 runes + Tailwind v4 + shadcn-svelte + Convex + Clerk. pnpm.
+Real-time two-player games. SvelteKit, Svelte 5 runes, Tailwind v4, shadcn-svelte, Convex, Clerk. pnpm.
 
-## Start here
-- **Project knowledge:** `.agents/skills/twoplay/` (architecture, conventions, backend, games). Read it before writing code.
-- **Do work through `/dev:work <request>`.** It runs triage → OpenSpec spec → implement → verify → deslop → review → docs sync → archive → commit.
-  - `/dev:work <change-id>` resumes. `/dev:status` shows in-flight work. `/dev:review` runs the review panel on the current diff.
-  - Flags: `--auto` skips the plan-approval gate, `--no-commit` stops before committing, `--branch` works on a new branch
-    (the default is the current branch), and `--push` pushes after committing.
+## Read
+- `WORKFLOW.md`: how work flows (`/dev:work`, workflows, agents).
+- `GLOSSARY.md`: domain, code, and workflow terms.
+- `.agents/skills/twoplay/`: architecture, conventions, backend, games, decisions.
 
-## Tooling
-- **OpenSpec** (`openspec` CLI, `/opsx:*` commands) owns specs: `openspec/specs/` is the truth, `openspec/changes/` holds proposals.
-- **SuperSpec discipline skills** (vendored, adapted to OpenSpec): `superspec-brainstorm`, `superspec-tdd`,
-  `superspec-debugging`, `superspec-verification`, `superspec-receiving-review`, `superspec-finish-branch`.
-- **Stack skills** (upstream, see `.agents/SOURCES.md`): `svelte-core-bestpractices`, `svelte-code-writer`,
-  `shadcn-svelte`, `convex`, `convex-design`, `convex-authz`, `convex-reviewer`, `convex-migrate`, `convex-test`,
-  `convex-deploy-guard`, `clerk`, `clerk-custom-ui`. Where they conflict with `twoplay`, the `twoplay` skill wins.
-- **Agents** (`.agents/agents/`): `triage`, `architect`, `engineer`, `designer`, `steward`, `security`, `verifier`, `reviewer`.
-  `steward` owns conventions, architecture, and the `twoplay` references: it conforms diffs, syncs docs, and audits drift.
-- **More commands:** `/dev:deslop` strips slop and drift from the current diff. `/dev:audit [area]` reports convention and architecture drift.
+## Work
+- Use `/dev:work <request>`. Flags: `--auto`, `--no-commit`, `--branch`, `--push`.
+- Other commands: `/dev:status`, `/dev:review`, `/dev:deslop`, `/dev:audit`, `/opsx:*`.
 
-## Non-negotiables
-- **No AI slop.** All agent-written code follows `.agents/skills/anti-slop`. Run its pass, or `/dev:deslop`, before calling work done.
-- The Convex server is the authority. Authenticate via `ctx.auth` and check room membership in every mutation.
-- No completion claim without fresh `pnpm check` (0 errors, 0 warnings). There is no test runner yet.
-- Never push, run `convex deploy`, or edit `.env*` without being asked.
+## Rules
+- The Convex server is the authority. Every mutation authenticates via `ctx.auth` and checks room membership.
+- All agent-written code follows `.agents/skills/anti-slop`.
+- Explore with CodeGraph (`codegraph_explore`) before Grep/Read. Run `codegraph impact <symbol>` before editing a shared symbol.
+- No completion claim without `pnpm check` passing (0 errors, 0 warnings). There is no test runner.
+- Never push without being asked, force-push, run `convex deploy`, or edit `.env*`.
+- Docs are factual and minimal.
 
-## Where agent config lives
-`.agents/` is the single source of truth. Edit files there, never under `.claude/`.
-
+## Layout
 ```
-.agents/
-  skills/<name>/SKILL.md     # project knowledge, OpenSpec + SuperSpec skills
-  agents/<name>.md           # subagents
-  commands/{dev,opsx}/*.md   # slash commands
-  link.sh                    # (re)creates the .claude/ symlinks
-  SOURCES.md                 # upstream origin + commit of every third-party skill
+.agents/                 source of truth; .claude/* are symlinks into it
+  skills/<name>/         project, OpenSpec, SuperSpec, stack, anti-slop
+  agents/<name>.md       triage architect engineer designer steward verifier reviewer security
+  commands/{dev,opsx}/   slash commands
+  workflows/*.js         dev-plan, dev-build
+  link.sh                recreate .claude symlinks after adding or renaming
+  SOURCES.md             upstream origin of third-party skills
+openspec/                specs (truth) and changes (proposals)
+.codegraph/              local CodeGraph index (gitignored); server in .mcp.json
 ```
 
-`.claude/{skills,agents,commands}/*` are symlinks into `.agents/`, which is how Claude Code finds them.
-After adding, removing, or renaming anything in `.agents/`, run `.agents/link.sh`.
-`openspec update` writes into `.claude/skills` and `.claude/commands/opsx`; those paths are already
-symlinks, so its output lands in `.agents/`. Run `.agents/link.sh` afterwards anyway.
+New clone: `pnpm install`, then `codegraph init -y`, then `.agents/link.sh`.

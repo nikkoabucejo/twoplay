@@ -13,6 +13,13 @@ Template:
 **Follow-ups:** <existing code that now violates it, or "—">
 ```
 
+## 2026-11-02 — CodeGraph for code navigation
+**Decision:** Agents explore code through CodeGraph (`codegraph_explore` over MCP, plus `codegraph impact`/`callers` from the
+CLI) before Grep/Read, and check the blast radius before changing a shared symbol. The index is local and gitignored, and the server is registered in `.mcp.json`.
+**Why:** It finds code in fewer tool calls, and impact/caller queries catch affected code outside the diff.
+**Supersedes:** —
+**Follow-ups:** —
+
 ## 2026-11-02 — Anti-slop applies to all agent-written code
 **Decision:** Every agent follows `.agents/skills/anti-slop` while writing, and `/dev:work` runs a
 steward conform (deslop) pass on every diff before review.

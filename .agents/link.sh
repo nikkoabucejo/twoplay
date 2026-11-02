@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Mirrors .agents/{skills,agents,commands} into .claude/ as relative symlinks.
+# Mirrors .agents/{skills,agents,commands,workflows} into .claude/ as relative symlinks.
 # Anything Claude-side that is a real file/dir (e.g. a tool wrote it there) is moved into .agents first.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root"
 
-for kind in skills agents commands; do
+for kind in skills agents commands workflows; do
 	mkdir -p ".agents/$kind" ".claude/$kind"
 
 	for entry in .claude/"$kind"/*; do
@@ -28,4 +28,4 @@ for kind in skills agents commands; do
 		[ -e ".claude/$kind/$name" ] || ln -s "../../.agents/$kind/$name" ".claude/$kind/$name"
 	done
 done
-echo "linked: $(find .claude/skills .claude/agents .claude/commands -maxdepth 1 -type l | wc -l | tr -d ' ') entries"
+echo "linked: $(find .claude/skills .claude/agents .claude/commands .claude/workflows -maxdepth 1 -type l | wc -l | tr -d ' ') entries"

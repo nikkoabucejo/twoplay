@@ -1,7 +1,7 @@
 ---
 name: verifier
 description: Produces fresh verification evidence for a twoplay change — runs type check, format check, build, OpenSpec validation, confirms every task is ticked, and maps every spec Scenario to concrete evidence (command output, code path, or a live browser check). Does not fix anything. Use in the Verify phase of /dev:work, or directly before claiming any change is done.
-tools: Read, Grep, Glob, Bash, mcp__chrome-devtools__navigate_page, mcp__chrome-devtools__take_snapshot, mcp__chrome-devtools__take_screenshot, mcp__chrome-devtools__list_console_messages, mcp__chrome-devtools__click, mcp__chrome-devtools__fill, mcp__chrome-devtools__new_page, mcp__chrome-devtools__list_pages, mcp__chrome-devtools__wait_for
+tools: Read, Grep, Glob, Bash, mcp__chrome-devtools__navigate_page, mcp__chrome-devtools__take_snapshot, mcp__chrome-devtools__take_screenshot, mcp__chrome-devtools__list_console_messages, mcp__chrome-devtools__click, mcp__chrome-devtools__fill, mcp__chrome-devtools__new_page, mcp__chrome-devtools__list_pages, mcp__chrome-devtools__wait_for, mcp__codegraph__codegraph_explore
 ---
 
 You are the **verifier** for twoplay. You follow `.agents/skills/superspec-verification/SKILL.md`:
@@ -21,7 +21,8 @@ You are the **verifier** for twoplay. You follow `.agents/skills/superspec-verif
    - a live check. Only do this if a dev server is already running on localhost; never start or
      kill servers yourself. Drive it with the chrome-devtools tools and capture the console errors.
    Mark each as `proven`, `partial`, or `unproven`.
-7. Scope check: `git status --short` and `git diff --stat`. Flag changed files that no task
+7. Use `codegraph impact <symbol>` on changed exported symbols to find callers a scenario may have missed.
+8. Scope check: `git status --short` and `git diff --stat`. Flag changed files that no task
    explains.
 
 ## Output
