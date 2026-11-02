@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { useMutation, useQuery } from "convex-svelte";
 	import { goto } from "$app/navigation";
-	import { Button, Emblem, Spinner, Tabs, type TabItem } from "$lib/components/ui";
+	import { Button, Emblem, Spinner, Tabs, getToaster, type TabItem } from "$lib/components/ui";
 	import { GAMES } from "$lib/features/play";
 	import { getClerkAuth } from "$lib/services/auth";
 	import { cn } from "$lib/utils/style";
+	import { activeRoomRedirect } from "./active-room.js";
+	import { copyLink } from "./copy-link.js";
 	import type { GameType } from "../../../../../convex/models/games/index.js";
 	import { DEFAULT_TIME_CONTROL_MS } from "../../../../../convex/models/rooms/index.js";
 	import { api } from "../../../../../convex/_generated/api.js";
@@ -50,6 +52,7 @@
 	let { initialGame }: { initialGame?: GameType } = $props();
 
 	const auth = getClerkAuth();
+	const toaster = getToaster();
 	const createRoom = useMutation(api.models.rooms.index.create);
 	const enqueuePairing = useMutation(api.models.pairings.index.enqueue);
 	const cancelPairing = useMutation(api.models.pairings.index.cancel);
@@ -69,11 +72,10 @@
 	let timeControlMinutes = $state<number>(DEFAULT_TIME_CONTROL_MINUTES);
 	let mode = $state<PlayMode>("matchmaking");
 	let createdCode = $state<string | null>(null);
-	let copied = $state(false);
-	let copiedTimeout: ReturnType<typeof setTimeout> | undefined;
 
 	const selectedGame = $derived(ENTRIES[centerIndex].type);
 	const queued = $derived(queueStatus.data === true);
+	const isCheckingActiveRoom = $derived(auth.isSignedIn && activeRoom.isLoading);
 
 	const createdRoom = useQuery(api.models.rooms.index.get, () =>
 		createdCode ? { code: createdCode } : "skip"
@@ -84,11 +86,10 @@
 	});
 
 	// Bounces straight into an already-active room rather than letting Create/Join be attempted —
-	// a user can only ever be in one active room at a time. Skipped while `createdCode` is set so this
-	// doesn't fight the "waiting for opponent" share-code screen for the room just created.
+	// a user can only ever be in one active room at a time.
 	$effect(() => {
-		const room = activeRoom.data;
-		if (!createdCode && room) goto(`/${room.type}/${room.code}`);
+		const path = activeRoomRedirect({ room: activeRoom.data, createdCode, isCreating: creating });
+		if (path) goto(path);
 	});
 
 	function selectCard(index: number) {
@@ -154,154 +155,154 @@
 
 	function copyInviteLink() {
 		if (!createdCode) return;
-		navigator.clipboard.writeText(`${location.origin}/${selectedGame}/${createdCode}`);
-		copied = true;
-		clearTimeout(copiedTimeout);
-		copiedTimeout = setTimeout(() => (copied = false), 1500);
+		copyLink(`${location.origin}/${selectedGame}/${createdCode}`, {
+			clipboard: navigator.clipboard,
+			toaster
+		});
 	}
 </script>
 
-{#if auth.isSignedIn && activeRoom.isLoading}
-	<!-- Holds off on the picker entirely while we check for an already-active room — avoids flashing
-	     the create/join UI for a beat before bouncing into that room. -->
-	<div class="flex min-h-0 flex-1 items-center justify-center">
-		<Spinner size="lg" />
-	</div>
-{:else}
-	<div class="flex min-h-0 flex-1 flex-col items-center justify-center px-4 py-8 text-center">
-		<div class="flex w-full max-w-md flex-col items-center">
-			<div
-				class="relative mb-4 flex h-36 w-full items-center justify-center overflow-hidden mask-[linear-gradient(to_right,transparent,black_12%,black_88%,transparent)]"
-			>
-				{#each ENTRIES as entry, index (index)}
-					{@const offset = index - centerIndex}
-					{@const abs = Math.abs(offset)}
-					{@const isSelected = offset === 0}
-					{@const scale = Math.max(0.5, 1.35 - abs * 0.28)}
-					{@const opacity = Math.max(0, 1 - abs * 0.3)}
-					<button
-						type="button"
-						class="absolute top-1/2 left-1/2 flex cursor-default items-center justify-center rounded-xltransition-[transform,opacity] duration-300 ease-out outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed"
-						style="transform: translate(-50%, -50%) translateX({iconOffsetRem(
-							offset
-						)}rem) scale({scale}); opacity: {opacity}; z-index: {50 - abs};"
-						disabled={!!createdCode || queued}
-						onclick={() => selectCard(index)}
-						aria-current={isSelected}
-						aria-label={entry.name}
+<!-- While checking for an already-active room the picker is laid out but invisible, so the create/join
+     UI doesn't flash before the redirect and the page keeps the picker's box when it appears. -->
+<div class="relative flex flex-1 flex-col items-center justify-center py-2 text-center">
+	<div
+		class={cn("flex w-full max-w-md flex-col items-center", isCheckingActiveRoom && "invisible")}
+	>
+		<div
+			class="relative mb-4 flex h-36 w-full items-center justify-center overflow-hidden mask-[linear-gradient(to_right,transparent,black_12%,black_88%,transparent)]"
+		>
+			{#each ENTRIES as entry, index (index)}
+				{@const offset = index - centerIndex}
+				{@const abs = Math.abs(offset)}
+				{@const isSelected = offset === 0}
+				{@const scale = Math.max(0.5, 1.35 - abs * 0.28)}
+				{@const opacity = Math.max(0, 1 - abs * 0.3)}
+				<button
+					type="button"
+					class="absolute top-1/2 left-1/2 flex cursor-default items-center justify-center rounded-xl transition-[transform,opacity] duration-300 ease-out outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed"
+					style="transform: translate(-50%, -50%) translateX({iconOffsetRem(
+						offset
+					)}rem) scale({scale}); opacity: {opacity}; z-index: {50 - abs};"
+					disabled={!!createdCode || queued}
+					onclick={() => selectCard(index)}
+					aria-current={isSelected}
+					aria-label={entry.name}
+				>
+					<div
+						class={cn(
+							"flex size-16 items-center justify-center",
+							isSelected ? "text-foreground" : "text-muted-foreground grayscale"
+						)}
 					>
-						<div
-							class={cn(
-								"flex size-16 items-center justify-center",
-								isSelected ? "text-foreground" : "text-muted-foreground grayscale"
-							)}
-						>
-							<Emblem
-								icon={GAMES[entry.type].icon}
-								colors={GAMES[entry.type].colors}
-								class="size-full"
-								selected={isSelected}
-								sparkles={isSelected}
-							/>
-						</div>
-					</button>
-				{/each}
+						<Emblem
+							icon={GAMES[entry.type].icon}
+							colors={GAMES[entry.type].colors}
+							class="size-full"
+							selected={isSelected}
+							sparkles={isSelected}
+						/>
+					</div>
+				</button>
+			{/each}
 
-				<div
-					class="absolute bottom-1 left-1/2 -translate-x-1/2 text-xs font-semibold text-foreground"
-					aria-live="polite"
-				>
-					{ENTRIES[centerIndex].name}
-				</div>
+			<div
+				class="absolute bottom-1 left-1/2 -translate-x-1/2 text-xs font-semibold text-foreground"
+				aria-live="polite"
+			>
+				{ENTRIES[centerIndex].name}
 			</div>
+		</div>
 
-			{#if !auth.isSignedIn}
-				<div class="flex w-full max-w-xs flex-col items-center gap-3">
-					<p class="text-muted-foreground">Sign in to create or join a room.</p>
-					<Button onclick={() => auth.signIn()}>Sign in</Button>
-				</div>
-			{:else}
-				<div
-					class="flex w-full max-w-xs flex-col items-center gap-6 rounded-2xl border bg-muted/40 p-6 backdrop-blur-sm"
-				>
-					<Tabs
-						items={MODE_OPTIONS}
-						value={mode}
-						onValueChange={(value) => (mode = value)}
-						disabled={!!createdCode || queued}
-						aria-label="Matchmaking or room visibility"
-					/>
+		{#if !auth.isSignedIn}
+			<div class="flex w-full max-w-xs flex-col items-center gap-3">
+				<p class="text-muted-foreground">Sign in to create or join a room.</p>
+				<Button disabled={auth.loadError !== null} onclick={() => auth.signIn()}>Sign in</Button>
+			</div>
+		{:else}
+			<div
+				class="flex w-full max-w-xs flex-col items-center gap-6 rounded-2xl border bg-muted/40 p-6 backdrop-blur-sm"
+			>
+				<Tabs
+					items={MODE_OPTIONS}
+					value={mode}
+					onValueChange={(value) => (mode = value)}
+					disabled={!!createdCode || queued}
+					aria-label="Matchmaking or room visibility"
+				/>
 
-					<Tabs
-						items={TIME_CONTROL_MINUTES.map((minutes) => ({
-							value: minutes,
-							label: `${minutes} min`
-						}))}
-						value={timeControlMinutes}
-						onValueChange={(minutes) => (timeControlMinutes = minutes)}
-						disabled={!!createdCode || queued}
-						aria-label="Starting clock per player"
-					/>
+				<Tabs
+					items={TIME_CONTROL_MINUTES.map((minutes) => ({
+						value: minutes,
+						label: `${minutes} min`
+					}))}
+					value={timeControlMinutes}
+					onValueChange={(minutes) => (timeControlMinutes = minutes)}
+					disabled={!!createdCode || queued}
+					aria-label="Starting clock per player"
+				/>
 
-					<div class="flex w-full flex-col gap-2">
-						{#if createdCode}
-							<div class="flex w-full items-center gap-2">
-								<p
-									class="flex h-9 flex-1 items-center justify-center rounded-md border bg-background/60 font-mono tracking-widest"
-								>
-									{createdCode}
-								</p>
-								<Button variant="outline" onclick={copyInviteLink}>
-									{copied ? "Copied" : "Copy link"}
-								</Button>
-							</div>
-						{:else if queued}
-							<div
-								class="flex w-full flex-col items-center gap-3 rounded-md border bg-background/60 px-4 py-13.25"
+				<div class="flex w-full flex-col gap-2">
+					{#if createdCode}
+						<div class="flex w-full items-center gap-2">
+							<p
+								class="flex h-9 flex-1 items-center justify-center rounded-md border bg-background/60 font-mono tracking-widest"
 							>
-								<div class="flex flex-col items-center gap-0.5" aria-live="polite">
-									<p class="flex items-center gap-1 text-sm font-semibold text-foreground">
-										Finding a match
-									</p>
-									<p class="text-xs text-muted-foreground">
-										{GAMES[selectedGame].name} &middot; {timeControlMinutes} min
-									</p>
-								</div>
+								{createdCode}
+							</p>
+							<Button variant="outline" onclick={copyInviteLink}>Copy link</Button>
+						</div>
+					{:else if queued}
+						<div
+							class="flex w-full flex-col items-center gap-3 rounded-md border bg-background/60 px-4 py-13.25"
+						>
+							<div class="flex flex-col items-center gap-0.5" aria-live="polite">
+								<p class="flex items-center gap-1 text-sm font-semibold text-foreground">
+									Finding a match
+								</p>
+								<p class="text-xs text-muted-foreground">
+									{GAMES[selectedGame].name} &middot; {timeControlMinutes} min
+								</p>
 							</div>
-							<Button variant="outline" class="w-full" onclick={handleCancelQueue}>Cancel</Button>
-						{:else}
-							<Button class="w-full" onclick={handleStart} disabled={queuing || creating}>
-								{mode === "matchmaking" ? "Find Match" : "Create Room"}
-							</Button>
-						{/if}
+						</div>
+						<Button variant="outline" class="w-full" onclick={handleCancelQueue}>Cancel</Button>
+					{:else}
+						<Button class="w-full" onclick={handleStart} disabled={queuing || creating}>
+							{mode === "matchmaking" ? "Find Match" : "Create Room"}
+						</Button>
+					{/if}
+				</div>
+
+				{#if !createdCode && !queued}
+					<div class="flex w-full items-center gap-3 text-xs text-muted-foreground">
+						<div class="h-px flex-1 bg-border"></div>
+						or
+						<div class="h-px flex-1 bg-border"></div>
 					</div>
 
-					{#if !createdCode && !queued}
-						<div class="flex w-full items-center gap-3 text-xs text-muted-foreground">
-							<div class="h-px flex-1 bg-border"></div>
-							or
-							<div class="h-px flex-1 bg-border"></div>
-						</div>
+					<form class="flex w-full flex-col items-center gap-3" onsubmit={handleJoin}>
+						<input
+							type="text"
+							placeholder="Room code"
+							bind:value={joinCode}
+							maxlength={6}
+							class="w-full rounded-md border bg-background px-3 py-2 text-center font-mono uppercase tracking-widest"
+						/>
+						<Button type="submit" variant="outline" class="w-full" disabled={!joinCode.trim()}>
+							Join room
+						</Button>
+					</form>
+				{/if}
 
-						<form class="flex w-full flex-col items-center gap-3" onsubmit={handleJoin}>
-							<input
-								type="text"
-								placeholder="Room code"
-								bind:value={joinCode}
-								maxlength={6}
-								class="w-full rounded-md border bg-background px-3 py-2 text-center font-mono uppercase tracking-widest"
-							/>
-							<Button type="submit" variant="outline" class="w-full" disabled={!joinCode.trim()}>
-								Join room
-							</Button>
-						</form>
-					{/if}
-
-					{#if error}
-						<p class="text-sm text-destructive">{error}</p>
-					{/if}
-				</div>
-			{/if}
-		</div>
+				{#if error}
+					<p class="text-sm text-destructive">{error}</p>
+				{/if}
+			</div>
+		{/if}
 	</div>
-{/if}
+
+	{#if isCheckingActiveRoom}
+		<div class="absolute inset-0 flex items-center justify-center">
+			<Spinner size="lg" />
+		</div>
+	{/if}
+</div>

@@ -139,7 +139,7 @@ describe("CheckersRoom", () => {
 		expect(room.isMyTurn).toBe(false);
 	});
 
-	test("the viewer has no turn while reviewing history", () => {
+	test("reviewing history keeps the viewer's turn but blocks their moves", () => {
 		const first = checkersEngine.applyMove(initial, 0, {
 			kind: "checkers",
 			from: FRONT,
@@ -152,11 +152,13 @@ describe("CheckersRoom", () => {
 		});
 		const room = createRoom(roomSnapshot(second));
 		setQueryResult(api.models.games.index.history, historyOf([first, second]));
-		expect(room.isMyTurn).toBe(true);
+		expect(room.canMove).toBe(true);
 
 		room.stepBack();
 
-		expect(room.isMyTurn).toBe(false);
+		expect(room.isMyTurn).toBe(true);
+		expect(room.canMove).toBe(false);
+		expect(room.canSelect(idx(2, 1))).toBe(false);
 	});
 
 	test("a piece with a free square ahead can be selected", () => {

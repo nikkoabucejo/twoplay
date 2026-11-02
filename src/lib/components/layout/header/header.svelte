@@ -1,94 +1,96 @@
+<script lang="ts" module>
+	export type HeaderLiveGame = {
+		href: string;
+		name: string;
+	};
+
+	export type HeaderProps = {
+		pathname: string;
+		/** The viewer's active room, when they aren't already in it. */
+		live: HeaderLiveGame | null;
+	};
+</script>
+
 <script lang="ts">
-	import { Gamepad2, History, House, LogOut, Trophy, Users } from "@lucide/svelte";
-	import { Button } from "$lib/components/ui";
+	import {
+		Beacon,
+		Button,
+		Dropdown,
+		DropdownContent,
+		DropdownItem,
+		DropdownSeparator,
+		DropdownTrigger,
+		Link
+	} from "$lib/components/ui";
 	import { getClerkAuth } from "$lib/services/auth";
+	import { NAV_ITEMS } from "$lib/utils/navigation";
+
+	let { pathname, live }: HeaderProps = $props();
 
 	const auth = getClerkAuth();
 </script>
 
-<header class="flex h-14 shrink-0 items-center justify-between gap-2 px-3 sm:h-16 sm:px-4">
-	<div class="flex min-w-0 items-center gap-1 sm:gap-4">
-		<a
-			href="https://ko-fi.com/nikkoabucejo"
-			target="_blank"
-			rel="noopener noreferrer"
-			aria-label="Buy me a coffee"
-			class="flex items-center gap-1.5 rounded-md p-2 text-sm text-[#ff5e5b] transition-colors hover:bg-muted hover:text-[#ff8785] sm:px-2.5 sm:py-1.5"
-		>
-			<span
-				aria-hidden="true"
-				class="h-4 w-4 shrink-0 bg-[#ff5e5b]"
-				style="mask: url('https://storage.ko-fi.com/cdn/cup-border.png') center / contain no-repeat; -webkit-mask: url('https://storage.ko-fi.com/cdn/cup-border.png') center / contain no-repeat;"
-			></span>
-			<span class="hidden sm:inline">Buy me a coffee</span>
-		</a>
+<header class="flex h-14 shrink-0 items-center justify-between gap-2 border-b px-3 sm:h-16 sm:px-4">
+	<div class="flex min-w-0 items-center gap-2 sm:gap-4">
 		<a
 			href="/"
-			aria-label="Home"
-			class="flex items-center gap-1.5 rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:px-2.5 sm:py-1.5"
+			class="rounded-md px-1.5 py-1 text-lg font-bold tracking-tight uppercase outline-none focus-visible:ring-2 focus-visible:ring-ring"
 		>
-			<House class="size-5 sm:size-4" />
-			<span class="hidden text-sm sm:inline">Home</span>
+			<span class="text-seat-0">two</span><span class="text-seat-1">play</span>
 		</a>
-		{#if auth.isSignedIn}
-			<nav class="flex items-center gap-1 sm:gap-2">
-				<a
-					href="/play"
-					aria-label="Play"
-					class="flex items-center gap-1.5 rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:px-2.5 sm:py-1.5"
-				>
-					<Gamepad2 class="size-5 sm:size-4" />
-					<span class="hidden text-sm sm:inline">Play</span>
-				</a>
-				<a
-					href="/lobby"
-					aria-label="Lobby"
-					class="flex items-center gap-1.5 rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:px-2.5 sm:py-1.5"
-				>
-					<Users class="size-5 sm:size-4" />
-					<span class="hidden text-sm sm:inline">Lobby</span>
-				</a>
-				<a
-					href="/history"
-					aria-label="History"
-					class="flex items-center gap-1.5 rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:px-2.5 sm:py-1.5"
-				>
-					<History class="size-5 sm:size-4" />
-					<span class="hidden text-sm sm:inline">History</span>
-				</a>
-				<a
-					href="/leaderboard"
-					aria-label="Leaderboard"
-					class="flex items-center gap-1.5 rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:px-2.5 sm:py-1.5"
-				>
-					<Trophy class="size-5 sm:size-4" />
-					<span class="hidden text-sm sm:inline">Leaderboard</span>
-				</a>
+		{#if auth.showsMemberNav}
+			<nav aria-label="Main" class="hidden items-center gap-1 sm:flex">
+				{#each NAV_ITEMS as item (item.href)}
+					<Link href={item.href} {pathname}>
+						<item.icon class="hidden size-4 md:block" />
+						{item.label}
+					</Link>
+				{/each}
 			</nav>
 		{/if}
 	</div>
 
-	{#if auth.isSignedIn}
-		<div class="flex shrink-0 items-center gap-1">
-			<button
-				type="button"
-				class="flex min-w-0 items-center gap-2 rounded-full py-1 pr-2 pl-1 text-sm transition-colors hover:bg-muted sm:pr-3"
-				onclick={() => auth.openUserProfile()}
+	<div class="flex min-w-0 flex-1 items-center justify-end gap-2">
+		{#if live}
+			<a
+				href={live.href}
+				class="flex min-w-0 items-center gap-2 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-500 transition-colors outline-none hover:bg-emerald-500/20 focus-visible:ring-2 focus-visible:ring-ring"
 			>
-				{#if auth.profile?.imageUrl}
-					<img src={auth.profile.imageUrl} alt="" class="size-6 shrink-0 rounded-full" />
-				{:else}
-					<span
-						class="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold"
+				<Beacon class="shrink-0" />
+				<span class="truncate"><span class="sr-only">Live game: </span>{live.name}</span>
+			</a>
+		{/if}
+		<!-- Fixed width (fits Sign in, 81px measured) so swapping the avatar for Sign in moves nothing. -->
+		<div data-slot="auth" class="flex w-21 shrink-0 justify-end">
+			{#if auth.isSignedIn}
+				<Dropdown>
+					<DropdownTrigger
+						variant="ghost"
+						size="icon"
+						class="shrink-0 rounded-full"
+						aria-label={auth.profile?.name ? `${auth.profile.name}, account menu` : "Account menu"}
 					>
-						{(auth.profile?.name ?? "?").charAt(0).toUpperCase()}
-					</span>
-				{/if}
-				<span class="hidden max-w-24 truncate font-medium sm:inline">{auth.profile?.name}</span>
-			</button>
-			<Button variant="ghost" size="icon-sm" aria-label="Sign out" onclick={() => auth.signOut()}>
-				<LogOut />
-			</Button>
+						{#if auth.profile?.imageUrl}
+							<img src={auth.profile.imageUrl} alt="" class="size-7 rounded-full" />
+						{:else}
+							<span
+								class="flex size-7 items-center justify-center rounded-full bg-muted text-xs font-semibold"
+							>
+								{(auth.profile?.name ?? "?").charAt(0).toUpperCase()}
+							</span>
+						{/if}
+					</DropdownTrigger>
+					<DropdownContent align="end" class="w-36">
+						<DropdownItem onSelect={() => auth.openUserProfile()}>Account</DropdownItem>
+						<DropdownSeparator />
+						<DropdownItem onSelect={() => auth.signOut()}>Sign out</DropdownItem>
+					</DropdownContent>
+				</Dropdown>
+			{:else}
+				<Button size="sm" disabled={auth.loadError !== null} onclick={() => auth.signIn()}>
+					Sign in
+				</Button>
+			{/if}
 		</div>
-	{/if}
+	</div>
 </header>

@@ -88,61 +88,64 @@
 >
 	{@render cloud(
 		0,
-		"bg-cyan-500/20",
+		"bg-seat-0/20",
 		"left-[calc(50%-10rem)] top-[calc(50%-23rem)] size-80",
 		"drift-a animation-delay-[0s] animation-duration-[26s]"
 	)}
 	{@render cloud(
 		1,
-		"bg-pink-500/20",
+		"bg-seat-1/20",
 		"left-[calc(50%-21.5rem)] top-[calc(50%-13rem)] size-72",
 		"drift-b animation-delay-[-6s] animation-duration-[30s]"
 	)}
 	{@render cloud(
 		0,
-		"bg-cyan-500/15",
+		"bg-seat-0/15",
 		"left-[calc(50%-16.5rem)] top-[calc(50%+1.5rem)] size-72",
 		"drift-c animation-delay-[-13s] animation-duration-[24s]"
 	)}
 	{@render cloud(
 		1,
-		"bg-pink-500/20",
+		"bg-seat-1/20",
 		"left-[calc(50%-4.5rem)] top-[calc(50%-1.5rem)] size-96",
 		"drift-a animation-delay-[-9s] animation-duration-[28s]"
 	)}
 	{@render cloud(
 		0,
-		"bg-cyan-500/20",
+		"bg-seat-0/20",
 		"left-[calc(50%+2.5rem)] top-[calc(50%-14rem)] size-80",
 		"drift-b animation-delay-[-16s] animation-duration-[32s]"
 	)}
 </div>
 
 <style>
-	.drift-a {
-		animation-name: drift-a;
-		animation-timing-function: ease-in-out;
-		animation-iteration-count: infinite;
-	}
+	/* Blobs keep their colors and size under reduced motion; only the drift stops. */
+	@media (prefers-reduced-motion: no-preference) {
+		.drift-a {
+			animation-name: drift-a;
+			animation-timing-function: ease-in-out;
+			animation-iteration-count: infinite;
+		}
 
-	.drift-b {
-		animation-name: drift-b;
-		animation-timing-function: ease-in-out;
-		animation-iteration-count: infinite;
-	}
+		.drift-b {
+			animation-name: drift-b;
+			animation-timing-function: ease-in-out;
+			animation-iteration-count: infinite;
+		}
 
-	.drift-c {
-		animation-name: drift-c;
-		animation-timing-function: ease-in-out;
-		animation-iteration-count: infinite;
-	}
+		.drift-c {
+			animation-name: drift-c;
+			animation-timing-function: ease-in-out;
+			animation-iteration-count: infinite;
+		}
 
-	.blob-float {
-		animation-name: blob-float;
-		animation-timing-function: ease-in-out;
-		animation-iteration-count: infinite;
-		animation-duration: var(--blob-speed, 16s);
-		transition: animation-duration 1.4s ease-out;
+		.blob-float {
+			animation-name: blob-float;
+			animation-timing-function: ease-in-out;
+			animation-iteration-count: infinite;
+			animation-duration: var(--blob-speed, 16s);
+			transition: animation-duration 1.4s ease-out;
+		}
 	}
 
 	@keyframes drift-a {

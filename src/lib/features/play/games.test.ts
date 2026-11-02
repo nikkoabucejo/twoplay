@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { gameEngines, gameTypeValidator } from "../../../../convex/models/games/index.js";
+import { SEAT_COLORS } from "$lib/utils/style";
 import { GAME_TYPES, GAMES } from "./games.js";
 
 describe("GAMES", () => {
@@ -19,9 +20,9 @@ describe("GAMES", () => {
 		expect(new Set(names).size).toBe(names.length);
 	});
 
-	test("uses the seat accents, cyan then pink, for every game", () => {
+	test("uses the seat colors, in seat order, for every game", () => {
 		for (const meta of Object.values(GAMES)) {
-			expect(meta.colors).toEqual(["#06b6d4", "#ec4899"]);
+			expect(meta.colors).toEqual(SEAT_COLORS);
 		}
 	});
 });

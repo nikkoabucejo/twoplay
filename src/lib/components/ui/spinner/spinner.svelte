@@ -1,7 +1,7 @@
 <script lang="ts" module>
 	import { LoaderCircle } from "@lucide/svelte";
-	import { cn } from "$lib/utils/style";
-	import { type VariantProps, tv } from "tailwind-variants";
+	import { cn, tv } from "$lib/utils/style";
+	import type { VariantProps } from "tailwind-variants";
 
 	export const spinnerVariants = tv({
 		base: "animate-spin text-muted-foreground",
@@ -21,12 +21,21 @@
 
 	export type SpinnerProps = {
 		size?: SpinnerSize;
+		label?: string;
 		class?: string;
 	};
 </script>
 
 <script lang="ts">
-	let { size = "default", class: className }: SpinnerProps = $props();
+	let { size = "default", label = "Loading", class: className }: SpinnerProps = $props();
+	const labelId = $props.id();
 </script>
 
-<LoaderCircle data-slot="spinner" class={cn(spinnerVariants({ size }), className)} />
+<span role="status" aria-labelledby={labelId} class="inline-flex">
+	<LoaderCircle
+		data-slot="spinner"
+		aria-hidden="true"
+		class={cn(spinnerVariants({ size }), className)}
+	/>
+	<span id={labelId} class="sr-only">{label}</span>
+</span>

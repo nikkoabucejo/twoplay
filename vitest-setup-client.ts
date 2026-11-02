@@ -13,3 +13,18 @@ if (!Element.prototype.animate) {
 		} as unknown as Animation;
 	};
 }
+
+// jsdom has no matchMedia; svelte/motion's prefersReducedMotion calls it on import.
+if (!window.matchMedia) {
+	window.matchMedia = (query: string) =>
+		({
+			media: query,
+			matches: false,
+			onchange: null,
+			addEventListener() {},
+			removeEventListener() {},
+			addListener() {},
+			removeListener() {},
+			dispatchEvent: () => false
+		}) as MediaQueryList;
+}

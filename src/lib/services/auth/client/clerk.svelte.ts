@@ -57,8 +57,16 @@ export class ClerkAuth {
 	profile = $state<ClerkProfile>(null);
 	user = $state<ClerkUser>(null);
 	session = $state<ClerkSession>(null);
+	loadError = $state<string | null>(null);
+	/** The SSR session's answer, kept after a failed load so member navigation stays put. */
+	serverSignedIn = $state(false);
+
+	get showsMemberNav() {
+		return this.isSignedIn || (this.loadError !== null && this.serverSignedIn);
+	}
 
 	#clerk: InstanceType<typeof Clerk> | undefined;
+	#loadPromise: Promise<void> | undefined;
 	#resolveReady!: () => void;
 	#ready = new Promise<void>((resolve) => {
 		this.#resolveReady = resolve;
@@ -68,24 +76,38 @@ export class ClerkAuth {
 	hydrate(profile: ClerkProfile) {
 		this.profile = profile;
 		this.isSignedIn = profile !== null;
+		this.serverSignedIn = profile !== null;
 		this.loaded = true;
 	}
 
-	async load(publishableKey: string) {
-		if (this.#clerk) return;
+	load(publishableKey: string) {
+		this.#loadPromise ??= this.#load(publishableKey);
+		return this.#loadPromise;
+	}
 
-		await loadClerkUiScript(publishableKey);
+	async #load(publishableKey: string) {
+		try {
+			await loadClerkUiScript(publishableKey);
 
-		const clerk = new Clerk(publishableKey);
-		this.#clerk = clerk;
-
-		await clerk.load({
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			ui: { ClerkUI: window.__internal_ClerkUICtor as any }
-		});
-		this.#sync();
-		this.#resolveReady();
-		clerk.addListener(() => this.#sync());
+			const clerk = new Clerk(publishableKey);
+			await clerk.load({
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				ui: { ClerkUI: window.__internal_ClerkUICtor as any }
+			});
+			this.#clerk = clerk;
+			this.#sync();
+			clerk.addListener(() => this.#sync());
+		} catch (error) {
+			// Fall back to signed out so member-only queries never wait on a token that won't come.
+			this.loadError = error instanceof Error ? error.message : String(error);
+			this.isSignedIn = false;
+			this.profile = null;
+			this.user = null;
+			this.session = null;
+			this.loaded = true;
+		} finally {
+			this.#resolveReady();
+		}
 	}
 
 	#sync() {

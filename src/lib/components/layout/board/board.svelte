@@ -1,16 +1,25 @@
 <script lang="ts" module>
+	/** Width: the room page's `px-3`. Height: the `sm:h-16` header (4rem), the page's `py-4` (2rem),
+	 *  two `h-14` strips (7rem), the controls row `h-8`, round line `h-4`, and error slot `h-5`
+	 *  (4.25rem), and five `gap-2` gaps (2.5rem): 19.75rem. At 360x640 that's min(336px, 324px), so
+	 *  the board is 324px. `BoardPlaceholder` shares it so loading takes the same box. */
+	export const BOARD_SIZE = "min(calc(100vw - 1.5rem), calc(100dvh - 19.75rem), 34rem)";
+
 	export type BoardPlayer = {
-		/** Name shown in the status bar. */
+		/** Name shown in the player's strip. */
 		label: string;
-		/** Lowercase hex codepoint for the status-bar emoji, e.g. "1f600". */
+		/** Lowercase hex codepoint for the strip's emoji, e.g. "1f600". */
 		emoji: string;
-		/** Tailwind text-color class for the label, e.g. "text-primary". */
+		/** Tailwind text-color class for the player's clock, e.g. "text-seat-0". */
 		accent?: string;
-		/** Score shown next to the player's label in the status bar. Omit to hide. */
+		/** Match score shown in the strip's status line. Omit to hide. */
 		score?: number;
+		/** Seat mark after the name, e.g. "X". Read by screen readers when `markIcon` draws it.
+		 *  Defaults to a disc. */
+		mark?: string;
 	};
 
-	/** Fixed set of emoji choices offered by the status-bar picker. */
+	/** Fixed set of emoji choices offered by the viewer's emoji picker. */
 	const EMOJI_OPTIONS = [
 		{ codepoint: "1f602", label: "Face with tears of joy" },
 		{ codepoint: "1f60f", label: "Smirking face" },
@@ -24,10 +33,9 @@
 		{ codepoint: "1f37f", label: "Popcorn" }
 	];
 
-	/** Drives the status bar's center content — whose turn it is, or how the game ended. `"waiting"`
-	 *  covers the room being short a seat — styled and moodboarded identically to `"draw"`. `closed`
-	 *  covers the room having been abandoned while still waiting — same empty seat, but there's no
-	 *  longer anything to wait for, so the center text goes blank rather than still reading "Waiting". */
+	/** Whose turn it is, or how the game ended. `"waiting"` covers the room being short a seat, and
+	 *  the mood background treats it like `"draw"`. `closed` covers a room abandoned while still
+	 *  waiting: the empty seat's line goes blank instead of reading "Waiting". */
 	export type BoardStatus =
 		| { type: "turn"; player: 0 | 1 }
 		| { type: "winner"; player: 0 | 1; reason?: "timeout" | "resign" | "abandon" }
@@ -79,7 +87,6 @@
 
 <script lang="ts">
 	import { ChevronLeft, ChevronRight } from "@lucide/svelte";
-	import { fade } from "svelte/transition";
 	import {
 		Button,
 		Dropdown,
@@ -95,22 +102,24 @@
 	import { ACCENTS, cn } from "$lib/utils/style";
 	import type { Snippet } from "svelte";
 	import { getMood } from "$lib/features/presence";
+	import { ringSeat, stripLine, stripSeats, type StripLine } from "./strips.js";
 
 	let {
 		players,
 		status,
 		footer,
 		clock,
-		size = "min(calc(100vw - 9rem), calc(100dvh - 16.5rem), 34rem)",
+		size = BOARD_SIZE,
 		class: className,
 		myIndex = null,
 		opponentDisconnected = false,
 		onTrashtalk,
+		markIcon,
 		children
 	}: {
-		/** The two players, rendered left and right of the board. */
+		/** The two players, shown in the strips above and below the board. */
 		players: [BoardPlayer, BoardPlayer];
-		/** Whose turn it is, or how the game ended. Omit to hide the status bar. */
+		/** Whose turn it is, or how the game ended. Omit for score lines and no turn ring. */
 		status?: BoardStatus;
 		/** Reset/invite actions and any error message. Omit to hide the action bar. */
 		footer?: BoardFooter;
@@ -119,13 +128,16 @@
 		/** Fixed side length of the square board area (any CSS length). */
 		size?: string;
 		class?: string;
-		/** Which seat the viewer occupies — that seat's emoji becomes clickable. Null/omitted (e.g.
-		 *  spectating) keeps both emoji purely decorative. */
+		/** Which seat the viewer occupies: that strip sits below the board and its emoji becomes
+		 *  clickable. Null/omitted (e.g. spectating) keeps both emoji purely decorative. */
 		myIndex?: 0 | 1 | null;
 		/** True while the opponent's seat has gone quiet — shows a small indicator on their emoji. */
 		opponentDisconnected?: boolean;
 		/** Called with the chosen codepoint when the viewer picks a new emoji for their own seat. */
 		onTrashtalk?: (emoji: string) => void;
+		/** Draws a seat's mark in the strip, in `currentColor` at `size-full` of a `size-3.5` box.
+		 *  Needs that player's `mark` as its spoken label. */
+		markIcon?: Snippet<[seat: 0 | 1]>;
 		/** The game itself. Fills the square board area — use `size-full`. */
 		children: Snippet;
 	} = $props();
@@ -133,7 +145,22 @@
 	/** Clock digits turn destructive-colored at or below this remaining time. */
 	const LOW_TIME_MS = 10_000;
 
+	/** Every variant renders stacked in one cell so the line keeps its box when the status changes. */
+	const STRIP_LINES: StripLine[] = [
+		"your-turn",
+		"to-move",
+		"waiting",
+		"won",
+		"lost",
+		"draw",
+		"score",
+		"blank"
+	];
+
 	const mood = getMood();
+
+	const seats = $derived(stripSeats(myIndex));
+	const ringed = $derived(status ? ringSeat(status) : null);
 
 	let pickerOpen = $state(false);
 
@@ -144,6 +171,55 @@
 	function selectEmoji(codepoint: string) {
 		onTrashtalk?.(codepoint);
 		pickerOpen = false;
+	}
+
+	/** The status as screen readers hear it; the strip lines are hidden from them. */
+	function statusText(status: BoardStatus): string {
+		switch (status.type) {
+			case "turn":
+				return status.player === myIndex ? "Your turn" : `${players[status.player].label}'s turn`;
+			case "winner":
+				return `${status.player === myIndex ? "You" : players[status.player].label} won`;
+			case "draw":
+				return "Draw";
+			case "waiting":
+				return status.closed ? "" : "Waiting for an opponent";
+		}
+	}
+
+	function lineText(line: StripLine, seat: 0 | 1): string {
+		switch (line) {
+			case "your-turn":
+				return "Your turn";
+			case "to-move":
+				return "To move";
+			case "waiting":
+				return "Waiting";
+			case "won":
+				return "Won";
+			case "lost":
+				return "Lost";
+			case "draw":
+				return "Draw";
+			case "score":
+				return players[seat].score === undefined ? "" : `Score ${players[seat].score}`;
+			case "blank":
+				return "";
+		}
+	}
+
+	function lineColor(line: StripLine, seat: 0 | 1): string {
+		switch (line) {
+			case "your-turn":
+			case "to-move":
+				return cn("font-semibold", ACCENTS[seat].text);
+			case "won":
+				return "font-semibold text-emerald-500";
+			case "lost":
+				return "text-destructive";
+			default:
+				return "text-muted-foreground";
+		}
 	}
 
 	function formatClock(ms: number): string {
@@ -165,7 +241,7 @@
 	<Popover bind:open={pickerOpen}>
 		<PopoverTrigger
 			aria-label="Change your emoji"
-			class="focus-visible:border-ring focus-visible:ring-ring/50 flex size-full items-center justify-center rounded-lg outline-none transition-opacity focus-visible:ring-3 hover:opacity-80"
+			class="focus-visible:border-ring focus-visible:ring-ring/50 flex size-full items-center justify-center rounded-md outline-none transition-opacity focus-visible:ring-3 hover:opacity-80"
 		>
 			<Emoji
 				codepoint={players[seat].emoji}
@@ -173,7 +249,7 @@
 				class="size-6"
 			/>
 		</PopoverTrigger>
-		<PopoverContent side="top" sideOffset={8} align={seat === 0 ? "start" : "end"}>
+		<PopoverContent side="top" sideOffset={8} align="start">
 			<div class="flex flex-nowrap items-center gap-1">
 				{#each EMOJI_OPTIONS as option (option.codepoint)}
 					<button
@@ -192,7 +268,7 @@
 
 {#snippet emojiBox(seat: 0 | 1)}
 	<div
-		class="relative flex size-10 shrink-0 items-center justify-center rounded-lg border bg-muted/40 backdrop-blur-sm sm:size-12"
+		class="relative flex size-10 shrink-0 items-center justify-center rounded-md border bg-background/40"
 	>
 		{#if myIndex === seat}
 			{@render emojiPicker(seat)}
@@ -219,13 +295,13 @@
 	{@const low = active && ms <= LOW_TIME_MS}
 	<div
 		class={cn(
-			"flex h-12 w-14 shrink-0 items-center justify-center rounded-lg sm:w-20",
+			"flex h-10 w-16 shrink-0 items-center justify-center rounded-md sm:w-20",
 			ACCENTS[seat].tintBg
 		)}
 	>
 		<span
 			class={cn(
-				"text-lg font-semibold tabular-nums",
+				"font-mono text-base font-semibold tabular-nums sm:text-lg",
 				low ? "text-destructive" : players[seat].accent
 			)}
 			aria-label={`${players[seat].label}'s clock: ${formatClock(ms)} remaining`}
@@ -235,197 +311,203 @@
 	</div>
 {/snippet}
 
-{#snippet turnIndicator(player: 0 | 1, word: string, pulse: boolean, color?: string)}
-	{@const arrowClass = cn("text-base leading-none", pulse && "animate-pulse", color)}
-	{@const wordClass = cn("text-[10px] font-semibold tracking-widest uppercase", color)}
-	{#if player === 0}
-		<span class={arrowClass}>◀</span>
-		<span class={wordClass}>{word}</span>
-	{:else}
-		<span class={wordClass}>{word}</span>
-		<span class={arrowClass}>▶</span>
-	{/if}
+<!-- The ring is a box-shadow, so passing the turn never changes the strip's box. -->
+{#snippet playerStrip(seat: 0 | 1)}
+	{@const line = status ? stripLine(status, seat, myIndex) : "score"}
+	<div
+		data-slot="strip"
+		data-seat={seat}
+		class={cn(
+			"flex h-14 w-(--board-size) items-center gap-2 rounded-lg border bg-muted/40 px-2 text-left whitespace-nowrap ring-2 backdrop-blur-sm",
+			ringed === seat ? ACCENTS[seat].ring : "ring-transparent"
+		)}
+	>
+		{@render emojiBox(seat)}
+
+		<div class="flex min-w-0 flex-1 flex-col gap-0.5">
+			<div class="flex min-w-0 items-center gap-1.5 text-sm font-semibold">
+				<span class="min-w-0 truncate">{players[seat].label}</span>
+				<span
+					data-slot="mark"
+					class={cn(
+						"flex size-3.5 shrink-0 items-center justify-center leading-none",
+						ACCENTS[seat].text
+					)}
+				>
+					{#if markIcon && players[seat].mark}
+						<span aria-hidden="true" class="contents">{@render markIcon(seat)}</span>
+						<span class="sr-only">{players[seat].mark}</span>
+					{:else if players[seat].mark}
+						{players[seat].mark}
+					{:else}
+						<span aria-hidden="true">●</span>
+					{/if}
+				</span>
+				{#if myIndex === seat}
+					<span
+						class="shrink-0 rounded-sm border px-1 text-caption tracking-widest text-muted-foreground uppercase"
+					>
+						You
+					</span>
+				{/if}
+			</div>
+
+			<div data-slot="strip-line" class="grid text-xs" aria-hidden="true">
+				{#each STRIP_LINES as variant (variant)}
+					<span
+						class={cn(
+							"col-start-1 row-start-1 flex min-w-0 items-center gap-1.5",
+							lineColor(variant, seat),
+							variant !== line && "invisible"
+						)}
+					>
+						{#if variant === "your-turn" || variant === "to-move"}
+							<span
+								class={cn(
+									"size-1.5 shrink-0 rounded-full motion-safe:animate-pulse",
+									ACCENTS[seat].bg
+								)}
+							></span>
+						{/if}
+						<span class="truncate">{lineText(variant, seat)}</span>
+					</span>
+				{/each}
+			</div>
+		</div>
+
+		{#if clock}
+			{@render clockBox(seat)}
+		{/if}
+	</div>
 {/snippet}
 
 <div
-	class={cn("mx-auto flex w-fit items-start justify-center gap-8", className)}
+	class={cn("mx-auto flex w-fit flex-col items-center gap-2", className)}
 	style:--board-size={size}
 >
-	<div class="flex flex-col items-center gap-6">
-		{#if status}
-			<div class="flex items-center gap-1.5 sm:gap-2">
-				{@render emojiBox(0)}
+	{@render playerStrip(seats.top)}
 
-				<div
-					class="grid h-12 w-(--board-size) grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-lg border bg-muted/40 px-2.5 text-sm backdrop-blur-sm sm:px-4"
-				>
-					<div class="flex items-center gap-2">
-						<span class={cn("font-semibold", players[0].accent)}>{players[0].label}</span>
-						{#if players[0].score !== undefined}
-							<span class="tabular-nums text-muted-foreground">{players[0].score}</span>
-						{/if}
-					</div>
-
-					<div class="flex items-center gap-1.5">
-						{#if status.type === "winner"}
-							{@const winColor = (seat: 0 | 1) =>
-								seat === status.player ? "text-emerald-500" : "text-destructive"}
-							{@render turnIndicator(0, status.player === 0 ? "Win" : "Loss", false, winColor(0))}
-							<span class="text-muted-foreground">·</span>
-							{@render turnIndicator(1, status.player === 1 ? "Win" : "Loss", false, winColor(1))}
-						{:else if status.type === "draw"}
-							<span
-								class="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase"
-							>
-								Draw
-							</span>
-						{:else if status.type === "waiting"}
-							{#if !status.closed}
-								<span
-									class="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase"
-								>
-									Waiting
-								</span>
-							{/if}
-						{:else}
-							{@render turnIndicator(status.player, "Turn", true, players[status.player].accent)}
-						{/if}
-					</div>
-
-					<div class="flex items-center justify-end gap-2">
-						{#if players[1].score !== undefined}
-							<span class="tabular-nums text-muted-foreground">{players[1].score}</span>
-						{/if}
-						<span class={cn("font-semibold", players[1].accent)}>{players[1].label}</span>
-					</div>
-				</div>
-
-				{@render emojiBox(1)}
-			</div>
-		{/if}
-
-		<div class="aspect-square w-(--board-size)">
-			{@render children()}
-		</div>
-
-		{#if footer}
-			{@const prevDisabled = footer.round <= 1}
-			{@const nextDisabled = footer.round >= footer.latestRound}
-			{@const roundOver = status?.type === "winner" || status?.type === "draw"}
-			{@const isSpectator = myIndex === null}
-			<div class="flex w-(--board-size) flex-col items-center gap-3">
-				<div class="flex w-(--board-size) items-center justify-between">
-					{#if clock}
-						{@render clockBox(0)}
-					{/if}
-
-					<div class="flex items-center gap-1.5 sm:gap-2">
-						<span class={cn(prevDisabled && "cursor-not-allowed")}>
-							<Button
-								variant="outline"
-								size="icon-sm"
-								aria-label="Previous round"
-								disabled={prevDisabled}
-								onclick={() => footer.onGoToRound(footer.round - 1)}
-							>
-								<ChevronLeft />
-							</Button>
-						</span>
-
-						<span class={cn(footer.isLive && isSpectator && "cursor-not-allowed")}>
-							{#if !footer.isLive}
-								<Button
-									variant="outline"
-									size="sm"
-									class="px-3 uppercase sm:w-32"
-									onclick={footer.onGoLive}
-								>
-									Go live
-								</Button>
-							{:else if footer.roomClosed}
-								<Button
-									variant="outline"
-									size="sm"
-									class="px-3 uppercase sm:w-32"
-									onclick={footer.onPlayAgain}
-								>
-									Play again
-								</Button>
-							{:else if footer.waitingForOpponent}
-								<Button
-									variant="outline"
-									size="sm"
-									class="px-3 uppercase sm:w-32"
-									onclick={footer.onAbandon}
-									disabled={isSpectator}
-								>
-									Abandon
-								</Button>
-							{:else if !roundOver}
-								<Dropdown>
-									<DropdownTrigger
-										variant="outline"
-										size="sm"
-										class="px-3 uppercase sm:w-32"
-										disabled={isSpectator}
-									>
-										Resign
-									</DropdownTrigger>
-									<DropdownContent side="bottom" sideOffset={8} class="w-24 sm:w-32">
-										<DropdownItem onSelect={footer.onResign}>Resign</DropdownItem>
-										<DropdownSeparator />
-										<DropdownItem variant="destructive" onSelect={footer.onAbandon}>
-											Abandon
-										</DropdownItem>
-									</DropdownContent>
-								</Dropdown>
-							{:else}
-								<Dropdown>
-									<DropdownTrigger
-										variant="outline"
-										size="sm"
-										class="px-3 uppercase sm:w-32"
-										disabled={isSpectator}
-									>
-										Rematch
-									</DropdownTrigger>
-									<DropdownContent side="bottom" sideOffset={8} class="w-24 sm:w-32">
-										<DropdownItem onSelect={footer.onRematch}>Rematch</DropdownItem>
-										<DropdownSeparator />
-										<DropdownItem variant="destructive" onSelect={footer.onAbandon}>
-											Abandon
-										</DropdownItem>
-									</DropdownContent>
-								</Dropdown>
-							{/if}
-						</span>
-
-						<span class={cn(nextDisabled && "cursor-not-allowed")}>
-							<Button
-								variant="outline"
-								size="icon-sm"
-								aria-label="Next round"
-								disabled={nextDisabled}
-								onclick={() => footer.onGoToRound(footer.round + 1)}
-							>
-								<ChevronRight />
-							</Button>
-						</span>
-					</div>
-
-					{#if clock}
-						{@render clockBox(1)}
-					{/if}
-				</div>
-
-				<p class="text-xs tabular-nums text-muted-foreground">
-					Round {footer.round} of {footer.latestRound}
-				</p>
-
-				{#if footer.error}
-					<p class="text-sm text-destructive" transition:fade>{footer.error}</p>
-				{/if}
-			</div>
-		{/if}
+	<div class="aspect-square w-(--board-size)">
+		{@render children()}
 	</div>
+
+	{@render playerStrip(seats.bottom)}
+
+	<span role="status" class="sr-only">{status ? statusText(status) : ""}</span>
+
+	{#if footer}
+		{@const prevDisabled = footer.round <= 1}
+		{@const nextDisabled = footer.round >= footer.latestRound}
+		{@const roundOver = status?.type === "winner" || status?.type === "draw"}
+		{@const isSpectator = myIndex === null}
+		<div class="flex w-(--board-size) flex-col items-center gap-2">
+			<div data-slot="controls" class="flex h-8 items-center gap-1.5 sm:gap-2">
+				<span class={cn(prevDisabled && "cursor-not-allowed")}>
+					<Button
+						variant="outline"
+						size="icon-sm"
+						aria-label="Previous round"
+						disabled={prevDisabled}
+						onclick={() => footer.onGoToRound(footer.round - 1)}
+					>
+						<ChevronLeft />
+					</Button>
+				</span>
+
+				<span class={cn(footer.isLive && isSpectator && "cursor-not-allowed")}>
+					{#if !footer.isLive}
+						<Button
+							variant="outline"
+							size="sm"
+							class="w-28 px-3 uppercase sm:w-32"
+							onclick={footer.onGoLive}
+						>
+							Go live
+						</Button>
+					{:else if footer.roomClosed}
+						<Button
+							variant="outline"
+							size="sm"
+							class="w-28 px-3 uppercase sm:w-32"
+							onclick={footer.onPlayAgain}
+						>
+							Play again
+						</Button>
+					{:else if footer.waitingForOpponent}
+						<Button
+							variant="outline"
+							size="sm"
+							class="w-28 px-3 uppercase sm:w-32"
+							onclick={footer.onAbandon}
+							disabled={isSpectator}
+						>
+							Abandon
+						</Button>
+					{:else if !roundOver}
+						<Dropdown>
+							<DropdownTrigger
+								variant="outline"
+								size="sm"
+								class="w-28 px-3 uppercase sm:w-32"
+								disabled={isSpectator}
+							>
+								Resign
+							</DropdownTrigger>
+							<DropdownContent side="bottom" sideOffset={8} class="w-28 sm:w-32">
+								<DropdownItem onSelect={footer.onResign}>Resign</DropdownItem>
+								<DropdownSeparator />
+								<DropdownItem variant="destructive" onSelect={footer.onAbandon}>
+									Abandon
+								</DropdownItem>
+							</DropdownContent>
+						</Dropdown>
+					{:else}
+						<Dropdown>
+							<DropdownTrigger
+								variant="outline"
+								size="sm"
+								class="w-28 px-3 uppercase sm:w-32"
+								disabled={isSpectator}
+							>
+								Rematch
+							</DropdownTrigger>
+							<DropdownContent side="bottom" sideOffset={8} class="w-28 sm:w-32">
+								<DropdownItem onSelect={footer.onRematch}>Rematch</DropdownItem>
+								<DropdownSeparator />
+								<DropdownItem variant="destructive" onSelect={footer.onAbandon}>
+									Abandon
+								</DropdownItem>
+							</DropdownContent>
+						</Dropdown>
+					{/if}
+				</span>
+
+				<span class={cn(nextDisabled && "cursor-not-allowed")}>
+					<Button
+						variant="outline"
+						size="icon-sm"
+						aria-label="Next round"
+						disabled={nextDisabled}
+						onclick={() => footer.onGoToRound(footer.round + 1)}
+					>
+						<ChevronRight />
+					</Button>
+				</span>
+			</div>
+
+			<p class="h-4 text-xs tabular-nums text-muted-foreground">
+				Round {footer.round} of {footer.latestRound}
+			</p>
+
+			<p
+				role="alert"
+				class={cn(
+					"h-5 w-full truncate text-sm text-destructive transition-opacity",
+					footer.error ? "opacity-100" : "opacity-0"
+				)}
+			>
+				{footer.error}
+			</p>
+		</div>
+	{/if}
 </div>

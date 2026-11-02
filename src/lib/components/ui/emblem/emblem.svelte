@@ -5,7 +5,7 @@
 
 	export type EmblemProps = {
 		icon: Component<{ class?: string }>;
-		colors: [string, string];
+		colors: readonly [string, string];
 		class?: string;
 		iconClass?: string;
 		active?: boolean;
@@ -56,8 +56,8 @@
 
 <style>
 	.emblem {
-		--emblem-primary: #06b6d4;
-		--emblem-secondary: #ec4899;
+		--emblem-primary: var(--seat-0);
+		--emblem-secondary: var(--seat-1);
 	}
 
 	.emblem__halo {

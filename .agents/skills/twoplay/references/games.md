@@ -22,21 +22,26 @@ half mirrors it so the UI responds instantly. Both share a discriminated union t
 ## Client: `src/lib/features/play/<game>/`
 - `types.ts` — re-export server-inferred types; derive client aliases locally.
 - `game.svelte.ts` — `<Game>Room extends Room` (`$lib/utils/multiplayer`). The base already owns
-  the live room query (`data`, `isLoading`), seats (`players`, `myIndex`), room state
+  the live room query (`data`, `isLoading`), seats (`players`, `myIndex`, `isMyTurn` from the abstract
+  `activeSeat`), room state
   (`wrongGameType`, `isWaitingForOpponent`, `isRoomClosed`, `opponentDisconnected`), clocks
   (`clock`, `now`), history scrubbing (`isViewingHistory`, `viewedMoveNumber`, `historyLength`,
   `protected displayState`), and actions (`protected submitMove`, `rematch`, `resign`, `abandon`,
   `trashtalk`, `timeout`). The subclass adds only `$derived` views of `displayState` narrowed to its
   `kind`, plus a `play/select` method that pre-validates locally and calls `submitMove({ kind, … })`.
 - `<game>.svelte` — UI composing `<Board players status clock footer>` with its own grid as
-  `children`, usually wrapped in `Cursor` from `$lib/features/presence`.
+  `children`, usually wrapped in `Cursor` from `$lib/features/presence`. Renders `BoardPlaceholder`
+  while `room.isLoading` or `room.wrongGameType`, and creates
+  `new TurnAlert(() => (room.isLoading ? null : room.isMyTurn))` next to the Room.
 - `index.ts` — barrel (component under its display name, Room class, types).
 
 ## Registration
 - `src/lib/assets/icons/games/<game>.svelte` + barrel line.
 - `src/lib/features/play/games.ts` `GAMES` record (name + icon) drives the home picker, `/play`,
-  `/lobby`, `/history`. Register once there.
+  `/lobby`, `/history`. Register once there. `colors` is `SEAT_COLORS`.
 - Route: `src/routes/(games)/<game>/[code]/[[round]]/+page.svelte` (copy tictactoe's, swap names).
+  It renders `<Meta title={GAMES.<game>.name}>`. The `[code]` segment is what makes the root layout
+  use the game-room frame (`isGameRoomRoute`).
   `/play` is the only create/join entry point. Don't add a per-game lobby.
 
 ## Recipe order

@@ -17,6 +17,8 @@
 		/** Set when this player's view of the tracked area is rotated 180° (e.g. a flipped board), so
 		 * positions are mirrored to/from the shared, un-rotated coordinate space other players use. */
 		flip?: boolean;
+		/** Must give the tracked area a definite size (e.g. `size-full`): it is a size container, and
+		 * peer cursors are placed in its `cqw`/`cqh` units. */
 		class?: string;
 		/** The tracked area — pointer moves over this are what get shared as this player's cursor. */
 		children: Snippet;
@@ -45,7 +47,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
 	bind:this={container}
-	class={cn("relative", className)}
+	class={cn("relative [container-type:size]", className)}
 	onpointermove={handlePointerMove}
 	onpointerleave={handlePointerLeave}
 >
@@ -55,9 +57,10 @@
 		{@const x = flip ? 1 - peer.x : peer.x}
 		{@const y = flip ? 1 - peer.y : peer.y}
 		{@const color = colorFor(peer.index)}
+		<!-- Moved with transform, not left/top, so a peer's cursor never records a layout shift. -->
 		<div
-			class="pointer-events-none absolute z-50 -translate-x-0.5 -translate-y-0.5 transition-[left,top] duration-100 ease-linear"
-			style={`left: ${x * 100}%; top: ${y * 100}%;`}
+			class="pointer-events-none absolute top-0 left-0 z-50 -translate-x-0.5 -translate-y-0.5 transition-transform duration-100 ease-linear"
+			style:transform={`translate(${x * 100}cqw, ${y * 100}cqh)`}
 			out:fade={{ duration: 400 }}
 		>
 			<div class="relative">

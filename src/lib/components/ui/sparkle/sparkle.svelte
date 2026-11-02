@@ -4,7 +4,7 @@
 
 	export type SparkleProps = {
 		/** Two hex colors, one per sparkle group — e.g. the app's player 1/player 2 seat accents. */
-		colors: [string, string];
+		colors: readonly [string, string];
 		/** Title is wide for the wordmark; icon is compact for square game marks. */
 		variant?: SparkleVariant;
 		class?: string;
@@ -184,7 +184,7 @@
 		};
 	}
 
-	function buildLayer(sparkle: Sparkle, index: number, colors: [string, string]) {
+	function buildLayer(sparkle: Sparkle, index: number, colors: readonly [string, string]) {
 		return {
 			ddd: 0,
 			ind: index + 1,
@@ -236,7 +236,7 @@
 
 	// Hand-authored Lottie composition (no fetched asset) so the two accent colors can be baked
 	// straight into each shape's fill rather than post-processing a generic sparkle file.
-	function createAnimationData(colors: [string, string], variant: SparkleVariant) {
+	function createAnimationData(colors: readonly [string, string], variant: SparkleVariant) {
 		const config = SPARKLE_VARIANTS[variant];
 
 		return {

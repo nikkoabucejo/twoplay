@@ -6,17 +6,18 @@ describe("ACCENTS", () => {
 		expect(ACCENTS).toHaveLength(2);
 	});
 
-	test("seat 0 is cyan and seat 1 is pink across every accent", () => {
-		for (const value of Object.values(ACCENTS[0])) expect(value).toContain("cyan-500");
-		for (const value of Object.values(ACCENTS[1])) expect(value).toContain("pink-500");
+	test("every accent uses its own seat's color token", () => {
+		for (const value of Object.values(ACCENTS[0])) expect(value).toContain("seat-0");
+		for (const value of Object.values(ACCENTS[1])) expect(value).toContain("seat-1");
 	});
 
 	test("every accent is one complete, literal tailwind class the scanner can find", () => {
 		for (const accent of ACCENTS) {
-			expect(accent.text).toMatch(/^text-[a-z]+-\d{3}$/);
-			expect(accent.bg).toMatch(/^bg-[a-z]+-\d{3}$/);
-			expect(accent.winBg).toMatch(/^bg-[a-z]+-\d{3}\/\d+$/);
-			expect(accent.tintBg).toMatch(/^bg-[a-z]+-\d{3}\/\d+$/);
+			expect(accent.text).toMatch(/^text-seat-\d$/);
+			expect(accent.bg).toMatch(/^bg-seat-\d$/);
+			expect(accent.winBg).toMatch(/^bg-seat-\d\/\d+$/);
+			expect(accent.tintBg).toMatch(/^bg-seat-\d\/\d+$/);
+			expect(accent.ring).toMatch(/^ring-seat-\d$/);
 		}
 	});
 

@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { Checkers } from "$lib/features/play";
+	import { Meta } from "$lib/components/ui";
+	import { GAMES, Checkers } from "$lib/features/play";
 	import type { PageProps } from "./$types.js";
 
 	let { params }: PageProps = $props();
@@ -9,6 +10,8 @@
 		params.round && /^[1-9]\d*$/.test(params.round) ? Number(params.round) : undefined
 	);
 </script>
+
+<Meta title={GAMES.checkers.name} description="A live game of Checkers on twoplay." />
 
 <div class="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 px-3 py-4 text-center">
 	<Checkers roomCode={params.code} {round} />

@@ -98,8 +98,7 @@ describe("Cursor", () => {
 	test("places a peer's cursor at their shared position", () => {
 		setQueryResult(api.models.cursors.index.list, [peer("Bob Baker", { x: 0.25, y: 0.75 })]);
 		render(Cursor, { props: { roomCode: "ABCD", colorFor: () => "text-pink-500", children } });
-		expect(cursorBox("Bob")?.style.left).toBe("25%");
-		expect(cursorBox("Bob")?.style.top).toBe("75%");
+		expect(cursorBox("Bob")?.style.transform).toBe("translate(25cqw, 75cqh)");
 	});
 
 	test("mirrors a peer's cursor on a flipped board", () => {
@@ -107,7 +106,20 @@ describe("Cursor", () => {
 		render(Cursor, {
 			props: { roomCode: "ABCD", colorFor: () => "text-pink-500", flip: true, children }
 		});
-		expect(cursorBox("Bob")?.style.left).toBe("75%");
-		expect(cursorBox("Bob")?.style.top).toBe("25%");
+		expect(cursorBox("Bob")?.style.transform).toBe("translate(75cqw, 25cqh)");
+	});
+
+	test("moves a peer's cursor with transform only, so it never shifts layout", () => {
+		setQueryResult(api.models.cursors.index.list, [peer("Bob Baker")]);
+		render(Cursor, { props: { roomCode: "ABCD", colorFor: () => "text-pink-500", children } });
+		const box = cursorBox("Bob");
+		expect(box?.style.left).toBe("");
+		expect(box?.style.top).toBe("");
+		expect(box).toHaveClass("top-0", "left-0", "transition-transform");
+	});
+
+	test("the tracked area is a size container for the cursor's units", () => {
+		render(Cursor, { props: { roomCode: "ABCD", colorFor: () => "text-pink-500", children } });
+		expect(screen.getByText("board").parentElement).toHaveClass("[container-type:size]");
 	});
 });

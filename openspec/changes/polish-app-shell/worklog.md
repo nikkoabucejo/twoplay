@@ -1,0 +1,72 @@
+# Worklog: polish-app-shell
+
+- PLAN done
+- 2026-11-02T02:45:25Z APPLY g1-g2 done; dark --ring raised to oklch(0.8) so /50 focus rings on buttons/tabs reach >=3:1 (orchestrator)
+- SPEC revised: dedupe nav links, layout-stability
+- 2026-11-02T03:30:39Z AUDIT 15.1 (partial, engineer): `pnpm build && pnpm preview` built at 03:30:21Z from the working tree, headless Chromium (Playwright), cold context per load, D11 observer via init script, 6 s idle. Signed out only: no test account or browser profile exists, so signed-in loads, turn changes, the live-game pill, and the "Link copied" toast are not measured. Signed out, room routes render the "Sign in" prompt, not the board.
+- AUDIT cls / 360x640 out 0.0017 font swap: home title block and game picker block, footer Ko-fi link (horizontal, fallback narrower than Inter)
+- AUDIT cls / 1280x800 out 0.0002 font swap: same nodes
+- AUDIT cls /play 360x640 out 0.0003 font swap: "Sign in to create or join a room." p, footer Ko-fi link
+- AUDIT cls /play 1280x800 out 0.0000 font swap: same nodes
+- AUDIT cls /lobby 360x640 out 0.0007 font swap: page heading block, footer Ko-fi link
+- AUDIT cls /lobby 1280x800 out 0.0001 font swap: same nodes
+- AUDIT cls /history 360x640 out 0.0006 font swap: page heading block, footer Ko-fi link
+- AUDIT cls /history 1280x800 out 0.0001 font swap: same nodes
+- AUDIT cls /leaderboard 360x640 out 0.0007 font swap: page heading block, footer Ko-fi link
+- AUDIT cls /leaderboard 1280x800 out 0.0001 font swap: same nodes
+- AUDIT cls /tictactoe/ABCD 360x640 out 0.0008 font swap: sign-in prompt block
+- AUDIT cls /tictactoe/ABCD 1280x800 out 0.0001 font swap: sign-in prompt block
+- AUDIT cls /checkers/ABCD 360x640 out 0.0008 font swap: sign-in prompt block
+- AUDIT cls /checkers/ABCD 1280x800 out 0.0001 font swap: sign-in prompt block
+- AUDIT cls banner /play 360x640 out 0.0602 <main> pushed down 42px (y 56->98) by the auth error banner (ui.browser.js blocked), plus font swap 0.0004
+- AUDIT cls banner /play 1280x800 out 0.0302 <main> pushed down 42px (y 64->106), plus font swap
+- AUDIT cls banner /lobby 360x640 out 0.0605 <main> pushed down 42px, plus font swap
+- AUDIT cls banner /lobby 1280x800 out 0.0303 <main> pushed down 42px, plus font swap
+- AUDIT cls slow-network (150 ms, 200 KB/s) /, /play, /lobby, /tictactoe/ABCD at both viewports: same scores and nodes as above, font arrives at ~1.9 s; no other shift
+- AUDIT note: header records no entry signed out at either viewport. On `pnpm dev` (5173) the font swap fires 2-3 times per load (Inter fetched twice when Vite re-injects the CSS), so dev scores are up to 3x higher (/ 360x640 0.0051); use the preview build for 20.12.
+- AUDIT not measured (needs sign-in): signed-in loads of all routes, game-room placeholder and status bar, 3 tic-tac-toe and 3 checkers turn changes, live-game pill on /history, "Link copied" toast, picker height for 18.9
+- 2026-11-02T03:57:39Z AUDIT 15.1 signed-in (qa): `pnpm dev` (5173), browser-a Alex `player.a+clerk_test@gmail.com`, browser-b Blair `player.b+clerk_test@gmail.com` (email code), D11 observer (hadRecentInput skipped), ignoreCache, 5 s idle, measured 03:46-03:57Z. Working tree already had group 16 edits (Inter Fallback `@font-face`, `--font-sans`, latin preload in layout.css/+layout.svelte from 03:39Z; both files changed again at ~03:48Z and ~03:52Z and Vite full-reloaded the open pages mid-run), so loads reflect partly fixed code. Dev only, not the preview build.
+- AUDIT cls signed-in / 360x640 0.0000 none
+- AUDIT cls signed-in / 1280x800 0.0000 (2 entries, 0.00001 each) font swap only: header "Lobby" link x 206->209->206 at font arrival
+- AUDIT cls signed-in /play 360x640 0.0214 footer pushed down 120px (y 508->628, off-screen) when the activeRoom loading box (`flex min-h-0 flex-1 items-center justify-center`, 404px, 32px Spinner) is replaced by the picker; reproduced 3/3
+- AUDIT cls signed-in /play 1280x800 0.0000 none (main is taller than the picker, footer stays at y 727)
+- AUDIT cls signed-in /lobby 360x640 0.0000 none
+- AUDIT cls signed-in /lobby 1280x800 0.0000 none
+- AUDIT cls signed-in /history 360x640 0.0000 none
+- AUDIT cls signed-in /history 1280x800 0.0000 none
+- AUDIT cls signed-in /leaderboard 360x640 0.0000 none
+- AUDIT cls signed-in /leaderboard 1280x800 0.0000 none
+- AUDIT cls signed-in header: avatar, tab bar, and primary links record no entry on any load at either viewport
+- AUDIT cls signed-in picker box (18.9): picker outer `flex flex-1 flex-col items-center justify-center py-2` is 524px at 360x640 (inner `max-w-md` column 508px = 144px carousel + 348px controls + mb-4); at 1280x800 the inner column is also 508px (outer stretches to 615px via flex-1). Loading box is 404px, so it needs min-h 524px (508px + py-2).
+- AUDIT cls signed-in room load /tictactoe/<code> 360x640 0.1443 board column `div.flex.flex-col.items-center.gap-6` replaces the 32x32 Spinner (164,332 -> 26,154 308x388); same at /checkers/<code> 360x640 0.1443
+- AUDIT cls signed-in room load /tictactoe/<code> 1280x800 0.1183 same node (624,416 32x32 -> 316,78 648x708)
+- AUDIT cls signed-in pill /history 360x640 0.0044 header right group `div.flex.min-w-0.items-center.gap-2` grows left (x 312 w36 -> x 194 w154) when "Live game" appears; avatar stays at x 312, wordmark and links do not move
+- AUDIT cls signed-in pill /history 1280x800 0.0225 history feed `div.no-scrollbar.min-h-0.w-full.max-w-md` pushed down 114px (y 156->270, h 547->433) by the active-room content appearing above it, plus header right group (x 1228 -> 1125); avatar stays at x 1228
+- AUDIT cls signed-in room join, host side 360x640 0.0006 clock box `div.flex.h-12.w-14` x 289->281, opponent group "0 <name>" (h 40->20, "Player 2" wrap -> name), footer icon button x 254->246; joiner side 1280x800 0.00002 seat-1 name and score spans x 836->861
+- AUDIT cls signed-in turns tictactoe A 360x640 + B 1280x800, 4 turn changes: 0 entries in both browsers
+- AUDIT cls signed-in turns checkers A 1280x800 + B 360x640, 4 turn changes: A 14 entries 0.00017, B 4 entries 0.00030; every source is the opponent's live cursor (`span.absolute.top-4.left-4` name label + svg) moving 4-9px; cursor.svelte positions it with `left`/`top` and `transition-[left,top]`, not transform. Status bar, board, and footer record nothing.
+- AUDIT cls signed-in toast "Link copied": not measurable. Create Room on /play navigates straight to the room (activeRoom effect in play.svelte redirects before `createdCode` is set), so the share-code screen with Copy link never renders (2/2: tictactoe private, checkers private).
+- AUDIT cls signed-in font-swap-only entries: only / 1280x800 (above); Inter fetched 3x per dev load (2 woff2 + `?import&url`), no other font-attributed shift
+- 2026-11-02T04:16:11Z APPLY done (groups 1-19 incl. follow-ups 10.5, 12.7-12.9, 18.10-18.11, 19.6)
+- SPEC revised: status bar center is content-sized (7rem rejected)
+- 2026-11-02T05:40:29Z QA 20.5-20.14 (qa): `pnpm dev` (5173) only; preview not started (qa may not start servers). browser-a Alex, browser-b Blair, D11 observer via init script (buffered, hadRecentInput skipped), 4 s idle per load, warm cache.
+- VERIFY cls signed-in / 360x640 0 | 1280x800 0.00011 (2 entries, home card row, font swap)
+- VERIFY cls signed-in /play 360x640 0 | 1280x800 0
+- VERIFY cls signed-in /lobby 360x640 0 | 1280x800 0
+- VERIFY cls signed-in /history 360x640 0 | 1280x800 0
+- VERIFY cls signed-in /leaderboard 360x640 0 | 1280x800 0
+- VERIFY cls signed-in /tictactoe/EX3TKB 360x640 0 | 1280x800 0
+- VERIFY cls signed-in /checkers/Z3NHNK 360x640 0 | 1280x800 0
+- VERIFY cls signed-out (isolated context) /, /play, /lobby, /history, /leaderboard, /tictactoe/EX3TKB, /checkers/Z3NHNK at 360x640 and 1280x800: 0 for all 14
+- QA 20.6 pass: wordmark only home link and goes home; aria-current on current link only; signed out shows Sign in, no member links, no dock; avatar menu has Account (opens profile) and Sign out (signs out; re-signed in with code); pill links to room off-room, hidden in room; dock only at 360, no Home, absent in rooms; header links hidden at 360, shown at 1280; footer Support + copyright, Support opens new tab; no duplicate href at either width; no storage.ko-fi.com request
+- QA 20.7 not ticked: history feed scrolls with header and footer visible (checked at 360x420, Alex's history fits 360x640); rooms no page scroll, no footer; navigation starts at top; one h1 per page. Empty history not observable (both accounts have history)
+- QA 20.8 not ticked: hidden tab simulated (document.hidden override + visibilitychange; real tab switch keeps visibilityState visible in this harness). Sound on: title alternates "Your turn · …" every 1 s, chime once, restores on visible. Sound off: flash, no oscillator. Spectator not testable (no third account)
+- QA 20.9 pass: ui.browser.js load failed via init-script interception (no request-blocking tool). /play renders, banner "Sign-in is unavailable right now." + Reload, both Sign in buttons disabled, no unhandledrejection, page settles. Unblocked: no banner
+- QA 20.10 pass: reduced motion holds wordmark and blobs still; focus ring contrast header link 10.63, tab option 3.33, button 3.33 (ring composited over card on body); Tabs arrow wrap, Home, End work; Copy link toast "Link copied" in aria-live=polite region 3 ms after click, removed after 3000 ms, focus stays on Copy link
+- QA 20.11 not ticked: preview not run. On dev: preload link for inter-latin-wght-normal.woff2 with crossorigin, file 200 font/woff2; signed-in /lobby HTML has dock + footer, /tictactoe/EX3TKB has neither
+- QA 20.5 not ticked: preview not run. On dev: titles, descriptions, og:*, manifest, apple-touch-icon, theme-color #0a0a0a present on /, /play, /leaderboard; manifest fields and 192/512/maskable icons ok; og.png 200 image/png
+- QA 20.13 pass: tic-tac-toe EX3TKB (A 1280x800, B 360x640) 4 turn changes, checkers Z3NHNK (A 360x640, B 1280x800) 5 turn changes, opponent cursor moving: 0 entries in both browsers; status bar, names, scores, clocks, footer controls same rects before/after; resign round end moves no name or score
+- QA 20.14 fail: toast 0 entries; return to tab after alert 0 entries; banner signed out 0 at both viewports; banner signed in /play 360x640 0.0120 (footer + header right group; dock removed when auth falls back to signed out), 1280x800 0.00009; pill on /history 1280x800 0.01683 (history rows pushed down 118px by the new PLAYING row at the top, plus header right group); wordmark, links, avatar did not move
+- SPEC revised: player strips, QA fixes (dock on auth fail, history active row, icon motion)
+- SPEC revised: fixed auth slot, checkers icon motion
+- 2026-11-02T06:03:48Z APPLY done (groups 20-24: player strips, auth-failure chrome, history active row, icon motion)

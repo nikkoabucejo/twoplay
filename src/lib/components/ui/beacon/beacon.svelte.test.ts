@@ -7,4 +7,11 @@ describe("Beacon", () => {
 		const { container } = render(Beacon);
 		expect(container.firstElementChild).toHaveAttribute("aria-hidden", "true");
 	});
+
+	test("only pings when motion is allowed", () => {
+		const { container } = render(Beacon);
+		const ping = container.querySelector("[class*=animate-ping]");
+		expect(ping).toHaveClass("motion-safe:animate-ping");
+		expect(ping).not.toHaveClass("animate-ping");
+	});
 });

@@ -4,9 +4,9 @@
 	import { fade } from "svelte/transition";
 	import { goto } from "$app/navigation";
 	import { resolve } from "$app/paths";
-	import { Board, type BoardStatus } from "$lib/components/layout";
-	import { Button, Spinner } from "$lib/components/ui";
-	import { Cursor } from "$lib/features/presence";
+	import { Board, BoardPlaceholder, type BoardStatus } from "$lib/components/layout";
+	import { Button } from "$lib/components/ui";
+	import { Cursor, TurnAlert } from "$lib/features/presence";
 	import { getClerkAuth } from "$lib/services/auth";
 	import { playCaptureSound, playMoveSound, prepareSound } from "$lib/utils/sound";
 	import { cn, ACCENTS } from "$lib/utils/style";
@@ -44,6 +44,7 @@
 		() => roomCode,
 		() => round
 	);
+	new TurnAlert(() => (room.isLoading ? null : room.isMyTurn));
 	const data = $derived(room.data);
 
 	let joinError = $state<string | null>(null);
@@ -184,23 +185,28 @@
 	</div>
 {/snippet}
 
+<!-- The board piece's disc without the drop-in, which plays the move sound. -->
+{#snippet stripMark(seat: 0 | 1)}
+	<div class={cn("size-full rounded-full shadow-md", ACCENTS[seat].bg)}></div>
+{/snippet}
+
 <svelte:window onkeydown={handleKeydown} />
 
 <div class={cn("flex flex-col items-center gap-6", className)}>
 	{#if !auth.isSignedIn}
 		<div class="flex flex-col items-center gap-3">
 			<p class="text-muted-foreground">Sign in to create or join a room.</p>
-			<Button onclick={() => auth.signIn()}>Sign in</Button>
+			<Button disabled={auth.loadError !== null} onclick={() => auth.signIn()}>Sign in</Button>
 		</div>
 	{:else if room.isLoading}
-		<Spinner size="lg" />
+		<BoardPlaceholder />
 	{:else if data === null}
 		<div class="flex flex-col items-center gap-3">
 			<p class="text-muted-foreground">Room "{roomCode}" doesn't exist.</p>
 			<Button variant="outline" href="/play?game=checkers">Back to play</Button>
 		</div>
 	{:else if room.wrongGameType}
-		<Spinner size="lg" />
+		<BoardPlaceholder />
 	{:else if joinError}
 		<div class="flex flex-col items-center gap-3">
 			<p class="text-muted-foreground">{joinError}</p>
@@ -235,13 +241,15 @@
 						label: room.players[0] ? firstName(room.players[0].name) : "Player 1",
 						emoji: room.players[0]?.emoji ?? DEFAULT_EMOJI,
 						accent: ACCENTS[0].text,
-						score: room.players[0]?.score ?? 0
+						score: room.players[0]?.score ?? 0,
+						mark: "Player 1 pieces"
 					},
 					{
 						label: room.players[1] ? firstName(room.players[1].name) : "Player 2",
 						emoji: room.players[1]?.emoji ?? DEFAULT_EMOJI,
 						accent: ACCENTS[1].text,
-						score: room.players[1]?.score ?? 0
+						score: room.players[1]?.score ?? 0,
+						mark: "Player 2 pieces"
 					}
 				]}
 				{status}
@@ -249,6 +257,7 @@
 				myIndex={room.myIndex}
 				opponentDisconnected={room.opponentDisconnected}
 				onTrashtalk={(emoji) => room.trashtalk(emoji)}
+				markIcon={stripMark}
 				footer={{
 					isLive: room.game.isLive,
 					round: room.game.round,

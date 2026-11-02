@@ -56,14 +56,8 @@ export class CheckersRoom extends Room {
 	});
 
 	myColor = $derived<PieceColor | null>(this.myIndex === null ? null : colorOfPlayer(this.myIndex));
-	isMyTurn = $derived(
-		this.game.isLive &&
-			this.game.endedSeat === null &&
-			!this.isViewingHistory &&
-			!this.isWaitingForOpponent &&
-			this.myColor !== null &&
-			this.myColor === this.#liveTurn
-	);
+	/** Moves are blocked while scrubbing history, even though the live turn is still the viewer's. */
+	canMove = $derived(this.isMyTurn && !this.isViewingHistory);
 
 	winner = $derived<PieceColor | null>(
 		this.#displayState !== null && this.legalMoves.length === 0
@@ -82,11 +76,11 @@ export class CheckersRoom extends Room {
 	}
 
 	canSelect(index: number): boolean {
-		return this.isMyTurn && this.legalMoves.some((move) => move.from === index);
+		return this.canMove && this.legalMoves.some((move) => move.from === index);
 	}
 
 	async select(index: number): Promise<void> {
-		if (this.winner || !this.isMyTurn) return;
+		if (this.winner || !this.canMove) return;
 
 		const from = this.effectiveSelected;
 		if (from !== null) {

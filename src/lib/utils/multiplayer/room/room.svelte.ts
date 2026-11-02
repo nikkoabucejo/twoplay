@@ -118,9 +118,15 @@ export abstract class Room {
 	myIndex = $derived((this.data?.myIndex ?? null) as 0 | 1 | null);
 
 	/** True while the room is short a seat — the host is waiting for someone to join. Every `*Room`
-	 *  subclass folds this into its own move-gating (`canPlay`/`isMyTurn`), since a lone host otherwise
+	 *  subclass folds this into its own move-gating (`canPlay`/`canMove`), since a lone host otherwise
 	 *  has nothing stopping them from playing both sides of an empty board. */
 	isWaitingForOpponent = $derived(this.players.some((seat) => seat === null));
+
+	/** True while the live round waits on the viewer's seat. Follows the live state, so scrubbing
+	 *  history doesn't change it. */
+	isMyTurn = $derived.by(
+		() => this.myIndex !== null && !this.isWaitingForOpponent && this.activeSeat === this.myIndex
+	);
 
 	/** True once the room has closed for good — a player abandoned it, it never filled, or every seat
 	 *  went idle. Closed rooms are permanently un-joinable; only Rematch/Play are gated on this, since

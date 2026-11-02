@@ -67,3 +67,24 @@ export function playCaptureSound(seat: number) {
 	osc.start(now);
 	osc.stop(now + 0.16);
 }
+
+/** Your turn arriving: two rising bell notes, E5 then A5. */
+export function playTurnChime() {
+	const ctx = getContext();
+	if (!ctx) return;
+	const now = ctx.currentTime;
+
+	for (const [index, pitch] of [659.25, 880].entries()) {
+		const start = now + index * 0.14;
+		const osc = ctx.createOscillator();
+		const gain = ctx.createGain();
+		osc.type = "sine";
+		osc.frequency.setValueAtTime(pitch, start);
+		gain.gain.setValueAtTime(0, start);
+		gain.gain.linearRampToValueAtTime(0.14, start + 0.01);
+		gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.5);
+		osc.connect(gain).connect(ctx.destination);
+		osc.start(start);
+		osc.stop(start + 0.52);
+	}
+}

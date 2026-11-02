@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { useMutation, useQuery } from "convex-svelte";
 	import { goto } from "$app/navigation";
-	import { Beacon, Button, Emblem, Playing, Tile } from "$lib/components/ui";
-	import { Feed } from "$lib/components/layout";
+	import { Beacon, Button, Emblem, EmptyState, Playing, Tile } from "$lib/components/ui";
+	import { Feed, FeedSkeleton } from "$lib/components/layout";
 	import { GAMES } from "$lib/features/play";
 	import { getClerkAuth } from "$lib/services/auth";
 	import { api } from "../../../../../convex/_generated/api.js";
@@ -31,67 +31,76 @@
 	}
 </script>
 
-<div class="flex w-full min-h-0 flex-1 flex-col items-center gap-3 overflow-hidden px-4 py-6">
-	{#if auth.isSignedIn && activeRoom.data}
-		<Playing code={activeRoom.data.code} type={activeRoom.data.type} class="max-w-md shrink-0" />
-	{/if}
-
+<div class="flex min-h-0 w-full flex-1 flex-col items-center gap-3 overflow-hidden">
 	{#if !auth.isSignedIn}
 		<div class="flex shrink-0 flex-col items-center gap-3">
 			<p class="text-sm text-muted-foreground">Sign in to browse open rooms.</p>
-			<Button size="sm" onclick={() => auth.signIn()}>Sign in</Button>
+			<Button size="sm" disabled={auth.loadError !== null} onclick={() => auth.signIn()}>
+				Sign in
+			</Button>
 		</div>
-	{:else if rooms.isLoading}
-		<p class="shrink-0 text-sm text-muted-foreground">Loading…</p>
+	{:else if rooms.isLoading || activeRoom.isLoading}
+		<FeedSkeleton />
 	{:else if rooms.error}
 		<p class="shrink-0 text-sm text-destructive">Could not load open rooms.</p>
-	{:else if !rooms.data?.length}
-		<p class="shrink-0 text-sm text-muted-foreground">No public rooms are waiting for a player.</p>
 	{:else}
-		<Feed>
-			<ul class="flex flex-col gap-2 py-1">
-				{#each rooms.data as room (room.code)}
-					<Tile highlighted={room.isOwn}>
-						{#snippet icon()}
-							<Emblem
-								icon={GAMES[room.type].icon}
-								colors={GAMES[room.type].colors}
-								class="size-8 shrink-0"
-								active={room.isOwn}
-								sparkles={false}
-							/>
-						{/snippet}
-						{#snippet title()}
-							<span class="flex items-center gap-1.5 text-xs font-semibold">
-								{GAMES[room.type].name}
+		{#if !rooms.data?.length}
+			<EmptyState
+				title="No open rooms"
+				description="Public rooms you can join show up here."
+				class="shrink-0"
+			/>
+		{:else}
+			<Feed>
+				<ul class="flex flex-col gap-2 py-1">
+					{#each rooms.data as room (room.code)}
+						<Tile highlighted={room.isOwn}>
+							{#snippet icon()}
+								<Emblem
+									icon={GAMES[room.type].icon}
+									colors={GAMES[room.type].colors}
+									class="size-8 shrink-0"
+									active={room.isOwn}
+									sparkles={false}
+								/>
+							{/snippet}
+							{#snippet title()}
+								<span class="flex items-center gap-1.5 text-xs font-semibold">
+									{GAMES[room.type].name}
+									{#if room.isOwn}
+										<Beacon />
+									{/if}
+								</span>
+							{/snippet}
+							{#snippet subtitle()}
+								<span class="text-caption text-muted-foreground">
+									Hosted by {room.isOwn ? "you" : (room.hostName ?? "someone")} · {room.timeControlMs /
+										60_000} min
+								</span>
+							{/snippet}
+							{#snippet trailing()}
 								{#if room.isOwn}
-									<Beacon />
+									<Button href="/{room.type}/{room.code}" variant="outline" size="xs">View</Button>
+								{:else}
+									<Button
+										size="xs"
+										onclick={() => handleJoin(room.code, room.type)}
+										disabled={joiningCode === room.code}
+									>
+										Join
+									</Button>
 								{/if}
-							</span>
-						{/snippet}
-						{#snippet subtitle()}
-							<span class="text-[11px] text-muted-foreground">
-								Hosted by {room.isOwn ? "you" : (room.hostName ?? "someone")} · {room.timeControlMs /
-									60_000} min
-							</span>
-						{/snippet}
-						{#snippet trailing()}
-							{#if room.isOwn}
-								<Button href="/{room.type}/{room.code}" variant="outline" size="xs">View</Button>
-							{:else}
-								<Button
-									size="xs"
-									onclick={() => handleJoin(room.code, room.type)}
-									disabled={joiningCode === room.code}
-								>
-									Join
-								</Button>
-							{/if}
-						{/snippet}
-					</Tile>
-				{/each}
-			</ul>
-		</Feed>
+							{/snippet}
+						</Tile>
+					{/each}
+				</ul>
+			</Feed>
+		{/if}
+
+		<!-- Below the feed, so a room started elsewhere shrinks the feed instead of pushing it down. -->
+		{#if activeRoom.data}
+			<Playing code={activeRoom.data.code} type={activeRoom.data.type} class="max-w-md shrink-0" />
+		{/if}
 	{/if}
 
 	{#if error}

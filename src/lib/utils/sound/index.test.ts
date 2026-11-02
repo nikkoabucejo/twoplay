@@ -133,3 +133,21 @@ describe("playCaptureSound", () => {
 		expect(seat2).toBe(seat0);
 	});
 });
+
+describe("playTurnChime", () => {
+	test("is a silent no-op during SSR, where there is no window", async () => {
+		const sound = await loadSound();
+		expect(() => sound.playTurnChime()).not.toThrow();
+	});
+
+	test("schedules its notes on the shared context", async () => {
+		stubBrowserAudio();
+		const sound = await loadSound();
+
+		sound.prepareSound();
+		sound.playTurnChime();
+
+		expect(FakeAudioContext.created).toHaveLength(1);
+		expect(FakeAudioContext.created[0].oscillators.length).toBeGreaterThan(0);
+	});
+});

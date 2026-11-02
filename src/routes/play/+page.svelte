@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { page } from "$app/state";
+	import { Page } from "$lib/components/layout";
+	import { Meta } from "$lib/components/ui";
 	import { Play } from "$lib/features/core";
 	import { GAME_TYPES } from "$lib/features/play";
 
@@ -9,4 +11,8 @@
 	);
 </script>
 
-<Play {initialGame} />
+<Meta title="Play" description="Find a match, create a room, or join one with a code." />
+
+<Page title="Play" titleClass="sr-only">
+	<Play {initialGame} />
+</Page>

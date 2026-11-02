@@ -12,6 +12,9 @@ Reference shapes: `Room` (`utils/multiplayer/room`), `TictactoeRoom`, `CheckersR
 - Use public getters for read-only or derived values (`get isLoading()`, `get data()`).
 - `protected` for subclass-only API (`submitMove`, `getCode`, `displayState`).
 - Reactive constructor inputs are **functions** (`getCode: () => string`), with defaults when optional.
+- App-wide stores use context, not module singletons (SSR isolation): `setupX()` in the root layout,
+  `getX()` reads it and throws when unset (`setupClerkAuth`, `setupPreferences`, `setupToaster`;
+  `getMood` returns `undefined` instead).
 
 ## Comments
 Default to none. Write one only for a non-obvious constraint, invariant, or workaround. Explain
@@ -20,7 +23,24 @@ Default to none. Write one only for a non-obvious constraint, invariant, or work
 ## Styling
 - `cn(...)` from `$lib/utils/style` for conditional classes — no ternary string concatenation.
 - `ACCENTS[seat].text / .bg / .winBg` — complete literal class strings. Never derive one from another.
-- `tailwind-variants` (`tv`) for variants, not `cva` (see `Button`, `Spinner`).
+- Seat colors: `text-seat-N` / `bg-seat-N/NN` in markup, `var(--seat-N)` in `<style>`, and
+  `SEAT_COLORS` from `$lib/utils/style` when a script needs the hex. Never raw seat hex values or
+  `cyan-500` / `pink-500`.
+- Small captions use `text-caption`. Never `text-[Npx]`.
+- Single-line UI labels (buttons, pills, tabs, nav links) get `whitespace-nowrap` so they never wrap
+  mid-label. Truncate user content such as names with `truncate` and a `min-w-0` parent.
+- No layout shift. Content the user didn't move stays put after first paint:
+  - Reserve the slot for conditional UI (render it always and toggle `invisible` or opacity).
+  - Give changing numbers and labels a fixed width, and numbers `tabular-nums`.
+  - Size loading placeholders like the content they replace.
+  - Overlay transient banners and toasts (`absolute` / `fixed`) instead of inserting them into the flow.
+  - Animate only `transform` and `opacity`.
+  - Check with a `PerformanceObserver` on `layout-shift` (`buffered: true`, skip entries with
+    `hadRecentInput`). The page-load budget is 0.01, and turn changes record zero entries.
+- Copy: short, plain, sentence case. Name the action or state ("Link copied", "Your turn"). No
+  exclamation marks, emoji, filler ("Oops", "Seamlessly"), or apologies.
+- `tailwind-variants` (`tv`) for variants, not `cva` (see `Button`, `Spinner`). Import `tv` from
+  `$lib/utils/style`, which shares `cn`'s tailwind-merge config (it knows `text-caption`).
 - Accessibility: visible focus states (`focus-visible:ring-*`), labels/aria on interactive controls.
 
 ## Types

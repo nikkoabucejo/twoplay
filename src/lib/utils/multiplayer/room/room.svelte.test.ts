@@ -121,6 +121,34 @@ describe("Room", () => {
 		expect(room.isWaitingForOpponent).toBe(false);
 	});
 
+	test("it is the viewer's turn when their seat is the active seat", () => {
+		const room = createRoom();
+		room.seat = 1;
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(initial, { myIndex: 1 }));
+		expect(room.isMyTurn).toBe(true);
+	});
+
+	test("it isn't the viewer's turn while the opponent's seat is active", () => {
+		const room = createRoom();
+		room.seat = 1;
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(initial, { myIndex: 0 }));
+		expect(room.isMyTurn).toBe(false);
+	});
+
+	test("a spectator never has the turn", () => {
+		const room = createRoom();
+		room.seat = 0;
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(initial, { myIndex: null }));
+		expect(room.isMyTurn).toBe(false);
+	});
+
+	test("the host has no turn while waiting for an opponent", () => {
+		const room = createRoom();
+		room.seat = 0;
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(initial, { players: [ALICE, null] }));
+		expect(room.isMyTurn).toBe(false);
+	});
+
 	test("isRoomClosed follows the room's closed status", () => {
 		const room = createRoom();
 		setQueryResult(api.models.rooms.index.get, roomSnapshot(initial));

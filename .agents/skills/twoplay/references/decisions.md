@@ -13,6 +13,55 @@ Template:
 **Follow-ups:** <existing code that now violates it, or "—">
 ```
 
+## 2026-11-02 — `components/layout` holds page regions only
+**Decision:** `components/layout` holds only page regions (`board`, `dock`, `feed`, `footer`, `header`, `page`),
+each named in one word. Generic pieces live in `components/ui`: `Banner` (message, tone, action), `Link`
+(`linkVariants`), and `Meta`. `Page` renders the page `h1` from `title`; there is no separate page-header component.
+**Why:** Layout should name regions of the page, not parts of a single region.
+**Supersedes:** `layout/{tab-bar,nav-link,page-header,meta,auth-error-banner}` (`TabBar`, `NavLink`, `PageHeader`, `AuthErrorBanner`).
+**Follow-ups:** —
+
+## 2026-11-02 — App shell: one frame per route type, one surface per destination
+**Decision:** The root layout picks the game-room frame (fixed, no footer or dock) or the scrolling page frame
+from `isGameRoomRoute(page.route.id)`, which matches the `[code]` segment. `NAV_ITEMS` is the one nav list:
+header from `sm`, `Dock` below it. The wordmark is the only home link and the footer holds Support only.
+**Why:** The `(games)` group also holds the landing page. Repeating links across header, footer, and menu was rejected.
+**Supersedes:** —
+**Follow-ups:** —
+
+## 2026-11-02 — Seat tokens, caption size, and stable layout
+**Decision:** Seat colors come from `--seat-N` in `layout.css` (`text-seat-N`, `var(--seat-N)`) and `SEAT_COLORS`
+in TS, kept equal by `utils/style/seats/index.test.ts`. Small text is `text-caption`. Content doesn't shift after
+first paint (reserved slots, fixed widths, sized placeholders, overlaid banners). Single-line labels are
+`whitespace-nowrap`. Copy is short, plain, and sentence case. `tv` comes from `$lib/utils/style`.
+**Why:** Seat colors existed in four forms and drifted. Late banners, font swap, and turn changes moved the page.
+**Supersedes:** `PLAYER_COLORS` in `features/play/games.ts`, literal `cyan-500`/`pink-500` and `text-[Npx]`.
+**Follow-ups:** —
+
+## 2026-11-02 — Verify and QA run in parallel slices
+**Decision:** Verification is split across agents that run at once: one commands `verifier`, plus evidence
+verifiers split by capability. QA runs scripted checks first (`.agents/scripts/layout-shift.mjs`, `curl`), then one
+`qa` agent per browser pair (a+b, c+d), each with its own scenario slice and time budget.
+**Why:** A single QA agent checking everything took about 30 minutes per run and blocked the flow.
+**Supersedes:** a single `verifier` and `qa` run per loop.
+**Follow-ups:** sign in `browser-c`/`browser-d` once (Casey, Drew).
+
+## 2026-11-02 — Polish lane in /dev:work
+**Decision:** UI, UX, copy, layout, accessibility, and performance polish with no Convex, schema, auth, or rule change runs
+the polish lane: `ff` route, one area owner, tests for logic only, batched feedback, scripted layout-shift checks,
+one `qa` run, one combined review.
+**Why:** `polish-app-shell` took the full `new` route with a spec revision per piece of feedback, class-name tests, and repeated
+two-browser QA. The overhead dwarfed the edits.
+**Supersedes:** —
+**Follow-ups:** —
+
+## 2026-11-02 — /dev:work steps are visible agents
+**Decision:** `/dev:work` runs triage and every verify phase as `Agent` calls in the conversation, each announced
+with a `▸` line and closed with a `✓`/`✗` line. It does not use the Workflow tool.
+**Why:** Background workflows hid what was running, so the user couldn't tell whether anything was in progress.
+**Supersedes:** the `triage` and `verify` saved workflows (`.agents/workflows/`, now removed).
+**Follow-ups:** —
+
 ## 2026-11-02 — OpenSpec plans and applies
 **Decision:** `/dev:work` triages a request, recommends an OpenSpec route (`none`, `explore`, `new`, `ff`, `propose`), and the
 OpenSpec skills plan and apply the change until it is archived. The saved workflows are `triage` (before planning) and `verify` (after apply).

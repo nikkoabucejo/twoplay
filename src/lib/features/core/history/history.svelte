@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { useQuery } from "convex-svelte";
-	import { Beacon, Button, Emblem, Playing, Tile } from "$lib/components/ui";
-	import { Feed } from "$lib/components/layout";
+	import { Button, Emblem, EmptyState, Playing, Tile } from "$lib/components/ui";
+	import { Feed, FeedSkeleton } from "$lib/components/layout";
 	import { GAMES } from "$lib/features/play";
 	import { getClerkAuth } from "$lib/services/auth";
 	import { cn } from "$lib/utils/style";
+	import { withoutActiveRoom } from "./rooms.js";
 	import { api } from "../../../../../convex/_generated/api.js";
 	import type { GameHistoryEntry } from "../../../../../convex/models/rooms/index.js";
 
@@ -30,6 +31,7 @@
 	// The single room (if any) this browser is still seated in and hasn't abandoned — same query
 	// `play.svelte` uses to bounce back into it, so "active" here always means the same thing there.
 	const activeRoom = useQuery(api.models.rooms.index.active, () => (auth.isSignedIn ? {} : "skip"));
+	const rooms = $derived(withoutActiveRoom(history.data ?? [], activeRoom.data?.code));
 
 	function formatDate(createdAt: number) {
 		return new Date(createdAt).toLocaleDateString(undefined, {
@@ -40,52 +42,46 @@
 	}
 </script>
 
-<div class="flex w-full min-h-0 flex-1 flex-col items-center gap-3 overflow-hidden px-4 py-6">
+<div class="flex min-h-0 w-full flex-1 flex-col items-center gap-3 overflow-hidden">
 	{#if !auth.isSignedIn}
 		<div class="flex shrink-0 flex-col items-center gap-3">
 			<p class="text-sm text-muted-foreground">Sign in to see your games.</p>
-			<Button size="sm" onclick={() => auth.signIn()}>Sign in</Button>
+			<Button size="sm" disabled={auth.loadError !== null} onclick={() => auth.signIn()}>
+				Sign in
+			</Button>
 		</div>
-	{:else if history.isLoading}
-		<p class="shrink-0 text-sm text-muted-foreground">Loading…</p>
+	{:else if history.isLoading || activeRoom.isLoading}
+		<FeedSkeleton />
 	{:else if history.error}
 		<p class="shrink-0 text-sm text-destructive">Could not load your games.</p>
-	{:else if !history.data?.length}
-		<p class="shrink-0 text-sm text-muted-foreground">You haven't played any games yet.</p>
-	{:else}
+	{:else if !rooms.length}
+		<EmptyState title="No games yet" description="Games you play show up here." class="shrink-0" />
 		{#if activeRoom.data}
 			<Playing code={activeRoom.data.code} type={activeRoom.data.type} class="max-w-md shrink-0" />
 		{/if}
-
+	{:else}
 		<Feed>
 			<ul class="flex flex-col gap-2 py-1">
-				{#each history.data as room (room.code)}
-					{@const isActive = activeRoom.data?.code === room.code}
-					<Tile highlighted={isActive}>
+				{#each rooms as room (room.code)}
+					<Tile>
 						{#snippet icon()}
 							<Emblem
 								icon={GAMES[room.type].icon}
 								colors={GAMES[room.type].colors}
 								class="size-8 shrink-0"
-								active={isActive}
 								sparkles={false}
 							/>
 						{/snippet}
 						{#snippet title()}
-							<span class="flex items-center gap-1.5 text-xs font-semibold">
-								{GAMES[room.type].name}
-								{#if isActive}
-									<Beacon />
-								{/if}
-							</span>
+							<span class="text-xs font-semibold">{GAMES[room.type].name}</span>
 						{/snippet}
 						{#snippet subtitle()}
-							<span class="text-[11px] text-muted-foreground">
+							<span class="text-caption text-muted-foreground">
 								You vs {room.opponentName ?? "waiting for opponent"}
 							</span>
 						{/snippet}
 						{#snippet trailing()}
-							<span class="font-mono text-[11px] text-muted-foreground">{room.code}</span>
+							<span class="font-mono text-caption text-muted-foreground">{room.code}</span>
 						{/snippet}
 
 						<ul class="flex flex-col gap-1.5">
@@ -93,14 +89,14 @@
 								<li class="flex items-center gap-2 rounded-lg bg-background/60 px-2.5 py-1.5">
 									<div class="flex flex-1 flex-col">
 										<span class="text-xs font-medium">Game {game.round}</span>
-										<span class="text-[11px] text-muted-foreground">
+										<span class="text-caption text-muted-foreground">
 											{formatDate(game.createdAt)}
 										</span>
 									</div>
 									<span
 										class={cn(
-											"text-[11px] font-semibold uppercase tracking-wide",
-											game.result === "playing" && "animate-pulse",
+											"text-caption font-semibold uppercase tracking-wide",
+											game.result === "playing" && "motion-safe:animate-pulse",
 											RESULT_CLASSES[game.result]
 										)}
 									>
@@ -109,7 +105,7 @@
 									{#if game.mmr !== null}
 										<span
 											class={cn(
-												"inline-block w-7 shrink-0 text-right font-mono text-[11px] font-semibold tabular-nums",
+												"inline-block w-7 shrink-0 text-right font-mono text-caption font-semibold tabular-nums",
 												game.mmr > 0 ? "text-emerald-500" : "text-destructive"
 											)}
 										>
@@ -126,5 +122,10 @@
 				{/each}
 			</ul>
 		</Feed>
+
+		<!-- Below the feed, so a room started elsewhere shrinks the feed instead of pushing it down. -->
+		{#if activeRoom.data}
+			<Playing code={activeRoom.data.code} type={activeRoom.data.type} class="max-w-md shrink-0" />
+		{/if}
 	{/if}
 </div>

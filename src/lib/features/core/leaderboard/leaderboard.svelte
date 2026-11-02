@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { useQuery } from "convex-svelte";
 	import { Crown, Medal, Trophy } from "@lucide/svelte";
-	import { Button, Sparkle } from "$lib/components/ui";
-	import { Feed } from "$lib/components/layout";
+	import { Button, Skeleton, Sparkle } from "$lib/components/ui";
+	import { Feed, FeedSkeleton } from "$lib/components/layout";
 	import { getClerkAuth } from "$lib/services/auth";
-	import { cn } from "$lib/utils/style";
+	import { cn, SEAT_COLORS } from "$lib/utils/style";
 	import { api } from "../../../../../convex/_generated/api.js";
 
 	// Circular badge treatment per rank — gold/silver/bronze for the podium, a plain numbered
@@ -15,6 +15,10 @@
 		2: "bg-gradient-to-br from-slate-300 to-slate-400 text-slate-900",
 		3: "bg-gradient-to-br from-orange-400 to-orange-600 text-orange-950"
 	};
+
+	// Shared with the loading skeleton so the loaded card replaces it in the same box.
+	const RATING_CARD_CLASS =
+		"relative w-full max-w-md shrink-0 overflow-hidden rounded-2xl border bg-muted/40 p-6 text-center backdrop-blur-sm";
 
 	const auth = getClerkAuth();
 	const leaderboard = useQuery(api.models.ratings.index.top, () => (auth.isSignedIn ? {} : "skip"));
@@ -30,21 +34,40 @@
 	const myRank = $derived(myRankIndex >= 0 ? myRankIndex + 1 : null);
 </script>
 
-<div class="flex w-full min-h-0 flex-1 flex-col items-center gap-3 overflow-hidden px-4 py-6">
+<div class="flex min-h-0 w-full flex-1 flex-col items-center gap-3 overflow-hidden">
 	{#if !auth.isSignedIn}
 		<div class="flex shrink-0 flex-col items-center gap-3">
 			<p class="text-sm text-muted-foreground">Sign in to see the leaderboard.</p>
-			<Button size="sm" onclick={() => auth.signIn()}>Sign in</Button>
+			<Button size="sm" disabled={auth.loadError !== null} onclick={() => auth.signIn()}>
+				Sign in
+			</Button>
 		</div>
 	{:else if leaderboard.isLoading || myRating.isLoading || myStats.isLoading}
-		<p class="shrink-0 text-sm text-muted-foreground">Loading…</p>
+		<div data-slot="rating-card-skeleton" class={RATING_CARD_CLASS} aria-hidden="true">
+			<div class="flex flex-col items-center gap-1.5">
+				<Skeleton class="h-4 w-24" />
+				<Skeleton class="h-10 w-20" />
+				<Skeleton class="h-4 w-32" />
+
+				<div class="mt-2 flex items-center gap-4 border-t border-border/60 pt-3">
+					<div class="flex flex-col items-center gap-0.5">
+						<Skeleton class="h-5 w-6" />
+						<Skeleton class="h-4 w-10" />
+					</div>
+					<div class="h-6 w-px bg-border"></div>
+					<div class="flex flex-col items-center gap-0.5">
+						<Skeleton class="h-5 w-8" />
+						<Skeleton class="h-4 w-12" />
+					</div>
+				</div>
+			</div>
+		</div>
+		<FeedSkeleton />
 	{:else if leaderboard.error || myRating.error || myStats.error}
 		<p class="shrink-0 text-sm text-destructive">Could not load the leaderboard.</p>
 	{:else}
-		<div
-			class="relative w-full max-w-md shrink-0 overflow-hidden rounded-2xl border bg-muted/40 p-6 text-center backdrop-blur-sm"
-		>
-			<Sparkle colors={["#06b6d4", "#ec4899"]} variant="title" class="opacity-70" />
+		<div class={RATING_CARD_CLASS}>
+			<Sparkle colors={SEAT_COLORS} variant="title" class="opacity-70" />
 			<div class="relative z-10 flex flex-col items-center gap-1.5">
 				<span
 					class="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase"
@@ -68,14 +91,14 @@
 						<span class="font-mono text-sm font-semibold tabular-nums">
 							{myStats.data?.totalGames ?? 0}
 						</span>
-						<span class="text-[11px] text-muted-foreground">Games</span>
+						<span class="text-caption text-muted-foreground">Games</span>
 					</div>
 					<div class="h-6 w-px bg-border"></div>
 					<div class="flex flex-col items-center gap-0.5">
 						<span class="font-mono text-sm font-semibold tabular-nums">
 							{myStats.data?.winRate ?? 0}%
 						</span>
-						<span class="text-[11px] text-muted-foreground">Win rate</span>
+						<span class="text-caption text-muted-foreground">Win rate</span>
 					</div>
 				</div>
 			</div>
@@ -113,10 +136,10 @@
 								<span class="flex items-center gap-1.5 truncate text-sm font-semibold">
 									{entry.name}
 									{#if entry.isMe}
-										<span class="text-[10px] font-bold text-emerald-500">YOU</span>
+										<span class="text-caption font-bold text-emerald-500">YOU</span>
 									{/if}
 								</span>
-								<span class="text-[11px] text-muted-foreground">
+								<span class="text-caption text-muted-foreground">
 									{stats?.totalGames ?? 0} games · {stats?.winRate ?? 0}% win
 								</span>
 							</div>

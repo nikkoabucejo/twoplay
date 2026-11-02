@@ -28,7 +28,13 @@
 
 <style>
 	.tictactoe-x-wobble {
-		animation: tictactoe-wobble 5s ease-in-out infinite;
+		transform: rotate(-10deg);
+	}
+
+	@media (prefers-reduced-motion: no-preference) {
+		.tictactoe-x-wobble {
+			animation: tictactoe-wobble 5s ease-in-out infinite;
+		}
 	}
 
 	@keyframes tictactoe-wobble {
