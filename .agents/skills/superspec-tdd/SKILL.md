@@ -19,12 +19,9 @@ description: |
 >
 > The orchestrator for all of this is `/dev:work` (see `.agents/commands/dev/work.md`).
 >
-> **twoplay reality check:** the repo has **no test runner yet** (no vitest/playwright in `package.json`).
-> Until one is added: apply strict RED→GREEN→REFACTOR only when a test harness exists for the code
-> you touch. Otherwise the "evidence" requirement is satisfied by `pnpm check` (svelte-check + tsc),
-> `pnpm build`, and a scripted or manual run of the affected flow, with each OpenSpec Scenario mapped
-> to how it was verified. Pure logic (`convex/models/games/*/rules.ts`, `engine.ts`) is the first
-> place a test harness should go — propose it as its own OpenSpec change rather than sneaking it in.
+> **twoplay:** Vitest. `pnpm test` runs three projects: `convex` (edge-runtime + convex-test, `convex/**/*.test.ts`),
+> `server` (node, `src/**/*.test.ts`), and `client` (jsdom + Testing Library, `src/**/*.svelte.test.ts`).
+> Convex helpers are in `convex/test.setup.ts`. Live browser checks are done by the `qa` agent, not by tests.
 
 # Test-Driven Development (TDD)
 

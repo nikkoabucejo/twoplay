@@ -1,10 +1,11 @@
 export const meta = {
 	name: 'dev-build',
-	description: 'twoplay: implement an approved OpenSpec change, verify, deslop, CodeGraph impact, review with adversarial checks, docs sync',
-	whenToUse: 'Called by /dev:work after plan approval. args: { changeId, groups, risks, base }',
+	description: 'twoplay: implement an approved OpenSpec change, verify (tests), live QA in two browsers, deslop, CodeGraph impact, review with adversarial checks, docs sync',
+	whenToUse: 'Called by /dev:work after plan approval. args: { changeId, groups, risks, base, qa }',
 	phases: [
 		{ title: 'Implement', detail: 'engineer/designer per task group' },
-		{ title: 'Verify', detail: 'verifier, fix loop (max 3)' },
+		{ title: 'Verify', detail: 'vitest, check, build, scenarios; fix loop (max 3)' },
+		{ title: 'QA', detail: 'qa drives browser-a/browser-b against the dev server; fix loop (max 2)' },
 		{ title: 'Conform', detail: 'steward deslop + conventions' },
 		{ title: 'Impact', detail: 'CodeGraph impact of changed symbols' },
 		{ title: 'Review', detail: 'reviewer/security/designer, skeptic per finding, fix loop (max 2)' },
@@ -17,6 +18,7 @@ if (!a.changeId || !Array.isArray(a.groups)) throw new Error('dev-build needs ar
 const ID = a.changeId
 const BASE = a.base || 'HEAD'
 const RISKS = a.risks || []
+const RUN_QA = a.qa !== false
 
 const IMPL = {
 	type: 'object',
@@ -34,6 +36,7 @@ const VERIFY = {
 	properties: {
 		result: { type: 'string', enum: ['pass', 'fail'] },
 		check: { type: 'string' },
+		tests: { type: 'string' },
 		build: { type: 'string' },
 		scenariosProven: { type: 'number' },
 		scenariosTotal: { type: 'number' },
@@ -41,7 +44,7 @@ const VERIFY = {
 		touchesUi: { type: 'boolean' },
 		touchesConvex: { type: 'boolean' }
 	},
-	required: ['result', 'check', 'failures', 'touchesUi', 'touchesConvex']
+	required: ['result', 'check', 'tests', 'failures', 'touchesUi', 'touchesConvex']
 }
 const CONFORM = {
 	type: 'object',
@@ -68,6 +71,19 @@ const FINDINGS = {
 	},
 	required: ['verdict', 'findings']
 }
+const QA = {
+	type: 'object',
+	properties: {
+		result: { type: 'string', enum: ['pass', 'fail', 'blocked'] },
+		scenarios: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, status: { type: 'string', enum: ['pass', 'fail', 'n/a'] }, observed: { type: 'string' } }, required: ['name', 'status', 'observed'] } },
+		consoleErrors: { type: 'string' },
+		networkFailures: { type: 'string' },
+		repro: { type: 'string' },
+		suspect: { type: 'string' },
+		reason: { type: 'string' }
+	},
+	required: ['result', 'scenarios']
+}
 const VERDICT = {
 	type: 'object',
 	properties: { real: { type: 'boolean' }, reason: { type: 'string' } },
@@ -76,7 +92,7 @@ const VERDICT = {
 
 const ownerPrompt = (g) =>
 	`Implement OpenSpec change \`${ID}\`, task group ${g.n} "${g.title}": tasks ${g.taskIds.join(', ')}.
-Read openspec/changes/${ID}/{proposal.md,design.md,tasks.md,specs/**} first. Do only these tasks, tick them in tasks.md,
+Follow .agents/skills/openspec-apply-change/SKILL.md steps 3–6 (\`openspec instructions apply --change ${ID} --json\`, read the context files) for these tasks only. Tick them in tasks.md,
 follow anti-slop, check blast radius with \`codegraph impact\` before editing shared symbols, run pnpm check.`
 
 async function runGroup(g) {
@@ -107,7 +123,7 @@ for (const batch of batches) {
 async function verifyLoop(label) {
 	let v = null
 	for (let i = 1; i <= 3; i++) {
-		v = await agent(`Verify OpenSpec change \`${ID}\` (diff base ${BASE}). Also report whether the diff touches .svelte/CSS (touchesUi) and convex/ or auth/env (touchesConvex).`,
+		v = await agent(`Verify OpenSpec change \`${ID}\` (diff base ${BASE}). Include the openspec-verify-change checks (completeness, correctness, coherence); any CRITICAL issue is a failure. Also report whether the diff touches .svelte/CSS (touchesUi) and convex/ or auth/env (touchesConvex).`,
 			{ label: `${label}:${i}`, phase: 'Verify', agentType: 'verifier', schema: VERIFY })
 		if (!v) throw new Error('verifier failed')
 		if (v.result === 'pass') return v
@@ -121,6 +137,30 @@ async function verifyLoop(label) {
 phase('Verify')
 let ver = await verifyLoop('verifier')
 if (ver.result !== 'pass') return { stage: 'verify-failed', verify: ver }
+
+async function qaLoop() {
+	if (!RUN_QA) return { result: 'skipped', scenarios: [] }
+	let q = null
+	for (let i = 1; i <= 2; i++) {
+		q = await agent(`Test mode. OpenSpec change \`${ID}\`. Test every user-visible scenario with both players.`,
+			{ label: `qa:${i}`, phase: 'QA', agentType: 'qa', schema: QA })
+		if (!q) throw new Error('qa failed')
+		if (q.result !== 'fail') return q
+		log(`qa ${i}/2 failed`)
+		if (i < 2) {
+			await agent(`Live QA of \`${ID}\` failed. Fix the root cause, add a Vitest test that reproduces it, and run pnpm test.\n${JSON.stringify(q)}`,
+				{ label: `engineer:qa-fix${i}`, phase: 'QA', agentType: 'engineer', schema: IMPL })
+			const v = await verifyLoop(`reverify-qa${i}`)
+			if (v.result !== 'pass') return { result: 'fail', scenarios: [], reason: 'verify failed after QA fix: ' + v.failures }
+		}
+	}
+	return q
+}
+
+phase('QA')
+const qa = await qaLoop()
+if (qa.result === 'blocked') log(`qa blocked: ${qa.reason || 'see output'}`)
+if (qa.result === 'fail') return { stage: 'qa-failed', verify: ver, qa }
 
 phase('Conform')
 const conform = await agent(`Conform mode. Diff base ${BASE}. OpenSpec change \`${ID}\`.`, { label: 'steward:conform', agentType: 'steward', schema: CONFORM })
@@ -173,6 +213,7 @@ const sync = await agent(`Knowledge-sync mode. Diff base ${BASE}. OpenSpec chang
 return {
 	stage: accepted.length ? 'review-unresolved' : 'built',
 	verify: ver,
+	qa,
 	conform,
 	impact,
 	review: review.map((r) => ({ from: r.type, verdict: r.verdict, minor: r.minor })),

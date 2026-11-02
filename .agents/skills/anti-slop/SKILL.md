@@ -99,6 +99,16 @@ or re-export the server-inferred type.
 names. Unprefixed booleans. A second name for an existing concept. Hungarian or suffix noise
 (`roomObj`, `playersArray`, `isLoadingBool`).
 
+### 10. Test slop
+- Tests that restate the implementation, assert mocks were called, or snapshot whole objects instead of
+  checking behavior.
+- Mocking the unit under test, or mocking what convex-test already provides (db, auth, scheduler).
+- One giant test per function. Use one behavior per `test`, named as the behavior (`"join rejects a full room"`).
+- Re-implementing helpers that `convex/test.setup.ts` already has (`setup`, `signIn`, `seatedRoom`).
+- `expect(true).toBe(true)`, assertion-free tests, `any`-typed fixtures, sleeps instead of fake timers.
+- Deleting or loosening a test to make it pass. A failing test either exposes a bug (fix the code, or mark
+  it `test.fails` with a one-line reason) or the test is wrong.
+
 ## Deslop pass (procedure)
 
 1. Base: given, else `git merge-base main HEAD`, else `HEAD`. Diff: `git diff <base>` (includes uncommitted work).

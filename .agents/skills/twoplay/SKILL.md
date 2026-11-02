@@ -41,13 +41,14 @@ Read the reference that matches the work. Each is self-contained.
 ## Verification commands
 
 ```bash
+pnpm test           # vitest: convex, server, client projects
 pnpm check          # svelte-kit sync + svelte-check (types) — must be 0 errors / 0 warnings
 pnpm format:check   # prettier
 pnpm build          # vite production build
 pnpm dev            # convex dev + vite dev (only when a live run is needed)
 ```
 
-There is no test runner yet. See `superspec-tdd` for how verification evidence works until one exists.
+Tests are colocated: `<module>.test.ts`, `<component>.svelte.test.ts`. Convex helpers are in `convex/test.setup.ts`.
 
 The `steward` agent owns these files. If a reference disagrees with the code, the code wins. Fix the
 reference in the same change, which `/dev:work` does in its knowledge-sync step.

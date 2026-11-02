@@ -1,9 +1,9 @@
 export const meta = {
 	name: 'dev-plan',
 	description: 'twoplay: CodeGraph map + triage, then an OpenSpec change (proposal, specs, design, tasks)',
-	whenToUse: 'Called by /dev:work. args: { request, answers?, decisions?, changeId? }',
+	whenToUse: 'Called by /dev:work. args: { request, answers?, decisions?, changeId?, revise? }',
 	phases: [
-		{ title: 'Map', detail: 'CodeGraph sync, explore, impact + triage' },
+		{ title: 'Map', detail: 'CodeGraph sync, explore, impact + triage; qa reproduces bugs' },
 		{ title: 'Spec', detail: 'architect writes and validates the OpenSpec change' }
 	]
 }
@@ -57,6 +57,16 @@ const SPEC = {
 	required: ['changeId', 'validate', 'proposal', 'groups', 'openQuestions']
 }
 
+if (a.changeId && a.revise) {
+	phase('Spec')
+	const updated = await agent(
+		`Revise OpenSpec change \`${a.changeId}\` with this feedback:\n${a.revise}\n\nFollow .agents/skills/openspec-update-change/SKILL.md (revise existing artifacts, keep them coherent; never recreate the change).
+Write only under openspec/. Run \`openspec validate ${a.changeId} --strict\` until it passes. Append "- SPEC revised" to worklog.md.`,
+		{ label: 'architect:update', agentType: 'architect', schema: SPEC })
+	if (!updated) throw new Error('architect agent failed')
+	return { stage: 'planned', spec: updated, revised: true }
+}
+
 phase('Map')
 const triage = await agent(
 	`Triage this request for twoplay.
@@ -74,18 +84,26 @@ Also run \`openspec list --json\` for overlaps. Follow your triage rubric. Do no
 if (!triage) throw new Error('triage agent failed')
 log(`${triage.type} · ${triage.size} · ${triage.changeId} · risks: ${triage.risks.join(', ') || 'none'}`)
 
-if (triage.type === 'question' || triage.size === 'trivial') return { stage: 'triaged', triage }
-if (triage.blockingQuestions.length && !a.answers) return { stage: 'needs-input', triage, questions: triage.blockingQuestions }
-if (triage.size === 'large' && !a.decisions) return { stage: 'needs-brainstorm', triage }
+let repro = null
+if (triage.type === 'bug' && a.reproduce !== false) {
+	repro = await agent(`Debug mode. Reproduce this bug in the running app and collect evidence:\n${a.request}\n${triage.notes || ''}`,
+		{ label: 'qa:reproduce', agentType: 'qa' })
+	if (repro) log('bug reproduction attempted (see repro)')
+}
+
+if (triage.type === 'question' || triage.size === 'trivial') return { stage: 'triaged', triage, repro }
+if (triage.blockingQuestions.length && !a.answers) return { stage: 'needs-input', triage, repro, questions: triage.blockingQuestions }
+if (triage.size === 'large' && !a.decisions) return { stage: 'needs-brainstorm', triage, repro }
 
 phase('Spec')
-const brief = JSON.stringify({ triage, answers: a.answers || null, decisions: a.decisions || null }, null, 1)
+const brief = JSON.stringify({ triage, repro, answers: a.answers || null, decisions: a.decisions || null }, null, 1)
 let spec = await agent(
 	`Create the OpenSpec change \`${a.changeId || triage.changeId}\` for twoplay from this brief:
 
 ${brief}
 
 Use the \`impact\` list: every affected caller needs a task or an explicit "unaffected because" in design.md.
+Every scenario gets a Vitest test task; user-visible scenarios are also checked by live QA. For bugs, the first task is a failing test from \`repro\`.
 Follow your architect process. Write only under openspec/. Run \`openspec validate <id> --strict\` until it passes.
 Also create openspec/changes/<id>/worklog.md with "- MAP done" and "- SPEC done" lines.`,
 	{ label: 'architect', agentType: 'architect', schema: SPEC }
@@ -97,4 +115,4 @@ if (spec && spec.validate === 'fail') {
 	)
 }
 if (!spec) throw new Error('architect agent failed')
-return { stage: 'planned', triage, spec }
+return { stage: 'planned', triage, repro, spec }

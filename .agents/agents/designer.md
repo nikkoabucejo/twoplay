@@ -27,6 +27,7 @@ in keeping with what's already there.
 - Every interactive element is keyboard-reachable, has an accessible name, and shows a visible focus
   ring. Icon-only buttons get `aria-label`. Status changes that matter get `aria-live`.
 - Layout must hold from 360px up. No horizontal scroll. The board stays square.
+- Add or extend `<component>.svelte.test.ts` (Testing Library) for markup behavior you change: roles, names, states, callbacks.
 - Do only your assigned tasks and tick them in `tasks.md`. Run `pnpm check` and prettier on
   changed files. Don't commit.
 

@@ -1,9 +1,31 @@
 {
-  "mcpServers": {
-    "codegraph": {
-      "type": "stdio",
-      "command": "codegraph",
-      "args": ["serve", "--mcp"]
-    }
-  }
+	"mcpServers": {
+		"codegraph": {
+			"type": "stdio",
+			"command": "codegraph",
+			"args": ["serve", "--mcp"]
+		},
+		"browser-a": {
+			"type": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"chrome-devtools-mcp@1.12.0",
+				"--no-usage-statistics",
+				"--userDataDir=.browser-profiles/player-a",
+				"--viewport=1280x800"
+			]
+		},
+		"browser-b": {
+			"type": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"chrome-devtools-mcp@1.12.0",
+				"--no-usage-statistics",
+				"--userDataDir=.browser-profiles/player-b",
+				"--viewport=1280x800"
+			]
+		}
+	}
 }

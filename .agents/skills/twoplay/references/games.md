@@ -8,8 +8,8 @@ half mirrors it so the UI responds instantly. Both share a discriminated union t
 - `rules.ts` — pure board math, with no turn order and no player index (e.g. checkers
   `computeLegalMoves`, which the client also imports).
 - `engine.ts` — implements `GameEngine<State, Move>` from `convex/models/games/engine.ts`:
-  `kind`, `playerCount`, `createInitialState()`, `applyMove(state, playerIndex, move)` (validates,
-  throws on illegal), `status(state)` → `{ turnIndex, winnerIndex, isOver }`, `roundWinner(state)`.
+  `kind`, `playerCount`, `createInitialState()`, `applyMove(state, playerIndex, move)` (throws
+  `"Not your turn"`; any other illegal move returns the same state, which `rooms.play` treats as a no-op), `status(state)` → `{ turnIndex, winnerIndex, isOver }`, `roundWinner(state)`.
 - `index.ts` — barrel: engine, validators, inferred types.
 
 ### Registry: `convex/models/games/index.ts`

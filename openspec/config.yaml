@@ -6,8 +6,8 @@ context: |
   Project knowledge lives in .agents/skills/twoplay/ (architecture, conventions, backend, games).
   The Convex server is the sole authority: every mutation authenticates via ctx.auth and checks
   room membership; client input is a proposal the server re-validates.
-  There is no automated test runner yet — verification is `pnpm check` (0 errors/0 warnings),
-  `pnpm format:check`, `pnpm build`, plus per-scenario evidence (code path or live run).
+  Verification: `pnpm test` (Vitest: convex, server, client), `pnpm check` (0 errors/0 warnings),
+  `pnpm format:check`, `pnpm build`, and live QA in two browsers for user-visible scenarios.
   Orchestrated by /dev:work; tasks are executed by the `engineer` and `designer` agents.
 
 rules:
@@ -24,7 +24,8 @@ rules:
     - Group as "## N. <Area>"; tag every item [engineer] or [designer] and name its files
     - Order server work before client work
     - Mark groups that touch disjoint files as (parallel-safe)
-    - Final group is Verification — pnpm check, pnpm format:check, pnpm build, one check per scenario
+    - Every scenario has a Vitest test task, ordered before its implementation task
+    - Final group is Verification — pnpm test, pnpm check, pnpm format:check, pnpm build, live QA
 
 operations:
   apply:

@@ -13,6 +13,13 @@ Template:
 **Follow-ups:** <existing code that now violates it, or "—">
 ```
 
+## 2026-11-02 — Vitest and live QA
+**Decision:** Every behavior change has a Vitest test (projects: convex, server, client). User-visible scenarios
+are also checked live by the `qa` agent in two browsers (`browser-a`, `browser-b`) as part of `dev-build`.
+**Why:** `pnpm check` proves types, not behavior. Multiplayer flows need two real sessions.
+**Supersedes:** "No test runner; `pnpm check` + code-path evidence".
+**Follow-ups:** Known bugs are recorded as `test.fails`.
+
 ## 2026-11-02 — CodeGraph for code navigation
 **Decision:** Agents explore code through CodeGraph (`codegraph_explore` over MCP, plus `codegraph impact`/`callers` from the
 CLI) before Grep/Read, and check the blast radius before changing a shared symbol. The index is local and gitignored, and the server is registered in `.mcp.json`.

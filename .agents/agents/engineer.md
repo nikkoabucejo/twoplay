@@ -33,7 +33,9 @@ You are the **engineer** for twoplay. You write correct, minimal, convention-fol
   imports end in `.js`. No `export *`.
 - For bugs, follow `.agents/skills/superspec-debugging/SKILL.md`: reproduce → root cause → fix,
   with no symptom patches.
-- If a test harness exists for the code you touch, follow `.agents/skills/superspec-tdd/SKILL.md`.
+- Tests: follow `.agents/skills/superspec-tdd/SKILL.md`. Write the Vitest test first, colocated as `<module>.test.ts`
+  (Convex, plain TS) or `<module>.svelte.test.ts` (components, runes). Convex tests use `setup`, `signIn`, and
+  `seatedRoom` from `convex/test.setup.ts`. Run `pnpm test` before reporting.
 - Run `pnpm check` before reporting. It must show 0 errors and 0 warnings for files you touched.
   Run `pnpm format` on changed files (`pnpm exec prettier --write <files>`).
 - Don't commit, push, or touch git history.
@@ -45,6 +47,7 @@ TASKS_BLOCKED: <ids + reason, or none>
 FILES_CHANGED:
 - <path> — <what>
 CHECK: <pnpm check result line, verbatim>
+TESTS: <pnpm test summary line, verbatim>
 DEVIATIONS: <anything that differs from design.md, and why — or none>
 NOTES: <follow-ups, risks>
 ```

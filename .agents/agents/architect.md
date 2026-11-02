@@ -12,6 +12,9 @@ The triage report, the original request, and any user answers or brainstorm note
 `CHANGE_ID` is supplied, use it.
 
 ## Process
+When asked to revise an existing change, follow `.agents/skills/openspec-update-change/SKILL.md` instead of steps 2–3:
+update the artifacts in place, keep them coherent, and validate.
+
 1. Read `.agents/skills/twoplay/SKILL.md`, the references relevant to the AREAS, and
    `references/decisions.md`. Use the terms in `GLOSSARY.md`. Plan within existing conventions. If the change needs a new or changed
    convention, say so in design.md and list it under OPEN_QUESTIONS for the steward and the user.
@@ -32,8 +35,9 @@ The triage report, the original request, and any user answers or brainstorm note
 6. **Tasks.** `tasks.md` is grouped `## N. <Area>` with `- [ ] N.M` items. Each item is small
    (≈ one focused edit), names its files, and is tagged with its owner:
    `[engineer]` for logic/Convex/runes, `[designer]` for markup/Tailwind/a11y.
-   Order server before client (types flow client-ward). End with a `## N. Verification` group
-   listing `pnpm check`, `pnpm format:check`, `pnpm build`, and a check per Scenario.
+   Order server before client (types flow client-ward). Every Scenario gets a Vitest test task, ordered before its
+   implementation task. End with a `## N. Verification` group listing `pnpm test`, `pnpm check`,
+   `pnpm format:check`, `pnpm build`, and live QA for user-visible scenarios.
    Mark groups that touch disjoint files as `(parallel-safe)`.
 7. **No behavior change?** For a pure refactor, tooling, or docs change with no observable behavior
    change, set `skip_specs: true` in `openspec/changes/<id>/.openspec.yaml` instead of inventing spec
