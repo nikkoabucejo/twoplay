@@ -44,6 +44,11 @@ afterEach(() => {
 });
 
 describe("Mood", () => {
+	test("hides the backdrop from assistive tech", () => {
+		const { backdrop } = renderMood(null);
+		expect(backdrop).toHaveAttribute("aria-hidden", "true");
+	});
+
 	test("keeps both seats' colors while a turn is in progress", () => {
 		const { backdrop } = renderMood({ type: "turn", player: 0 });
 		expect(backdrop).not.toHaveClass("grayscale");

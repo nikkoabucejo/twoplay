@@ -52,33 +52,45 @@ const neighborhood = (control) => {
 
 // Neighbors whose box changes while a control is hovered. Running animations are paused first,
 // so only transitions the hover starts can move anything; two idle snapshots catch the rest.
+async function hoverMoves(page, control) {
+	await control.scrollIntoViewIfNeeded({ timeout: 1000 });
+	await page.mouse.move(0, 0);
+	await page.waitForTimeout(250);
+	await page.evaluate(() => document.getAnimations().forEach((a) => a.pause()));
+	const idleA = await control.evaluate(neighborhood);
+	await page.waitForTimeout(250);
+	const idleB = await control.evaluate(neighborhood);
+	await control.hover({ timeout: 1000 });
+	await page.waitForTimeout(300);
+	const hovered = await control.evaluate(neighborhood);
+	return hovered.filter((el, i) => idleA[i]?.box === idleB[i]?.box && el.box !== idleA[i]?.box);
+}
+
 async function hoverShifts(page) {
+	// A dev-server update (hot update or reload) re-injects CSS, which swaps fonts, and remounts
+	// components, which resets scroll. A control measured within a second of one is measured again.
+	let lastUpdate = 0;
+	page.on("console", (message) => {
+		if (message.text().startsWith("[vite]")) lastUpdate = Date.now();
+	});
+	page.on("framenavigated", (frame) => {
+		if (frame === page.mainFrame()) lastUpdate = Date.now();
+	});
 	await page.addStyleTag({ content: "*, html { scroll-behavior: auto !important }" });
 	const controls = await page.locator(CONTROLS).filter({ visible: true }).all();
 	const offenders = [];
 	for (const control of controls) {
-		try {
-			await control.scrollIntoViewIfNeeded({ timeout: 1000 });
-			await page.mouse.move(0, 0);
-			await page.waitForTimeout(250);
-			await page.evaluate(() => document.getAnimations().forEach((a) => a.pause()));
-			const idleA = await control.evaluate(neighborhood);
-			await page.waitForTimeout(250);
-			const idleB = await control.evaluate(neighborhood);
-			await control.hover({ timeout: 1000 });
-			await page.waitForTimeout(300);
-			const hovered = await control.evaluate(neighborhood);
-			const moved = hovered.filter(
-				(el, i) => idleA[i]?.box === idleB[i]?.box && el.box !== idleA[i]?.box
-			);
+		for (let attempt = 0; attempt < 3; attempt++) {
+			const start = Date.now();
+			const moved = await hoverMoves(page, control).catch(() => []);
+			if (lastUpdate > start - 1000) continue;
 			if (moved.length > 0) {
 				offenders.push({
 					control: await control.evaluate((el) => el.outerHTML.slice(0, 80)),
 					moved: moved.slice(0, 3).map((el) => el.html)
 				});
 			}
-		} catch {
-			continue;
+			break;
 		}
 	}
 	return offenders;

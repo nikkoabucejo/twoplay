@@ -114,6 +114,7 @@
 
 <div
 	bind:this={backdrop}
+	aria-hidden="true"
 	class={cn(
 		"pointer-events-none absolute inset-0 -z-10 overflow-hidden transition-[filter] duration-1400 ease-out",
 		isDraw && "grayscale saturate-0"
