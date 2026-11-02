@@ -556,6 +556,10 @@ describe("history", () => {
 });
 
 describe("resign", () => {
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
 	test("throws for a signed-out visitor", async () => {
 		const t = setup();
 		const { code } = await seatedRoom(t, "tictactoe");
@@ -620,6 +624,39 @@ describe("resign", () => {
 		const own = clocks.find((clock) => clock.playerId === room.players[0]);
 		expect(own).toBeDefined();
 		expect(own).not.toHaveProperty("turnedAt");
+	});
+
+	test("banks the time used on the resigning player's own turn", async () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(1_000_000);
+		const t = setup();
+		const { a, code } = await seatedRoom(t, "tictactoe", 60_000);
+		vi.setSystemTime(1_003_000);
+		await a.mutation(api.models.games.index.resign, { code });
+		const { room, game } = await roomAndGame(t, code);
+		const clocks = await clocksOf(t, game._id);
+		expect(clocks.find((clock) => clock.playerId === room.players[0])).toMatchObject({
+			remaining: 57_000
+		});
+		expect(clocks.some((clock) => clock.turnedAt !== undefined)).toBe(false);
+	});
+
+	test("an off-turn resign banks only the running clock", async () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(1_000_000);
+		const t = setup();
+		const { b, code } = await seatedRoom(t, "tictactoe", 60_000);
+		vi.setSystemTime(1_003_000);
+		await b.mutation(api.models.games.index.resign, { code });
+		const { room, game } = await roomAndGame(t, code);
+		const clocks = await clocksOf(t, game._id);
+		expect(clocks.find((clock) => clock.playerId === room.players[0])).toMatchObject({
+			remaining: 57_000
+		});
+		expect(clocks.find((clock) => clock.playerId === room.players[1])).toMatchObject({
+			remaining: 60_000
+		});
+		expect(clocks.some((clock) => clock.turnedAt !== undefined)).toBe(false);
 	});
 
 	test("does nothing once the round has already ended", async () => {

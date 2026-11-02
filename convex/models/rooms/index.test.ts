@@ -1094,6 +1094,16 @@ describe("abandon", () => {
 		expect(seats[0]?.clock?.turnedAt).toBeUndefined();
 	});
 
+	test("banks the time used on the abandoner's own turn", async () => {
+		const t = setup();
+		const { a, code } = await seatedRoom(t, "tictactoe", 60_000);
+		vi.setSystemTime(START + 3_000);
+		await a.mutation(abandon, { code });
+		const clocks = await clocksOf(t, code);
+		expect(clocks[0]).toMatchObject({ remaining: 57_000 });
+		expect(clocks.some((clock) => clock?.turnedAt !== undefined)).toBe(false);
+	});
+
 	test("awards the opponent a point for a round in progress", async () => {
 		const t = setup();
 		const { a, code } = await seatedRoom(t, "tictactoe");

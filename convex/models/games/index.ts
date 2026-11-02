@@ -294,7 +294,6 @@ export const resign = mutation({
 		const ownClock = clocks.find((clock) => clock.playerId === player._id);
 		if (!ownClock) throw new Error("You are not playing this round");
 
-		await ctx.db.patch(ownClock._id, { turnedAt: undefined });
 		await markEnded(ctx, game._id, player._id, "resign");
 		await settleRound(ctx, room, game);
 	}

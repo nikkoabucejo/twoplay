@@ -366,7 +366,6 @@ async function forfeitRoom(ctx: MutationCtx, room: Doc<"rooms">, player: Doc<"pl
 			const clocks = await clocksByGame(ctx, game._id);
 			const ownClock = clocks.find((clock) => clock.playerId === player._id);
 			if (ownClock) {
-				await ctx.db.patch(ownClock._id, { turnedAt: undefined });
 				await markEnded(ctx, game._id, player._id, "abandon");
 			}
 		}
@@ -431,7 +430,6 @@ export const sweep = internalMutation({
 								)
 						);
 						if (ownClock) {
-							await ctx.db.patch(ownClock._id, { turnedAt: undefined });
 							await markEnded(ctx, game._id, ownClock.playerId, "abandon");
 						}
 						await settleRound(ctx, room, game);
