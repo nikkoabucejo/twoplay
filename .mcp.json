@@ -26,6 +26,28 @@
 				"--userDataDir=.browser-profiles/player-b",
 				"--viewport=1280x800"
 			]
+		},
+		"browser-c": {
+			"type": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"chrome-devtools-mcp@1.12.0",
+				"--no-usage-statistics",
+				"--userDataDir=.browser-profiles/player-c",
+				"--viewport=1280x800"
+			]
+		},
+		"browser-d": {
+			"type": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"chrome-devtools-mcp@1.12.0",
+				"--no-usage-statistics",
+				"--userDataDir=.browser-profiles/player-d",
+				"--viewport=1280x800"
+			]
 		}
 	}
 }

@@ -4,7 +4,7 @@ Real-time two-player games. SvelteKit, Svelte 5 runes, Tailwind v4, shadcn-svelt
 
 ## Read
 
-- `WORKFLOW.md`: how work flows (`/dev:work`, workflows, agents).
+- `WORKFLOW.md`: how work flows (`/dev:work`, steps, agents).
 - `GLOSSARY.md`: domain, code, and workflow terms.
 - `.agents/skills/twoplay/`: architecture, conventions, backend, games, decisions.
 
@@ -30,13 +30,13 @@ Real-time two-player games. SvelteKit, Svelte 5 runes, Tailwind v4, shadcn-svelt
   skills/<name>/         project, OpenSpec, SuperSpec, stack, anti-slop
   agents/<name>.md       triage architect engineer designer steward verifier qa reviewer security
   commands/{dev,opsx}/   slash commands
-  workflows/*.js         triage, verify
+  scripts/               layout-shift.mjs (Playwright, run by the orchestrator)
   link.sh                recreate .claude symlinks after adding or renaming
   SOURCES.md             upstream origin of third-party skills
 openspec/                specs (truth) and changes (proposals)
 .codegraph/              local CodeGraph index (gitignored)
-.browser-profiles/       Chrome profiles for browser-a / browser-b (gitignored)
-.mcp.json                codegraph, browser-a, browser-b
+.browser-profiles/       Chrome profiles for browser-a…d (gitignored)
+.mcp.json                codegraph, browser-a…d
 convex/test.setup.ts     convex-test helpers: setup, signIn, seatedRoom
 ```
 

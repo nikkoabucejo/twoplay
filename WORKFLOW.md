@@ -1,16 +1,16 @@
 # Workflow
 
-Entry point: `/dev:work <request>`. The command orchestrates. OpenSpec plans and applies. Two saved workflows do the multi-agent work around it.
+Entry point: `/dev:work <request>`. The command orchestrates and OpenSpec plans and applies. Every step runs as a visible agent in the conversation, with a `▸` line when it starts and a `✓`/`✗` line when it ends. The Workflow tool is not used.
 
 ```
 /dev:work
   1 Preflight       git state · codegraph init/sync · dev server
-  2 triage          Map → Reproduce (bugs)
+  2 Triage          triage → qa reproduce (bugs)
   3 Route           user picks the OpenSpec route (recommended one first)
   4 Plan            OpenSpec artifacts via the chosen route
   5 Gate            user approves the change (skipped with --auto)
   6 Apply           openspec-apply-change, task groups to engineer/designer
-  7 verify          Verify → QA → Conform → Impact → Review → Sync
+  7 Verify          Verify → QA → Conform → Impact → Review → Sync
   8 Archive         validate · archive · commit · push (--push)
 ```
 
@@ -28,6 +28,18 @@ The flow ends when the change is archived or the user stops it.
 
 `triage` recommends one. `--auto` takes it without asking.
 
+**Polish lane.** For UI, UX, copy, layout, accessibility, and performance polish with no Convex, schema, auth, or rule change:
+
+- `ff` route, with short specs and group-level tasks
+- one `designer` owns the area
+- tests for logic only
+- feedback applied in one batch
+- a scripted layout-shift check
+- one `qa` run at the end
+- one combined review
+
+See `.agents/commands/dev/work.md`.
+
 ## OpenSpec lifecycle
 
 | OpenSpec step  | Where in `/dev:work`             | Skill followed            |
@@ -35,32 +47,34 @@ The flow ends when the change is archived or the user stops it.
 | Plan           | Plan, by route                   | see Routes                |
 | Update         | Gate → Revise, or a blocked task | `openspec-update-change`  |
 | Apply          | Apply                            | `openspec-apply-change`   |
-| Verify         | verify → Verify                  | `openspec-verify-change`  |
+| Verify         | Verify → Verify                  | `openspec-verify-change`  |
 | Sync + Archive | Archive                          | `openspec-archive-change` |
 | Status         | `/dev:status`, Resume            | `openspec status`         |
 
 `/opsx:*` commands remain available but are not needed.
 
-## triage (`.agents/workflows/triage.js`)
+## Triage (step 2)
 
 | Phase     | Agent    | Output                                                                  |
 | --------- | -------- | ----------------------------------------------------------------------- |
 | Map       | `triage` | Type, size, route, change id, areas, CodeGraph impact, risks, questions |
 | Reproduce | `qa`     | Bugs only. Reproduction steps, console and network evidence             |
 
-## verify (`.agents/workflows/verify.js`)
+## Verify (step 7)
 
-| Phase           | Agent                              | Rule                                                                                              |
-| --------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------- |
-| Verify          | `verifier` → `engineer`            | `pnpm test`, check, format, build, and a test per scenario. Max 3 fix loops.                      |
-| QA              | `qa` → `engineer`                  | User-visible scenarios in `browser-a` + `browser-b`. Max 2 fix loops. `blocked` if no dev server. |
-| Conform         | `steward`                          | Anti-slop and conventions on the changed lines. Behavior unchanged.                               |
-| Impact          | `triage`                           | `codegraph impact` for each changed exported symbol. Lists callers outside the diff.              |
-| Review          | `reviewer`, `security`, `designer` | Security runs if Convex, auth, or env changed. Designer runs if UI changed.                       |
-| Verify findings | skeptic per finding                | Only critical, high, and important findings are verified. Real ones are fixed. Max 2 rounds.      |
-| Sync            | `steward`                          | Updates the `twoplay` references and `decisions.md`.                                              |
+Each phase is one or more agent calls in order. Agents in the same phase run in parallel. Work is split across them, never given to one agent whole. Layout shift for signed-out pages: `node .agents/scripts/layout-shift.mjs` (needs a running server; `BASE=` selects it).
 
-End states: `verified`, `verify-failed`, `qa-failed`, and `review-unresolved`.
+| Phase           | Agent                                        | Rule                                                                                                              |
+| --------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Verify          | `verifier` ×N (parallel) → `engineer`        | One commands verifier plus evidence verifiers split by capability. Max 3 fix loops.                               |
+| QA              | script + `qa` ×pairs (parallel) → `engineer` | Signed-out, layout-shift, and metadata checks by script; live slices, one `qa` per browser pair. Max 2 fix loops. |
+| Conform         | `steward`                                    | Anti-slop and conventions on the changed lines. Behavior unchanged.                                               |
+| Impact          | `triage`                                     | `codegraph impact` for each changed exported symbol. Lists callers outside the diff.                              |
+| Review          | `reviewer`, `security`, `designer`           | Security runs if Convex, auth, or env changed. Designer runs if UI changed.                                       |
+| Verify findings | skeptic per finding                          | Only critical, high, and important findings are verified. Real ones are fixed. Max 2 rounds.                      |
+| Sync            | `steward`                                    | Updates the `twoplay` references and `decisions.md`.                                                              |
+
+It stops on a failed verify or QA after its loops, or asks the user when review findings stay unresolved.
 
 ## Testing
 
@@ -69,9 +83,9 @@ End states: `verified`, `verify-failed`, `qa-failed`, and `review-unresolved`.
 | Convex functions  | Vitest + convex-test (edge-runtime) | `convex/**/*.test.ts`     |
 | Plain TS          | Vitest (node)                       | `src/**/*.test.ts`        |
 | Components, runes | Vitest + Testing Library (jsdom)    | `src/**/*.svelte.test.ts` |
-| Live app          | `qa` agent, chrome-devtools MCP     | `browser-a`, `browser-b`  |
+| Live app          | `qa` agent, chrome-devtools MCP     | `browser-a`…`browser-d`   |
 
-QA sign-in (Clerk dev instance): `player-a+clerk_test@example.com` / `player-b+clerk_test@example.com`, code `424242`.
+QA browser pairs: pair 1 is `browser-a` + `browser-b`, pair 2 is `browser-c` + `browser-d`. One `qa` agent per pair, never shared. QA sign-in (Clerk dev instance, existing test users, email code `424242`): `player.a+clerk_test@gmail.com` (Alex, `browser-a`), `player.b+clerk_test@gmail.com` (Blair, `browser-b`), `player.c+clerk_test@gmail.com` (Casey, `browser-c`), `player.d+clerk_test@gmail.com` (Drew, `browser-d`). Clerk rejects `example.com`, and sign-up from the QA browsers hits a captcha, so create new test users with the Clerk Backend API.
 
 ## Commands
 
