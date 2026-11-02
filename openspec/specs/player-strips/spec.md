@@ -51,7 +51,7 @@ Each strip SHALL show, on one line without wrapping: the player's emoji box, the
 
 ### Requirement: Strip status line
 
-Each strip's secondary line SHALL show exactly one of: "Your turn" (the viewer's own strip on the viewer's turn), "To move" (any other strip whose turn it is), "Waiting" (seat 1 while the room waits for an opponent), "Won", "Lost", or "Draw" (when the round is over), or the seat's match score otherwise. A closed waiting room SHALL leave seat 1's line blank.
+Each strip's secondary line SHALL show exactly one of: "Reconnecting…" (a quiet opponent mid-round), "You must capture" (the viewer's checkers turn when every move captures), "Your turn", "To move" (another strip's turn), "Waiting" (seat 1 before an opponent joins), "Won", "Lost", or "Draw" (round over), or the seat's match score. A closed waiting room SHALL leave seat 1's line blank.
 
 #### Scenario: Viewer's turn
 
@@ -73,28 +73,24 @@ Each strip's secondary line SHALL show exactly one of: "Your turn" (the viewer's
 - **WHEN** the room is waiting for a second player
 - **THEN** seat 1's line reads "Waiting"
 
-### Requirement: Turn ring
+#### Scenario: Forced capture
 
-The strip whose seat is to move SHALL be outlined by a ring in that seat's color. No strip SHALL show the ring while the round is over or the room is waiting.
+- **WHEN** it is the viewer's checkers turn and every legal move is a capture
+- **THEN** the viewer's strip line reads "You must capture" and the opponent's strip shows no such line
 
-#### Scenario: Ring follows the turn
+#### Scenario: Spectator sees no capture prompt
 
-- **WHEN** the status changes from seat 0's turn to seat 1's turn
-- **THEN** seat 1's strip shows the ring in the seat 1 color and seat 0's strip shows none
-
-#### Scenario: No ring after the round
-
-- **WHEN** the round ends in a draw
-- **THEN** neither strip shows the ring
+- **WHEN** a spectator watches a checkers turn where every legal move is a capture
+- **THEN** the mover's strip line reads "To move"
 
 ### Requirement: Status announced once
 
-The room SHALL expose exactly one `role="status"` element whose text is the current status ("Your turn", "Alex's turn", "You won", "Alex won", "Draw", "Waiting for an opponent", or empty for a closed room). Every visual status label in the strips SHALL be hidden from assistive technology.
+The room SHALL expose exactly one `role="status"` element for the game status, whose text is the current status, such as "Your turn", "Your turn. You must capture.", "Alex's turn", "You won", "Draw", "Waiting for an opponent", or empty for a closed room. The strips' visual status labels SHALL be hidden from assistive technology. A hidden disconnect announcement SHALL be the only other `role="status"` element.
 
 #### Scenario: One status region
 
 - **WHEN** a room renders on seat 1's turn for a viewer in seat 0 and seat 1 is "Blair"
-- **THEN** exactly one element has role `status`, its text is "Blair's turn", and the strip labels are `aria-hidden`
+- **THEN** exactly one game status element reads "Blair's turn", the disconnect announcement is empty, and the strip labels are `aria-hidden`
 
 ### Requirement: Board fills the width on phones
 
@@ -112,12 +108,22 @@ The board area SHALL have no emoji columns beside it. Below the `sm` breakpoint,
 
 ### Requirement: Round controls below the board
 
-The previous-round and next-round buttons, the round action button (Resign, Rematch, Abandon, Go live, or Play again), the round counter, and the error slot SHALL render below the lower strip. Clocks SHALL NOT render in the round controls row.
+Below `lg`, a round controls row SHALL render below the lower strip with, in order: "First move", "Previous move", the round action (Resign, Rematch, Abandon, Go live, or Play again) or a spectator's "Spectating" pill, "Next move", and "Live", followed by a notice line, with no clocks. The round counter and navigation SHALL render in the room bar. From `lg`, the replay buttons, round action, and notice line SHALL render at the bottom of the side panel instead.
 
 #### Scenario: Controls under the lower strip
 
-- **WHEN** a live round renders
-- **THEN** the round controls row, the "Round N of M" counter, and the error slot follow the lower strip in document order, and the controls row contains no clock
+- **WHEN** a live round renders at 360x640
+- **THEN** the round controls row and the notice line follow the lower strip in document order, and the controls row contains no clock and no round counter
+
+#### Scenario: Spectator pill
+
+- **WHEN** a spectator views a live round
+- **THEN** the action slot shows a "Spectating" pill and no disabled Resign, Rematch, or Abandon button
+
+#### Scenario: Rematch in one click
+
+- **WHEN** a round has ended, the viewer has hidden the result card with "View board", and clicks Rematch in the controls row
+- **THEN** the rematch request is sent with no menu in between
 
 ### Requirement: Same strips on desktop
 
@@ -127,3 +133,36 @@ At `sm` and wider, the room SHALL render the same two strips above and below the
 
 - **WHEN** a seated player views a live room at 1280x800
 - **THEN** one strip is above the board, one is below, and both are as wide as the board
+
+### Requirement: Resign and Abandon need confirmation
+
+Choosing Resign or Abandon from the round action menu SHALL ask for confirmation ("Resign this round?" or "Leave and close this room?") with a confirm and a Cancel button, and SHALL send the request only on confirm.
+
+#### Scenario: Cancel a resignation
+
+- **WHEN** a seated viewer chooses Resign and then Cancel
+- **THEN** no resign request is sent and the round continues
+
+#### Scenario: Confirm a resignation
+
+- **WHEN** a seated viewer chooses Resign and then confirms
+- **THEN** one resign request is sent
+
+### Requirement: Disconnect notice
+
+While a seated viewer's opponent has gone quiet during play, the opponent's strip SHALL read "Reconnecting…" with an amber dot that pulses only when motion is allowed, and its emoji, name, and clock SHALL dim by opacity inside the strip's fixed box. A visually hidden `role="status"` element SHALL announce "<name> disconnected". The notice line SHALL carry only the room error, as a compact inline alert, and SHALL keep its box while empty. A finished round keeps its result line.
+
+#### Scenario: Opponent drops
+
+- **WHEN** the viewer is seated and opponent "Alex" has not sent a heartbeat for over 30 seconds during play
+- **THEN** Alex's strip line reads "Reconnecting…", the strip dims, a `role="status"` element reads "Alex disconnected", the notice line stays empty, and no layout-shift entry is recorded
+
+#### Scenario: Opponent returns
+
+- **WHEN** Alex's heartbeat arrives again
+- **THEN** Alex's strip shows its usual line at full opacity and the announcement is empty
+
+#### Scenario: Reduced motion
+
+- **WHEN** `prefers-reduced-motion: reduce` is emulated and the opponent drops
+- **THEN** the amber dot holds still

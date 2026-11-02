@@ -64,7 +64,7 @@ When the viewer is signed out, the header SHALL show a Sign in button that opens
 
 ### Requirement: Avatar menu
 
-When signed in, the header SHALL show the user's avatar as a button whose accessible name includes the user's display name, opening a menu with exactly two items: Account and Sign out.
+When signed in, the header SHALL show the user's avatar as a button whose accessible name includes the user's display name, opening a menu with exactly four items in order: My stats, Settings, Account, and Sign out.
 
 #### Scenario: Avatar button has an accessible name
 
@@ -74,7 +74,7 @@ When signed in, the header SHALL show the user's avatar as a button whose access
 #### Scenario: Menu actions
 
 - **WHEN** the user opens the avatar menu
-- **THEN** Account opens the account profile and Sign out signs the user out
+- **THEN** My stats goes to `/me`, Settings goes to `/settings`, Account opens the account profile, and Sign out signs the user out
 
 #### Scenario: No Support item in the menu
 
@@ -144,12 +144,27 @@ The tab bar SHALL be hidden on game-room routes (any route with a room code segm
 
 ### Requirement: Footer
 
-Non-game routes SHALL end with a footer holding the Support link, the copyright, and only those internal links that the header and tab bar do not render. Every internal footer link SHALL point to a page that exists. Game-room routes SHALL NOT render the footer.
+Non-game routes SHALL show a fixed footer bar below the scrolling main region, with How to play, Tour, About, Privacy, and Terms on the left and Support on the right; below `sm` Support shows only its icon. The footer SHALL hold only existing internal pages that the header, tab bar, and avatar menu do not link, and no copyright. Game-room routes SHALL NOT render the footer.
+
+#### Scenario: Footer links
+
+- **WHEN** any non-game page renders
+- **THEN** the footer links to `/how-to-play`, `/tour`, `/about`, `/privacy`, `/terms`, and the Ko-fi page
+
+#### Scenario: Footer layout
+
+- **WHEN** any non-game page renders at 360px or wider
+- **THEN** the info links sit together on the left and Support on the right in one compact row, no copyright is shown, and the page has no horizontal scroll
+
+#### Scenario: Support is icon-only on mobile
+
+- **WHEN** any non-game page renders below the `sm` breakpoint
+- **THEN** the Support link shows the Ko-fi icon with its "Support" label visually hidden but still in its accessible name
 
 #### Scenario: Footer does not repeat header or tab bar links
 
 - **WHEN** a signed-in user loads `/history`
-- **THEN** the footer contains no href that the header (wordmark or primary links) or the tab bar also renders
+- **THEN** the footer contains no href that the header (wordmark, primary links, or avatar menu) or the tab bar also renders
 
 #### Scenario: Footer links resolve
 
@@ -163,7 +178,7 @@ Non-game routes SHALL end with a footer holding the Support link, the copyright,
 
 ### Requirement: One navigation surface per destination
 
-At any viewport width, each in-app destination SHALL be linked from at most one of the header, the tab bar, and the footer. The avatar menu SHALL hold only account actions (Account and Sign out), not page links.
+At any viewport width, each in-app destination SHALL be linked from at most one of the header (including the avatar menu), the tab bar, and the footer. The avatar menu SHALL hold only the viewer's own pages and account actions (My stats, Settings, Account, Sign out).
 
 #### Scenario: No duplicate links on mobile
 
