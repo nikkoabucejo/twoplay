@@ -20,7 +20,7 @@
 				<span class="title-player1">TWO</span><span class="title-player2">PLAY</span>
 			</h1>
 		</div>
-		<p class="text-muted-foreground">Real-time two-player games in the browser.</p>
+		<p class="text-muted-foreground">Real-time two-player games.</p>
 	</div>
 
 	<div class="flex items-center justify-center gap-8 sm:gap-12">
