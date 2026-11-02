@@ -266,6 +266,27 @@ describe("Checkers", () => {
 		expect(screen.queryAllByRole("grid")).toHaveLength(0);
 	});
 
+	test("the last move's dark squares show the mover's tint, with no override", async () => {
+		signIn();
+		const first = checkersEngine.applyMove(checkersEngine.createInitialState(), 0, {
+			kind: "checkers",
+			from: idx(5, 0),
+			to: idx(4, 1)
+		});
+		setQueryResult(api.models.rooms.index.get, roomSnapshot(first));
+		setQueryResult(api.models.games.index.history, historyOf([first]));
+		render(Checkers, { props: { roomCode: "ABCD" } });
+
+		const from = await screen.findByRole("button", { name: "a3, empty" });
+		const to = screen.getByRole("button", { name: "b4, cyan man" });
+		for (const square of [from, to]) {
+			expect(square).toHaveClass("bg-seat-0/10");
+			expect(square).not.toHaveClass("bg-foreground/15");
+			expect(square.className).not.toMatch(/\b\w+:bg-/);
+		}
+		expect(screen.getByRole("button", { name: "c5, empty" })).toHaveClass("bg-foreground/15");
+	});
+
 	test("board cells sit inside a click-sound opt-out region", async () => {
 		signIn();
 		setQueryResult(api.models.rooms.index.get, roomSnapshot(checkersEngine.createInitialState()));

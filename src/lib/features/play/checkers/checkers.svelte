@@ -326,7 +326,7 @@
 								data-slot-index={slot}
 								tabindex={slot === focusedSlot ? 0 : -1}
 								class={cn(
-									"relative flex items-center justify-center bg-foreground/10 outline-none hover:bg-foreground/15 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset dark:bg-foreground/15",
+									"relative flex items-center justify-center bg-foreground/15 outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset",
 									isLastMove && room.lastMove && ACCENTS[room.lastMove.seat].tintBg
 								)}
 								aria-label={squareLabel(index, cell, room.abilityOf(index))}
