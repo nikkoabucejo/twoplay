@@ -2,7 +2,8 @@
 // route twice in a signed-in copy of a .browser-profiles profile: once with the Convex websocket
 // held (queries never resolve, so the skeleton stays), once live. Pairs [data-loading="x"] in the
 // held page with [data-loaded="x"] in the live page and reports:
-//   region  the two roots' boxes differ
+//   region  the two roots' boxes differ in position or width
+//   length  (note, not a failure) only the height differs: the list has more or fewer rows
 //   leaves  a skeleton leaf's top or height differs from the loaded leaf on its row, or a loaded
 //           leaf has no skeleton leaf on its row (missing placeholder)
 //   around  an element outside both regions moved between the two pages
@@ -52,17 +53,55 @@ function snapshot(attribute) {
 	const regions = [...document.querySelectorAll(`[${attribute}]`)].filter(isVisible);
 	const inRegion = (el) => el.closest("[data-loading], [data-loaded]") !== null;
 
+	// A badge or chip with its own fill or border shows its whole box.
+	const isPainted = (el) => {
+		const style = getComputedStyle(el);
+		const clear = /rgba\(.*, 0\)$|transparent/;
+		return (
+			(!clear.test(style.backgroundColor) || style.backgroundImage !== "none" || parseFloat(style.borderTopWidth) > 0) &&
+			el.tagName !== "TD" && el.tagName !== "TR" && el.tagName !== "LI"
+		);
+	};
+	// A control (Button, input) is one box, and so is a painted text box. Other text is its line box: the text's vertical center, one
+	// line-height tall per line, so a padded cell compares like the line inside it.
+	const ATOMIC = "[data-slot=button], input, select, textarea";
+	const textBox = (el) => {
+		const rects = [...el.childNodes]
+			.filter((n) => n.nodeType === 3 && n.textContent.trim())
+			.flatMap((n) => {
+				const range = document.createRange();
+				range.selectNodeContents(n);
+				return [...range.getClientRects()];
+			});
+		const top = Math.min(...rects.map((r) => r.top));
+		const bottom = Math.max(...rects.map((r) => r.bottom));
+		const left = Math.min(...rects.map((r) => r.left));
+		const right = Math.max(...rects.map((r) => r.right));
+		const lineHeight = parseFloat(getComputedStyle(el).lineHeight) || bottom - top;
+		const lines = new Set(rects.map((r) => Math.round(r.top))).size;
+		const h = lineHeight * lines;
+		return { x: left, y: (top + bottom) / 2 - h / 2, w: right - left, h };
+	};
+	// Pinned rows (sticky, fixed) float over the list, so a skeleton doesn't mirror them.
+	const isPinned = (el, root) => {
+		for (let node = el; node && node !== root; node = node.parentElement) {
+			if (/sticky|fixed/.test(getComputedStyle(node).position)) return true;
+		}
+		return false;
+	};
 	const leavesOf = (root) =>
 		[...root.querySelectorAll("*")]
 			.filter((el) => !(el instanceof SVGElement) || el instanceof SVGSVGElement)
-			.filter(isVisible)
-			.filter((el) => {
+			.filter((el) => !el.parentElement.closest("svg") && !el.parentElement.closest(ATOMIC))
+			.filter((el) => isVisible(el) && !isPinned(el, root))
+			.flatMap((el) => {
+				if (el.matches(ATOMIC) || el instanceof SVGSVGElement || isPainted(el)) {
+					return [{ ...box(el), html: describe(el) }];
+				}
 				const hasText = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
-				const visibleChildren = [...el.children].filter(isVisible);
-				return hasText || visibleChildren.length === 0 || el instanceof SVGSVGElement;
-			})
-			.filter((el) => !el.parentElement.closest("svg"))
-			.map((el) => ({ ...box(el), html: describe(el) }));
+				if (hasText) return [{ ...textBox(el), html: describe(el) }];
+				return [...el.children].some(isVisible) ? [] : [{ ...box(el), html: describe(el) }];
+			});
 
 	const path = (el) => {
 		const parts = [];
@@ -101,17 +140,25 @@ const round = (b) => [b.x, b.y, b.w, b.h].map((n) => +n.toFixed(1)).join(",");
 
 function compare(loading, loaded) {
 	const issues = [];
-	if (off(loading.x, loaded.x) || off(loading.y, loaded.y) || off(loading.w, loaded.w) || off(loading.h, loaded.h)) {
+	if (off(loading.x, loaded.x) || off(loading.y, loaded.y) || off(loading.w, loaded.w)) {
 		issues.push({ kind: "region", loading: round(loading), loaded: round(loaded) });
+	} else if (off(loading.h, loaded.h)) {
+		// Only the height differs: a list with more or fewer rows than the skeleton. Not a misfit by
+		// itself; `around` reports anything it pushed, and rows are checked below.
+		issues.push({ kind: "length", note: true, loading: round(loading), loaded: round(loaded) });
 	}
 	// Rows: a loaded leaf matches the skeleton leaf that overlaps it horizontally with the
-	// closest top; text bars may differ in width, so only top and height must agree.
+	// closest top; text bars may differ in width, so only top and height must agree. Rows past
+	// the shorter of the two lists aren't compared.
 	const overlapX = (a, b) => Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x) > 0;
 	const near = (a, b) => Math.abs(a.y - b.y) + Math.abs(a.y + a.h - (b.y + b.h));
 	const dx = loaded.x - loading.x;
 	const dy = loaded.y - loading.y;
+	const skeletonBottom = Math.max(...loading.leaves.map((bar) => bar.y + bar.h));
+	const bottom = Math.min(loading.y + loading.h, loaded.y + loaded.h - dy, skeletonBottom);
 	for (const real of loaded.leaves) {
 		const shifted = { ...real, x: real.x - dx, y: real.y - dy };
+		if (shifted.y + shifted.h > bottom) continue;
 		const candidates = loading.leaves.filter(
 			(bar) => overlapX(bar, shifted) && bar.y < shifted.y + shifted.h && bar.y + bar.h > shifted.y
 		);
@@ -120,7 +167,10 @@ function compare(loading, loaded) {
 			continue;
 		}
 		const bar = candidates.reduce((a, b) => (near(a, shifted) <= near(b, shifted) ? a : b));
-		if (off(bar.y, shifted.y) || off(bar.h, shifted.h)) {
+		// Smaller inline text (a "YOU" tag on a name) sits centered in the larger line's bar.
+		const inside = bar.y <= shifted.y + TOLERANCE && bar.y + bar.h >= shifted.y + shifted.h - TOLERANCE;
+		const centered = !off(bar.y + bar.h / 2, shifted.y + shifted.h / 2);
+		if ((off(bar.y, shifted.y) || off(bar.h, shifted.h)) && !(inside && centered)) {
 			issues.push({ kind: "leaves", loaded: real.html, at: round(shifted), skeleton: bar.html, bar: round(bar) });
 		}
 	}
@@ -205,8 +255,13 @@ try {
 		});
 		try {
 			for (const route of routes) {
-				const held = await capture(context, route, "data-loading", true);
-				const live = await capture(context, route, "data-loaded", false);
+				// A dev-server reload mid-capture destroys the page; capture that state again, up to twice.
+				const retry = (attribute, holdSocket) => {
+					const attempt = () => capture(context, route, attribute, holdSocket);
+					return attempt().catch(attempt).catch(attempt);
+				};
+				const held = await retry("data-loading", true);
+				const live = await retry("data-loaded", false);
 				const viewport = `${width}x${height}`;
 				const pairs = held.regions.map((loading) => ({
 					loading,
@@ -228,8 +283,8 @@ try {
 					issues.push({ kind: "unpaired", hint: `no [data-loading] while queries were held; see ${stem}-loading.png` });
 				}
 				issues.push(...moved(held.around, live.around).slice(0, 8));
-				if (issues.length) failed = true;
-				console.log(JSON.stringify({ route, viewport, regions: pairs.map((p) => p.loading.name), ok: issues.length === 0, issues: issues.slice(0, 20) }));
+				if (issues.some((issue) => !issue.note)) failed = true;
+				console.log(JSON.stringify({ route, viewport, regions: pairs.map((p) => p.loading.name), ok: !issues.some((issue) => !issue.note), issues: issues.slice(0, 20) }));
 			}
 		} finally {
 			await context.close();

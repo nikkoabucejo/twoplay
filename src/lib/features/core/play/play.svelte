@@ -471,7 +471,13 @@
 		</div>
 		<div class="flex flex-col gap-2" aria-hidden="true">
 			<Skeleton variant="text" class="h-4 w-28" />
-			<Skeleton class="h-7.5 w-full rounded-lg" />
+			<div class="flex w-full rounded-lg border">
+				{#each CLOCK_OPTIONS as option (option.value)}
+					<div class="flex flex-1 justify-center px-3 py-1.5">
+						<Skeleton variant="text" class="h-4 w-10" />
+					</div>
+				{/each}
+			</div>
 		</div>
 		<div class="flex flex-col gap-2" aria-hidden="true">
 			<Skeleton class="h-9 w-full rounded-lg" />
