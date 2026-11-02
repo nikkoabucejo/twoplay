@@ -67,6 +67,11 @@ During the build, nine named agent cursors SHALL join one at a time about one se
 
 An agent with no step it can start SHALL assist instead (`measure`, `comment`, `inspect`, or `pair` on a running type, draw, code, or gradient step), and SHALL wander only when no assist is free. Assists SHALL target only built elements in the work window, one agent per target, and SHALL NOT repeat a kind on a target within 6 s. Assists SHALL NOT count toward progress or a section's review.
 
+#### Scenario: Inspect stays occasional
+
+- **WHEN** agents assist during a build
+- **THEN** at most one inspect panel is open at a time, with at least 4 s between inspects across the team
+
 #### Scenario: Idle agent assists
 
 - **WHEN** an agent has no step it can start and a built element is in the work window

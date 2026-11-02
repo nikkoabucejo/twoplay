@@ -109,6 +109,8 @@ const FADE_MS = 400;
 /** Agents only pick steps whose element starts above the visible bottom plus this share of it. */
 const LOOK_AHEAD = 0.15;
 const ASSIST_COOLDOWN_MS = 6000;
+/** One inspect panel at a time, with at least this long between them across the team. */
+const INSPECT_GAP_MS = 4000;
 /** An agent pauses this long after an assist, so one that does nothing can't spin the loop. */
 const ASSIST_REST_MS = 120;
 /** `measure` only spans gaps a redline can show. */
@@ -291,6 +293,8 @@ export class AboutBuild {
 	#assists: Partial<Record<AssistKind, AssistWork>>;
 	/** Elements and steps an agent is assisting on right now. */
 	#assisted = new Set<object>();
+	#isInspecting = false;
+	#nextInspectMs = 0;
 	/** When each element or step may take each assist kind again. */
 	#cooldowns = new Map<object, Map<AssistKind, number>>();
 
@@ -737,6 +741,8 @@ export class AboutBuild {
 		});
 		const isFree = (kind: AssistKind, target: object) => {
 			const readyAt = this.#cooldowns.get(target)?.get(kind);
+			if (kind === "inspect" && (this.#isInspecting || this.#clockMs < this.#nextInspectMs))
+				return false;
 			return !this.#assisted.has(target) && (readyAt === undefined || readyAt <= this.#clockMs);
 		};
 		for (const kind of agent.assists) {
@@ -766,11 +772,17 @@ export class AboutBuild {
 
 	async #runAssist(cursor: AgentCursor, assist: Assist, run: Run): Promise<void> {
 		const target = assist.joins ?? assist.el;
+		const isInspect = assist.kind === "inspect";
 		this.#assisted.add(target);
+		if (isInspect) this.#isInspecting = true;
 		cursor.focusY = run.box(assist.el).y;
 		await this.#assists[assist.kind]?.(cursor, assist, run);
 		cursor.focusY = null;
 		this.#assisted.delete(target);
+		if (isInspect) {
+			this.#isInspecting = false;
+			this.#nextInspectMs = this.#clockMs + INSPECT_GAP_MS;
+		}
 		const cooldowns = this.#cooldowns.get(target) ?? new Map<AssistKind, number>();
 		cooldowns.set(assist.kind, this.#clockMs + ASSIST_COOLDOWN_MS);
 		this.#cooldowns.set(target, cooldowns);
@@ -994,6 +1006,8 @@ export class AboutBuild {
 		this.#stepsAtReview = null;
 		this.#base = { from: 1, to: 1, atMs: 0 };
 		this.#assisted.clear();
+		this.#isInspecting = false;
+		this.#nextInspectMs = 0;
 		this.#cooldowns.clear();
 
 		for (const el of this.#targets.values()) el.removeAttribute("data-build-state");

@@ -897,6 +897,16 @@ describe("AboutBuild assists", RUN_TIMEOUT, () => {
 		expect(overlaps()).toBe(0);
 	});
 
+	test("one inspect panel at a time, at least 4 s apart across the team", async () => {
+		const { build, assists } = recordWork();
+		trackScroll(build);
+		build.start();
+		await vi.advanceTimersByTimeAsync(90_000);
+		const starts = assists.filter((assist) => assist.kind === "inspect").map((assist) => assist.at);
+		expect(starts.length).toBeGreaterThan(0);
+		for (let i = 1; i < starts.length; i++) expect(starts[i] - starts[i - 1]).toBeGreaterThan(4000);
+	});
+
 	test("an assist kind does not repeat on the same element within its cooldown", async () => {
 		const { build, assists } = recordWork();
 		trackScroll(build);

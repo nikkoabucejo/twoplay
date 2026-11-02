@@ -55,7 +55,7 @@ export const TEAM: readonly BuildAgent[] = [
 		color: "#d97706",
 		joinAt: 0,
 		roles: ["scan", "frame", "type"],
-		assists: ["measure", "inspect", "pair"]
+		assists: ["measure", "pair", "inspect"]
 	},
 	{
 		name: "architect",
@@ -90,7 +90,7 @@ export const TEAM: readonly BuildAgent[] = [
 		color: "#2563eb",
 		joinAt: 5000,
 		roles: ["check", "contrast", "type"],
-		assists: ["inspect", "pair"]
+		assists: ["pair", "inspect"]
 	},
 	{
 		name: "qa",
@@ -111,7 +111,7 @@ export const TEAM: readonly BuildAgent[] = [
 		color: "#dc2626",
 		joinAt: 8000,
 		roles: ["secure", "contrast", "check", "fill", "type"],
-		assists: ["inspect", "pair"]
+		assists: ["pair", "inspect"]
 	}
 ];
 
