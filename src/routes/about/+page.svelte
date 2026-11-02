@@ -1,8 +1,12 @@
 <script lang="ts">
 	import { Page } from "$lib/components/layout";
 	import { Meta } from "$lib/components/ui";
-	import { About } from "$lib/features/core";
+	import { About, PREPAINT_SCRIPT } from "$lib/features/core";
 </script>
+
+<svelte:head>
+	{@html PREPAINT_SCRIPT}
+</svelte:head>
 
 <Meta
 	title="About"

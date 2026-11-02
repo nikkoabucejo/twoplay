@@ -6,6 +6,7 @@ export {
 	NEW_GAME_CLOCKS,
 	NEW_GAME_OPPONENTS,
 	parsePreferences,
+	PREFERENCES_KEY,
 	PreferencesStore,
 	setupPreferences,
 	type LastPlay,

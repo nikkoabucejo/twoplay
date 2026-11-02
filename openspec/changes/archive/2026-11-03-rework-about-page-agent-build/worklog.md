@@ -1,0 +1,3 @@
+- PLAN done
+- APPLY done
+- VERIFY done (tests 154/154 about+storage, full suite 2088 pass, check 0/0, build ok, CLS 0 at 1280x800 and 360x640, run 42.8s / 46.4s, live QA on preview)

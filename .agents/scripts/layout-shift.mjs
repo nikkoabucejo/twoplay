@@ -5,7 +5,8 @@
 // its edge (data-frame="edge" opts out), if sibling frames in a row don't share their top and
 // bottom, or if a [data-piece] sits more than 0.5px off its square's center. [data-float] is skipped;
 // faded-out boxes are not.
-// Usage: node .agents/scripts/layout-shift.mjs [routes,comma,separated] [--block-clerk] [--hover] [--overflow]
+// With --wait=<ms>, waits that long after load instead of 6000 ms (e.g. --wait=45000 for the /about build).
+// Usage: node .agents/scripts/layout-shift.mjs [routes,comma,separated] [--block-clerk] [--hover] [--overflow] [--wait=<ms>]
 // Env: BASE (default http://localhost:5173), BUDGET (default 0.01). Exits 1 if any route exceeds BUDGET.
 import { chromium } from "playwright-core";
 
@@ -35,6 +36,8 @@ const routes = routeArg
 const blockClerk = process.argv.includes("--block-clerk");
 const checkHover = process.argv.includes("--hover");
 const checkOverflow = process.argv.includes("--overflow");
+const waitArg = process.argv.find((arg) => arg.startsWith("--wait="));
+const WAIT_MS = waitArg ? Number(waitArg.slice("--wait=".length)) : 6000;
 const CONTROLS = "a[href], button, summary, label, [role=tab], [role=button], [role=menuitem]";
 
 // Boxes of the control and its layout neighborhood (the grandparent's subtree), skipping
@@ -258,7 +261,7 @@ async function measure(route, width, height) {
 		const page = await context.newPage();
 		await page.addInitScript(observer);
 		await page.goto(BASE + route, { waitUntil: "load" });
-		await page.waitForTimeout(6000);
+		await page.waitForTimeout(WAIT_MS);
 		const shifts = await page.evaluate(() => window.__shifts);
 		const score = shifts.reduce((sum, s) => sum + s.value, 0);
 		const overflow = checkOverflow ? await overflowCheck(page) : undefined;
@@ -275,7 +278,7 @@ for (const [width, height] of viewports) {
 		const attempt = () =>
 			Promise.race([
 				measure(route, width, height),
-				new Promise((_, reject) => setTimeout(() => reject(new Error("timed out")), 120_000))
+				new Promise((_, reject) => setTimeout(() => reject(new Error("timed out")), 120_000 + WAIT_MS))
 			]);
 		const result = await attempt().catch(attempt).catch(attempt);
 		if (result.score > BUDGET || result.overflow || result.hover?.length) failed = true;

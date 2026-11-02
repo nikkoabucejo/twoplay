@@ -6,7 +6,7 @@ export { Home } from "./home/index.js";
 export { Stats } from "./stats/index.js";
 export { Door, Lesson, RULES, type GameRules } from "./rules/index.js";
 export { Tour } from "./tour/index.js";
-export { About } from "./about/index.js";
+export { About, PREPAINT_SCRIPT } from "./about/index.js";
 export { Legal, type LegalHighlight, type LegalSection } from "./legal/index.js";
 export { Settings } from "./settings/index.js";
 export { Sandbox } from "./sandbox/index.js";

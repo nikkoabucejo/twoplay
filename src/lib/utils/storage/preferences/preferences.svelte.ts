@@ -22,7 +22,7 @@ export type Preferences = {
 };
 type PreferencesStorage = Pick<Storage, "getItem" | "setItem">;
 
-const STORAGE_KEY = "twoplay:prefs";
+export const PREFERENCES_KEY = "twoplay:prefs";
 const DEFAULT_PREFERENCES: Preferences = {
 	sound: true,
 	lastPlay: null,
@@ -117,7 +117,7 @@ export class PreferencesStore {
 		this.#storage = storage;
 		let raw: string | null = null;
 		try {
-			raw = storage?.getItem(STORAGE_KEY) ?? null;
+			raw = storage?.getItem(PREFERENCES_KEY) ?? null;
 		} catch {
 			// Storage access throws in some privacy modes; the defaults apply.
 		}
@@ -192,7 +192,7 @@ export class PreferencesStore {
 			uiSounds: this.uiSounds
 		};
 		try {
-			this.#storage?.setItem(STORAGE_KEY, JSON.stringify(preferences));
+			this.#storage?.setItem(PREFERENCES_KEY, JSON.stringify(preferences));
 		} catch {
 			// Unwritable storage keeps the choice for this page load only.
 		}
